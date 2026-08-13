@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -140,11 +140,11 @@ export default function AdminDashboardScreen() {
         <View style={styles.headerRow}>
           <ThemedText type="title">Admin Dashboard</ThemedText>
           <View style={styles.headerActions}>
-            <Link href="/(admin)/scanner" asChild>
-              <Pressable style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
-                <ThemedText type="smallBold">Scan Receipt</ThemedText>
-              </Pressable>
-            </Link>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}
+              onPress={() => router.push('/(admin)/scanner')}>
+              <ThemedText type="smallBold">Scan Receipt</ThemedText>
+            </Pressable>
             <Pressable onPress={() => void signOut()}>
               <ThemedText type="smallBold">Sign out</ThemedText>
             </Pressable>
