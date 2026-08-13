@@ -18,13 +18,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatPaiseAsInr, todayInKolkata } from '@/lib/money';
 import { extractReceiptData } from '@/services/ocrService';
 import {
   calculateAssetValue,
   fetchLiveGoldRatePerGram,
   type GoldRateQuote,
 } from '@/services/goldRateService';
-import { createLoanWithCustomer, uploadImageToStorage } from '@/services/loanService';
+import { createLoanWithCustomer } from '@/services/loanService';
 import type { LoanFormData } from '@/types/database';
 
 const emptyForm: LoanFormData = {
@@ -34,8 +35,9 @@ const emptyForm: LoanFormData = {
   address: '',
   item_name: '',
   weight_grams: '',
-  loan_amount: '',
-  interest_rate_monthly: '3',
+  loan_amount_rupees: '',
+  interest_percent_monthly: '3',
+  disbursed_on: todayInKolkata(),
 };
 
 function FormField({
@@ -74,16 +76,15 @@ export default function AdminScannerScreen() {
 
   const [step, setStep] = useState<'camera' | 'review'>('camera');
   const [localPhotoUri, setLocalPhotoUri] = useState<string | null>(null);
-  const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
   const [form, setForm] = useState<LoanFormData>(emptyForm);
   const [goldQuote, setGoldQuote] = useState<GoldRateQuote | null>(null);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
-  const assetValue = useMemo(() => {
+  const assetValuePaise = useMemo(() => {
     const weight = Number(form.weight_grams);
     if (!goldQuote || !weight) return 0;
-    return calculateAssetValue(weight, goldQuote.pricePerGramInr);
+    return calculateAssetValue(weight, goldQuote.pricePerGramPaise);
   }, [form.weight_grams, goldQuote]);
 
   const updateForm = useCallback((key: keyof LoanFormData, value: string) => {
@@ -107,10 +108,9 @@ export default function AdminScannerScreen() {
       }
 
       setLocalPhotoUri(photo.uri);
-      const publicUrl = await uploadImageToStorage(photo.uri, 'receipts');
-      setReceiptImageUrl(publicUrl);
-
-      const extracted = await extractReceiptData(publicUrl);
+      // OCR via Edge Function (Moonshot key server-side); upload deferred until save
+      // so the object path can be namespaced by customer id.
+      const extracted = await extractReceiptData(photo.uri);
       setForm({
         serial_number: extracted.serial_number,
         customer_name: extracted.customer_name,
@@ -118,8 +118,9 @@ export default function AdminScannerScreen() {
         address: extracted.address,
         item_name: extracted.item_name,
         weight_grams: extracted.weight_grams ? String(extracted.weight_grams) : '',
-        loan_amount: extracted.loan_amount ? String(extracted.loan_amount) : '',
-        interest_rate_monthly: extracted.interest_rate ? String(extracted.interest_rate) : '3',
+        loan_amount_rupees: extracted.loan_amount ? String(extracted.loan_amount) : '',
+        interest_percent_monthly: extracted.interest_rate ? String(extracted.interest_rate) : '3',
+        disbursed_on: extracted.date || todayInKolkata(),
       });
       setStep('review');
     } catch (error) {
@@ -130,19 +131,14 @@ export default function AdminScannerScreen() {
   };
 
   const handleSave = async () => {
-    if (!receiptImageUrl) {
+    if (!localPhotoUri) {
       Alert.alert('Missing receipt', 'Capture a receipt image before saving.');
       return;
     }
 
     setIsBusy(true);
     try {
-      let signatureUrl: string | null = null;
-      if (signatureDataUrl) {
-        signatureUrl = await uploadSignatureDataUrl(signatureDataUrl);
-      }
-
-      const loanId = await createLoanWithCustomer(form, receiptImageUrl, signatureUrl);
+      const loanId = await createLoanWithCustomer(form, localPhotoUri, signatureDataUrl);
       Alert.alert('Saved', 'Girvi loan created successfully.', [
         { text: 'View loan', onPress: () => router.replace(`/(admin)/loan/${loanId}`) },
         { text: 'Dashboard', onPress: () => router.replace('/(admin)/dashboard') },
@@ -206,9 +202,9 @@ export default function AdminScannerScreen() {
           <View style={[styles.goldCard, { backgroundColor: colors.backgroundElement }]}>
             <ThemedText type="smallBold">Live Gold Rate</ThemedText>
             <ThemedText type="small">
-              ₹{goldQuote.pricePerGramInr.toLocaleString('en-IN')} / gram ({goldQuote.source})
+              {formatPaiseAsInr(goldQuote.pricePerGramPaise)} / gram ({goldQuote.source})
             </ThemedText>
-            <ThemedText type="smallBold">Estimated Asset Value: ₹{assetValue.toLocaleString('en-IN')}</ThemedText>
+            <ThemedText type="smallBold">Estimated Asset Value: {formatPaiseAsInr(assetValuePaise)}</ThemedText>
           </View>
         ) : null}
 
@@ -230,15 +226,20 @@ export default function AdminScannerScreen() {
         />
         <FormField
           label="Loan Amount (₹)"
-          value={form.loan_amount}
-          onChangeText={(v) => updateForm('loan_amount', v)}
+          value={form.loan_amount_rupees}
+          onChangeText={(v) => updateForm('loan_amount_rupees', v)}
           keyboardType="numeric"
         />
         <FormField
-          label="Interest Rate (% monthly)"
-          value={form.interest_rate_monthly}
-          onChangeText={(v) => updateForm('interest_rate_monthly', v)}
+          label="Interest Rate (% per 30 days)"
+          value={form.interest_percent_monthly}
+          onChangeText={(v) => updateForm('interest_percent_monthly', v)}
           keyboardType="numeric"
+        />
+        <FormField
+          label="Disbursed on (YYYY-MM-DD)"
+          value={form.disbursed_on}
+          onChangeText={(v) => updateForm('disbursed_on', v)}
         />
 
         <ThemedText type="smallBold">Customer Digital Signature</ThemedText>
@@ -264,14 +265,6 @@ export default function AdminScannerScreen() {
       </ScrollView>
     </ThemedView>
   );
-}
-
-async function uploadSignatureDataUrl(dataUrl: string): Promise<string> {
-  const FileSystem = await import('expo-file-system/legacy');
-  const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
-  const fileUri = `${FileSystem.cacheDirectory}signature-${Date.now()}.png`;
-  await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-  return uploadImageToStorage(fileUri, 'signatures');
 }
 
 const styles = StyleSheet.create({

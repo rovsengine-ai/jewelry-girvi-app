@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { asBps, asPaise, formatBpsAsPercent, formatPaiseAsInr } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import type { LoanWithCustomer } from '@/types/database';
@@ -22,50 +23,52 @@ import type { LoanWithCustomer } from '@/types/database';
 type CustomerTab = 'retail_customer' | 'merchant';
 
 interface Analytics {
-  totalActiveCapital: number;
-  monthlyInterestYield: number;
-  bracket3: { oneMonth: number; sixMonths: number; oneYear: number };
-  bracket4: { oneMonth: number; sixMonths: number; oneYear: number };
+  totalActiveCapitalPaise: number;
+  periodInterestYieldPaise: number;
+  bracket300: { onePeriod: number; sixPeriods: number; twelvePeriods: number };
+  bracket400: { onePeriod: number; sixPeriods: number; twelvePeriods: number };
 }
 
-function projectYield(principal: number, ratePercent: number, months: number): number {
-  return principal * (ratePercent / 100) * months;
+/** Integer paise: principal * rate_bps * periods / 10000 (truncated). Placeholder until SQL engine. */
+function projectYieldPaise(principalPaise: number, rateBps: number, periods: number): number {
+  return Math.trunc((principalPaise * rateBps * periods) / 10000);
 }
 
 function computeAnalytics(loans: LoanWithCustomer[]): Analytics {
   const activeLoans = loans.filter((loan) => loan.status === 'active');
 
-  const totalActiveCapital = activeLoans.reduce((sum, loan) => sum + Number(loan.loan_amount), 0);
+  const totalActiveCapitalPaise = activeLoans.reduce(
+    (sum, loan) => sum + asPaise(loan.principal_paise),
+    0,
+  );
 
-  const monthlyInterestYield = activeLoans.reduce((sum, loan) => {
-    const rate = Number(loan.interest_rate_monthly);
-    return sum + Number(loan.loan_amount) * (rate / 100);
+  const periodInterestYieldPaise = activeLoans.reduce((sum, loan) => {
+    return sum + projectYieldPaise(asPaise(loan.principal_paise), asBps(loan.rate_bps), 1);
   }, 0);
 
-  const bracket3Loans = activeLoans.filter((loan) => Number(loan.interest_rate_monthly) === 3);
-  const bracket4Loans = activeLoans.filter((loan) => Number(loan.interest_rate_monthly) === 4);
+  const bracket300Loans = activeLoans.filter((loan) => asBps(loan.rate_bps) === 300);
+  const bracket400Loans = activeLoans.filter((loan) => asBps(loan.rate_bps) === 400);
 
-  const sumBracket = (items: LoanWithCustomer[], months: number, rate: number) =>
-    items.reduce((sum, loan) => sum + projectYield(Number(loan.loan_amount), rate, months), 0);
+  const sumBracket = (items: LoanWithCustomer[], periods: number, rateBps: number) =>
+    items.reduce(
+      (sum, loan) => sum + projectYieldPaise(asPaise(loan.principal_paise), rateBps, periods),
+      0,
+    );
 
   return {
-    totalActiveCapital,
-    monthlyInterestYield,
-    bracket3: {
-      oneMonth: sumBracket(bracket3Loans, 1, 3),
-      sixMonths: sumBracket(bracket3Loans, 6, 3),
-      oneYear: sumBracket(bracket3Loans, 12, 3),
+    totalActiveCapitalPaise,
+    periodInterestYieldPaise,
+    bracket300: {
+      onePeriod: sumBracket(bracket300Loans, 1, 300),
+      sixPeriods: sumBracket(bracket300Loans, 6, 300),
+      twelvePeriods: sumBracket(bracket300Loans, 12, 300),
     },
-    bracket4: {
-      oneMonth: sumBracket(bracket4Loans, 1, 4),
-      sixMonths: sumBracket(bracket4Loans, 6, 4),
-      oneYear: sumBracket(bracket4Loans, 12, 4),
+    bracket400: {
+      onePeriod: sumBracket(bracket400Loans, 1, 400),
+      sixPeriods: sumBracket(bracket400Loans, 6, 400),
+      twelvePeriods: sumBracket(bracket400Loans, 12, 400),
     },
   };
-}
-
-function formatInr(value: number): string {
-  return `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
 function AnalyticsCard({ label, value }: { label: string; value: string }) {
@@ -82,7 +85,7 @@ function AnalyticsCard({ label, value }: { label: string; value: string }) {
 export default function AdminDashboardScreen() {
   const colors = useTheme();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
 
   const [tab, setTab] = useState<CustomerTab>('retail_customer');
   const [search, setSearch] = useState('');
@@ -133,12 +136,13 @@ export default function AdminDashboardScreen() {
   }, [loans, search, tab]);
 
   const analytics = useMemo(() => computeAnalytics(loans), [loans]);
+  const isOwner = profile?.role === 'owner';
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.headerRow}>
-          <ThemedText type="title">Admin Dashboard</ThemedText>
+          <ThemedText type="title">{isOwner ? 'Owner Dashboard' : 'Staff Dashboard'}</ThemedText>
           <View style={styles.headerActions}>
             <Link href="/(admin)/scanner" asChild>
               <Pressable style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
@@ -151,28 +155,37 @@ export default function AdminDashboardScreen() {
           </View>
         </View>
 
-        <View style={styles.analyticsGrid}>
-          <AnalyticsCard label="Active Capital Outlay" value={formatInr(analytics.totalActiveCapital)} />
-          <AnalyticsCard
-            label="Monthly Interest Revenue"
-            value={formatInr(analytics.monthlyInterestYield)}
-          />
-        </View>
+        {isOwner ? (
+          <>
+            <View style={styles.analyticsGrid}>
+              <AnalyticsCard
+                label="Active Capital Outlay"
+                value={formatPaiseAsInr(analytics.totalActiveCapitalPaise)}
+              />
+              <AnalyticsCard
+                label="30-day Interest Revenue"
+                value={formatPaiseAsInr(analytics.periodInterestYieldPaise)}
+              />
+            </View>
 
-        <View style={[styles.bracketCard, { backgroundColor: colors.backgroundElement }]}>
-          <ThemedText type="smallBold">3% Monthly Bracket</ThemedText>
-          <ThemedText type="small">
-            1M {formatInr(analytics.bracket3.oneMonth)} · 6M {formatInr(analytics.bracket3.sixMonths)} · 1Y{' '}
-            {formatInr(analytics.bracket3.oneYear)}
-          </ThemedText>
-          <ThemedText type="smallBold" style={styles.bracketSpacer}>
-            4% Monthly Bracket
-          </ThemedText>
-          <ThemedText type="small">
-            1M {formatInr(analytics.bracket4.oneMonth)} · 6M {formatInr(analytics.bracket4.sixMonths)} · 1Y{' '}
-            {formatInr(analytics.bracket4.oneYear)}
-          </ThemedText>
-        </View>
+            <View style={[styles.bracketCard, { backgroundColor: colors.backgroundElement }]}>
+              <ThemedText type="smallBold">300 bps (3%) Bracket</ThemedText>
+              <ThemedText type="small">
+                1P {formatPaiseAsInr(analytics.bracket300.onePeriod)} · 6P{' '}
+                {formatPaiseAsInr(analytics.bracket300.sixPeriods)} · 12P{' '}
+                {formatPaiseAsInr(analytics.bracket300.twelvePeriods)}
+              </ThemedText>
+              <ThemedText type="smallBold" style={styles.bracketSpacer}>
+                400 bps (4%) Bracket
+              </ThemedText>
+              <ThemedText type="small">
+                1P {formatPaiseAsInr(analytics.bracket400.onePeriod)} · 6P{' '}
+                {formatPaiseAsInr(analytics.bracket400.sixPeriods)} · 12P{' '}
+                {formatPaiseAsInr(analytics.bracket400.twelvePeriods)}
+              </ThemedText>
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.tabRow}>
           {(['retail_customer', 'merchant'] as CustomerTab[]).map((value) => (
@@ -225,7 +238,8 @@ export default function AdminDashboardScreen() {
                 <ThemedText>{item.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
                 <ThemedText type="small">{item.profiles?.phone_number ?? '—'}</ThemedText>
                 <ThemedText type="small">
-                  {item.item_name} · {formatInr(Number(item.loan_amount))} · {item.interest_rate_monthly}% / mo
+                  {item.item_name} · {formatPaiseAsInr(asPaise(item.principal_paise))} ·{' '}
+                  {formatBpsAsPercent(asBps(item.rate_bps))}% / 30d
                 </ThemedText>
               </Pressable>
             )}

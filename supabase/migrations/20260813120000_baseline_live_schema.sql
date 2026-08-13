@@ -1,7 +1,8 @@
 -- =============================================================================
--- Jewelry Girvi App — PostgreSQL schema for Supabase
--- Run in Supabase SQL Editor or via supabase db push / migration.
--- Order matters: enums + profiles must exist before helpers/RLS that query them.
+-- Baseline: schema as applied on the hosted project before integer-money work.
+-- Captured from the former database/schema.sql (unversioned). Fresh installs
+-- run this first; already-live projects should mark it applied then run later
+-- migrations only.
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";

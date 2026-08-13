@@ -1,8 +1,10 @@
-export type UserRole = 'admin' | 'retail_customer' | 'merchant';
+export type UserRole = 'owner' | 'staff' | 'retail_customer' | 'merchant';
 
 export type LoanStatus = 'active' | 'closed';
 
-export type PaymentType = 'interest' | 'principal';
+export type InterestModel = 'retail' | 'merchant';
+
+export type PartialPeriodMode = 'pro_rata' | 'full_period';
 
 export interface Profile {
   id: string;
@@ -14,6 +16,18 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface ShopDefaults {
+  id: number;
+  interest_model: InterestModel;
+  rate_bps: number;
+  merchant_rate_bps: number;
+  simple_period_days: number;
+  compound_every_days: number;
+  grace_days: number;
+  partial_period_mode: PartialPeriodMode;
+  updated_at: string;
+}
+
 export interface Loan {
   id: string;
   customer_id: string;
@@ -21,8 +35,14 @@ export interface Loan {
   receipt_image_url: string | null;
   item_name: string;
   weight_grams: number;
-  loan_amount: number;
-  interest_rate_monthly: number;
+  principal_paise: number;
+  rate_bps: number;
+  disbursed_on: string;
+  interest_model: InterestModel;
+  simple_period_days: number;
+  compound_every_days: number;
+  grace_days: number;
+  partial_period_mode: PartialPeriodMode;
   status: LoanStatus;
   digital_signature_url: string | null;
   created_at: string;
@@ -36,9 +56,20 @@ export interface LoanWithCustomer extends Loan {
 export interface Payment {
   id: string;
   loan_id: string;
-  amount_paid: number;
-  payment_type: PaymentType;
+  amount_paid_paise: number;
+  paid_on: string;
   created_at: string;
+}
+
+export interface LoanTermChange {
+  id: string;
+  loan_id: string;
+  changed_by: string;
+  changed_at: string;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  reason: string;
 }
 
 export interface OcrExtractionResult {
@@ -49,10 +80,13 @@ export interface OcrExtractionResult {
   address: string;
   item_name: string;
   weight_grams: number;
+  /** Rupees from OCR — convert to paise at the form/save boundary. */
   loan_amount: number;
+  /** Monthly percent from OCR — convert to basis points at the form/save boundary. */
   interest_rate: number;
 }
 
+/** Form fields are display strings; convert to paise/bps on save. */
 export interface LoanFormData {
   serial_number: string;
   customer_name: string;
@@ -60,13 +94,16 @@ export interface LoanFormData {
   address: string;
   item_name: string;
   weight_grams: string;
-  loan_amount: string;
-  interest_rate_monthly: string;
+  loan_amount_rupees: string;
+  interest_percent_monthly: string;
+  disbursed_on: string;
 }
 
 export interface LoanBalances {
-  principalPaid: number;
-  interestPaid: number;
-  remainingPrincipal: number;
-  accruedInterestEstimate: number;
+  accruedInterestPaise: number;
+  outstandingPrincipalPaise: number;
+  totalDuePaise: number;
+  interestPaidPaise: number;
+  principalPaidPaise: number;
+  overpaymentRefundedPaise: number;
 }

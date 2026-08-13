@@ -1,4 +1,4 @@
-import type { PaymentType, UserRole } from './database';
+import type { InterestModel, PartialPeriodMode, UserRole } from './database';
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -34,6 +34,41 @@ export interface Database {
         };
         Relationships: [];
       };
+      shop_defaults: {
+        Row: {
+          id: number;
+          interest_model: InterestModel;
+          rate_bps: number;
+          merchant_rate_bps: number;
+          simple_period_days: number;
+          compound_every_days: number;
+          grace_days: number;
+          partial_period_mode: PartialPeriodMode;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          interest_model?: InterestModel;
+          rate_bps?: number;
+          merchant_rate_bps?: number;
+          simple_period_days?: number;
+          compound_every_days?: number;
+          grace_days?: number;
+          partial_period_mode?: PartialPeriodMode;
+          updated_at?: string;
+        };
+        Update: {
+          interest_model?: InterestModel;
+          rate_bps?: number;
+          merchant_rate_bps?: number;
+          simple_period_days?: number;
+          compound_every_days?: number;
+          grace_days?: number;
+          partial_period_mode?: PartialPeriodMode;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       loans: {
         Row: {
           id: string;
@@ -42,8 +77,14 @@ export interface Database {
           receipt_image_url: string | null;
           item_name: string;
           weight_grams: number;
-          loan_amount: number;
-          interest_rate_monthly: number;
+          principal_paise: number;
+          rate_bps: number;
+          disbursed_on: string;
+          interest_model: InterestModel;
+          simple_period_days: number;
+          compound_every_days: number;
+          grace_days: number;
+          partial_period_mode: PartialPeriodMode;
           status: string;
           digital_signature_url: string | null;
           created_at: string;
@@ -56,8 +97,14 @@ export interface Database {
           receipt_image_url?: string | null;
           item_name: string;
           weight_grams: number;
-          loan_amount: number;
-          interest_rate_monthly: number;
+          principal_paise: number;
+          rate_bps: number;
+          disbursed_on: string;
+          interest_model: InterestModel;
+          simple_period_days: number;
+          compound_every_days: number;
+          grace_days: number;
+          partial_period_mode: PartialPeriodMode;
           status?: string;
           digital_signature_url?: string | null;
           created_at?: string;
@@ -69,8 +116,14 @@ export interface Database {
           receipt_image_url?: string | null;
           item_name?: string;
           weight_grams?: number;
-          loan_amount?: number;
-          interest_rate_monthly?: number;
+          principal_paise?: number;
+          rate_bps?: number;
+          disbursed_on?: string;
+          interest_model?: InterestModel;
+          simple_period_days?: number;
+          compound_every_days?: number;
+          grace_days?: number;
+          partial_period_mode?: PartialPeriodMode;
           status?: string;
           digital_signature_url?: string | null;
           created_at?: string;
@@ -90,26 +143,66 @@ export interface Database {
         Row: {
           id: string;
           loan_id: string;
-          amount_paid: number;
-          payment_type: PaymentType;
+          amount_paid_paise: number;
+          paid_on: string;
           created_at: string;
         };
         Insert: {
           id?: string;
           loan_id: string;
-          amount_paid: number;
-          payment_type: PaymentType;
+          amount_paid_paise: number;
+          paid_on: string;
           created_at?: string;
         };
         Update: {
           loan_id?: string;
-          amount_paid?: number;
-          payment_type?: PaymentType;
+          amount_paid_paise?: number;
+          paid_on?: string;
           created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: 'payments_loan_id_fkey';
+            columns: ['loan_id'];
+            isOneToOne: false;
+            referencedRelation: 'loans';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      loan_term_changes: {
+        Row: {
+          id: string;
+          loan_id: string;
+          changed_by: string;
+          changed_at: string;
+          field: string;
+          old_value: string | null;
+          new_value: string | null;
+          reason: string;
+        };
+        Insert: {
+          id?: string;
+          loan_id: string;
+          changed_by: string;
+          changed_at?: string;
+          field: string;
+          old_value?: string | null;
+          new_value?: string | null;
+          reason: string;
+        };
+        Update: {
+          loan_id?: string;
+          changed_by?: string;
+          changed_at?: string;
+          field?: string;
+          old_value?: string | null;
+          new_value?: string | null;
+          reason?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'loan_term_changes_loan_id_fkey';
             columns: ['loan_id'];
             isOneToOne: false;
             referencedRelation: 'loans';
@@ -124,10 +217,30 @@ export interface Database {
         Args: { p_phone: string };
         Returns: string | null;
       };
+      is_shop_user: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      is_owner: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      loan_balances_as_of: {
+        Args: { p_loan_id: string; p_as_of?: string };
+        Returns: {
+          accrued_interest_paise: number;
+          outstanding_principal_paise: number;
+          total_due_paise: number;
+          interest_paid_paise: number;
+          principal_paid_paise: number;
+          overpayment_refunded_paise: number;
+        }[];
+      };
     };
     Enums: {
       user_role: UserRole;
-      payment_type: PaymentType;
+      interest_model: InterestModel;
+      partial_period_mode: PartialPeriodMode;
     };
     CompositeTypes: Record<string, never>;
   };

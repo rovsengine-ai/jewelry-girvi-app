@@ -16,20 +16,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { toE164India } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 import { routeForRole, useAuth } from '@/providers/auth-provider';
 import type { Profile, UserRole } from '@/types/database';
-
-function normalizePhoneInput(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('91') && digits.length === 12) {
-    return `+${digits}`;
-  }
-  if (digits.length === 10) {
-    return `+91${digits}`;
-  }
-  return phone.startsWith('+') ? phone : `+${digits}`;
-}
 
 export default function LoginScreen() {
   const colors = useTheme();
@@ -42,8 +32,14 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSendOtp = async () => {
-    const normalized = normalizePhoneInput(phone.trim());
-    if (normalized.length < 12) {
+    let normalized: string;
+    try {
+      normalized = toE164India(phone.trim());
+    } catch {
+      Alert.alert('Invalid phone', 'Enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (normalized.length < 13) {
       Alert.alert('Invalid phone', 'Enter a valid 10-digit mobile number.');
       return;
     }
@@ -62,7 +58,13 @@ export default function LoginScreen() {
   };
 
   const handleVerifyOtp = async () => {
-    const normalized = normalizePhoneInput(phone.trim());
+    let normalized: string;
+    try {
+      normalized = toE164India(phone.trim());
+    } catch {
+      Alert.alert('Invalid phone', 'Enter a valid 10-digit mobile number.');
+      return;
+    }
     if (otp.trim().length < 4) {
       Alert.alert('Invalid OTP', 'Enter the verification code from SMS.');
       return;

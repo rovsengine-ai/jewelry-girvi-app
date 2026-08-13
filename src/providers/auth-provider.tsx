@@ -87,7 +87,7 @@ export function useAuth(): AuthContextValue {
 }
 
 export function routeForRole(role: UserRole | undefined): '/(admin)/dashboard' | '/(customer)/dashboard' {
-  if (role === 'admin') {
+  if (role === 'owner' || role === 'staff') {
     return '/(admin)/dashboard';
   }
   return '/(customer)/dashboard';

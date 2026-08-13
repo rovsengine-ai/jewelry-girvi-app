@@ -16,9 +16,12 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+import { resolveReceiptDisplayUrl } from '@/services/loanService';
 import type { Loan } from '@/types/database';
 
-type CustomerLoanView = Pick<Loan, 'id' | 'receipt_image_url' | 'status'>;
+type CustomerLoanView = Pick<Loan, 'id' | 'receipt_image_url' | 'status'> & {
+  displayUrl?: string | null;
+};
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === 'active';
@@ -53,7 +56,14 @@ export default function CustomerDashboardScreen() {
       return;
     }
 
-    setLoans((data ?? []) as CustomerLoanView[]);
+    const rows = (data ?? []) as CustomerLoanView[];
+    const withUrls = await Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        displayUrl: await resolveReceiptDisplayUrl(row.receipt_image_url).catch(() => null),
+      })),
+    );
+    setLoans(withUrls);
   }, [session?.user.id]);
 
   const refresh = useCallback(async () => {
@@ -97,9 +107,9 @@ export default function CustomerDashboardScreen() {
             }
             renderItem={({ item }) => (
               <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
-                {item.receipt_image_url ? (
+                {item.displayUrl ? (
                   <Image
-                    source={{ uri: item.receipt_image_url }}
+                    source={{ uri: item.displayUrl }}
                     style={styles.receiptImage}
                     contentFit="cover"
                   />
@@ -120,37 +130,32 @@ export default function CustomerDashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+    marginBottom: Spacing.two,
   },
   signOut: { padding: Spacing.two },
-  privacyNote: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.two,
-    opacity: 0.75,
-  },
+  privacyNote: { marginBottom: Spacing.three, opacity: 0.8 },
   loader: { marginTop: Spacing.five },
-  listContent: { padding: Spacing.four, gap: Spacing.three },
-  card: { borderRadius: 16, overflow: 'hidden', gap: Spacing.two, padding: Spacing.two },
-  receiptImage: { width: '100%', height: 220, borderRadius: 12 },
+  listContent: { gap: Spacing.three, paddingBottom: Spacing.five },
+  empty: { textAlign: 'center', marginTop: Spacing.five },
+  card: { borderRadius: 14, overflow: 'hidden' },
+  receiptImage: { width: '100%', height: 220 },
   receiptPlaceholder: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
+    height: 160,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: Spacing.three,
+    position: 'absolute',
+    top: Spacing.two,
+    right: Spacing.two,
+    borderRadius: 8,
+    paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
   },
   badgeText: { color: '#fff' },
-  empty: { textAlign: 'center', opacity: 0.7, marginTop: Spacing.five },
 });
