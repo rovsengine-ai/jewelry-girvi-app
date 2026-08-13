@@ -107,10 +107,10 @@ export default function AdminScannerScreen() {
       }
 
       setLocalPhotoUri(photo.uri);
+      // Kimi K3 requires base64 (not public URLs) — OCR from the local camera file first.
+      const extracted = await extractReceiptData(photo.uri);
       const publicUrl = await uploadImageToStorage(photo.uri, 'receipts');
       setReceiptImageUrl(publicUrl);
-
-      const extracted = await extractReceiptData(publicUrl);
       setForm({
         serial_number: extracted.serial_number,
         customer_name: extracted.customer_name,
