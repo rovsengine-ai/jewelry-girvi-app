@@ -1,12 +1,13 @@
 -- =============================================================================
 -- Jewelry Girvi App — PostgreSQL schema for Supabase
 -- Run in Supabase SQL Editor or via supabase db push / migration.
+-- Order matters: enums + profiles must exist before helpers/RLS that query them.
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ---------------------------------------------------------------------------
--- Enums
+-- 1. Enums (must come first — profiles.role depends on user_role)
 -- ---------------------------------------------------------------------------
 CREATE TYPE public.user_role AS ENUM (
   'admin',
@@ -20,23 +21,8 @@ CREATE TYPE public.payment_type AS ENUM (
 );
 
 -- ---------------------------------------------------------------------------
--- RLS helpers
+-- 2. Utility trigger (no dependency on profiles)
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.profiles
-    WHERE id = auth.uid()
-      AND role = 'admin'::public.user_role
-  );
-$$;
-
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -48,7 +34,7 @@ END;
 $$;
 
 -- ---------------------------------------------------------------------------
--- profiles
+-- 3. profiles (must exist before is_admin / find_profile_by_phone / RLS)
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.profiles (
   id            uuid PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
@@ -73,7 +59,38 @@ CREATE TRIGGER profiles_set_updated_at
   EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- loans
+-- 4. RLS / lookup helpers (safe now that public.profiles exists)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = auth.uid()
+      AND role = 'admin'::public.user_role
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.find_profile_by_phone(p_phone text)
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT id
+  FROM public.profiles
+  WHERE phone_number = p_phone
+  LIMIT 1;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 5. loans
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.loans (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -108,7 +125,7 @@ CREATE TRIGGER loans_set_updated_at
   EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- payments
+-- 6. payments
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.payments (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -124,7 +141,7 @@ CREATE INDEX payments_loan_id_idx ON public.payments (loan_id);
 CREATE INDEX payments_created_at_idx ON public.payments (created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- Auto-create profile on signup
+-- 7. Auth triggers — auto-create / sync profiles
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -158,7 +175,6 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
 
--- Link phone on profile update (customer registers after admin created loan metadata)
 CREATE OR REPLACE FUNCTION public.sync_profile_phone_from_auth()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -181,31 +197,15 @@ CREATE TRIGGER on_auth_user_phone_updated
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_profile_phone_from_auth();
 
--- Admin helper: resolve customer profile by phone (returns NULL if not registered)
-CREATE OR REPLACE FUNCTION public.find_profile_by_phone(p_phone text)
-RETURNS uuid
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT id
-  FROM public.profiles
-  WHERE phone_number = p_phone
-  LIMIT 1;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.find_profile_by_phone(text) TO authenticated;
-
 -- ---------------------------------------------------------------------------
--- Storage bucket for receipt & signature images
+-- 8. Storage bucket for receipt & signature images
 -- ---------------------------------------------------------------------------
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('receipts', 'receipts', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- Row Level Security
+-- 9. Row Level Security
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.loans ENABLE ROW LEVEL SECURITY;
@@ -275,7 +275,7 @@ CREATE POLICY "receipts_admin_delete"
   USING (bucket_id = 'receipts' AND public.is_admin());
 
 -- ---------------------------------------------------------------------------
--- Grants
+-- 10. Grants
 -- ---------------------------------------------------------------------------
 GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
@@ -283,3 +283,4 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authentic
 GRANT USAGE ON TYPE public.user_role TO authenticated, service_role;
 GRANT USAGE ON TYPE public.payment_type TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.find_profile_by_phone(text) TO authenticated;
