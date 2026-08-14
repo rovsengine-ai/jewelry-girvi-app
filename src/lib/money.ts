@@ -40,6 +40,20 @@ export function percentInputToBps(percent: string): BasisPoints {
   return bps;
 }
 
+/** Reverse of rupeesInputToPaise, for prefilling an amount field. Zero is allowed. */
+export function paiseToRupeesInput(paise: Paise): string {
+  assertInteger(paise, 'paise');
+  if (paise < 0) {
+    throw new Error('Amount cannot be negative.');
+  }
+  const rupees = Math.trunc(paise / 100);
+  const rem = paise % 100;
+  if (rem === 0) {
+    return String(rupees);
+  }
+  return `${rupees}.${String(rem).padStart(2, '0')}`;
+}
+
 export function formatPaiseAsInr(paise: Paise | string): string {
   const value = asPaise(paise);
   const sign = value < 0 ? '-' : '';
