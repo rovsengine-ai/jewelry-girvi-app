@@ -49,9 +49,15 @@ create extension "supabase-dbdev";
 select dbdev.install('basejump-supabase_test_helpers');
 create extension if not exists "basejump-supabase_test_helpers" version '0.0.6';
 
--- Verify setup with a no-op test
+-- Verify the hook actually installed what the later suites depend on, rather
+-- than asserting a tautology. 040 and 050 impersonate users through these.
 begin;
-select plan(1);
-select ok(true, 'Pre-test hook completed successfully');
+select plan(4);
+
+select has_extension('extensions', 'pgtap', 'pgtap is installed');
+select has_extension('basejump-supabase_test_helpers', 'basejump test helpers are installed');
+select has_function('tests', 'create_supabase_user', 'tests.create_supabase_user is available');
+select has_function('tests', 'authenticate_as', 'tests.authenticate_as is available');
+
 select * from finish();
 rollback;
