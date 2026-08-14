@@ -112,7 +112,16 @@ export interface RenewLoanResult {
 }
 
 export interface LoanWithCustomer extends Loan {
-  profiles: Pick<Profile, 'full_name' | 'phone_number' | 'address' | 'role'> | null;
+  profiles: Pick<
+    Profile,
+    | 'full_name'
+    | 'phone_number'
+    | 'address'
+    | 'role'
+    | 'id_document_type'
+    | 'kyc_verified_on'
+    | 'guardian_name'
+  > | null;
 }
 
 export interface Payment {

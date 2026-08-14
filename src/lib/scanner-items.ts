@@ -19,6 +19,8 @@ export interface ScannerItemDraft {
   /** null = not assessed. Never default this to 22. Silver always stays null. */
   purity_karat: number | null;
   quantity: string;
+  /** Local file URI captured before save; uploaded to receipts/{customer_id}/items/ after create_loan. */
+  localPhotoUri: string | null;
 }
 
 export type ScannerItemsAction =
@@ -39,6 +41,7 @@ export function emptyScannerItem(key: string): ScannerItemDraft {
     netManuallyEdited: false,
     purity_karat: null,
     quantity: '1',
+    localPhotoUri: null,
   };
 }
 

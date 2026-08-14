@@ -272,6 +272,28 @@ export async function createLoanWithCustomer(
     throw new Error('Could not create the loan.');
   }
 
+  const createdItems = items.some((item) => item.localPhotoUri)
+    ? await fetchLoanItems(data)
+    : [];
+  if (items.some((item) => item.localPhotoUri) && createdItems.length !== items.length) {
+    throw new Error('Loan was created but pledged items could not be matched for photos.');
+  }
+  for (let index = 0; index < items.length; index += 1) {
+    const uri = items[index]?.localPhotoUri;
+    const itemId = createdItems[index]?.id;
+    if (!uri || !itemId) {
+      continue;
+    }
+    const storagePath = await uploadImageToStorage(uri, 'items', customerId);
+    const { error: photoError } = await supabase.from('loan_item_photos').insert({
+      loan_item_id: itemId,
+      storage_path: storagePath,
+    });
+    if (photoError) {
+      throw new Error(photoError.message);
+    }
+  }
+
   return data;
 }
 

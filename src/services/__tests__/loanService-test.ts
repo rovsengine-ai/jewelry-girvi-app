@@ -318,6 +318,7 @@ describe('createLoanWithCustomer', () => {
       netManuallyEdited: false,
       purity_karat: null,
       quantity: '1',
+      localPhotoUri: null,
     },
   ];
 

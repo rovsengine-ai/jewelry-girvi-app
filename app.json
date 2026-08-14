@@ -47,6 +47,14 @@
           "defaultChannel": "loan-reminders"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Girvi Shop to attach pledged-item and KYC photos.",
+          "cameraPermission": "Allow Girvi Shop to photograph pledged items and ID documents.",
+          "microphonePermission": false
+        }
+      ],
       "expo-sharing"
     ],
     "experiments": {
