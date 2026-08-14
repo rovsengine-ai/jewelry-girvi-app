@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
+  Share,
   StyleSheet,
   TextInput,
   View,
@@ -16,60 +18,20 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { asBps, asPaise, formatBpsAsPercent, formatPaiseAsInr } from '@/lib/money';
+import { buildOverdueCallListCsv, noticeTypeLabel } from '@/lib/notices';
+import { loanStatusLabel } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
-import type { LoanWithCustomer } from '@/types/database';
+import {
+  fetchLoanNotices,
+  fetchOverdueLoans,
+  fetchRateYield,
+  generateLoanNotices,
+} from '@/services/loanService';
+import type { LoanNotice, LoanStatus, LoanWithCustomer, OverdueLoan, RateYield } from '@/types/database';
 
 type CustomerTab = 'retail_customer' | 'merchant';
-
-interface Analytics {
-  totalActiveCapitalPaise: number;
-  periodInterestYieldPaise: number;
-  bracket300: { onePeriod: number; sixPeriods: number; twelvePeriods: number };
-  bracket400: { onePeriod: number; sixPeriods: number; twelvePeriods: number };
-}
-
-/** Integer paise: principal * rate_bps * periods / 10000 (truncated). Placeholder until SQL engine. */
-function projectYieldPaise(principalPaise: number, rateBps: number, periods: number): number {
-  return Math.trunc((principalPaise * rateBps * periods) / 10000);
-}
-
-function computeAnalytics(loans: LoanWithCustomer[]): Analytics {
-  const activeLoans = loans.filter((loan) => loan.status === 'active');
-
-  const totalActiveCapitalPaise = activeLoans.reduce(
-    (sum, loan) => sum + asPaise(loan.principal_paise),
-    0,
-  );
-
-  const periodInterestYieldPaise = activeLoans.reduce((sum, loan) => {
-    return sum + projectYieldPaise(asPaise(loan.principal_paise), asBps(loan.rate_bps), 1);
-  }, 0);
-
-  const bracket300Loans = activeLoans.filter((loan) => asBps(loan.rate_bps) === 300);
-  const bracket400Loans = activeLoans.filter((loan) => asBps(loan.rate_bps) === 400);
-
-  const sumBracket = (items: LoanWithCustomer[], periods: number, rateBps: number) =>
-    items.reduce(
-      (sum, loan) => sum + projectYieldPaise(asPaise(loan.principal_paise), rateBps, periods),
-      0,
-    );
-
-  return {
-    totalActiveCapitalPaise,
-    periodInterestYieldPaise,
-    bracket300: {
-      onePeriod: sumBracket(bracket300Loans, 1, 300),
-      sixPeriods: sumBracket(bracket300Loans, 6, 300),
-      twelvePeriods: sumBracket(bracket300Loans, 12, 300),
-    },
-    bracket400: {
-      onePeriod: sumBracket(bracket400Loans, 1, 400),
-      sixPeriods: sumBracket(bracket400Loans, 6, 400),
-      twelvePeriods: sumBracket(bracket400Loans, 12, 400),
-    },
-  };
-}
+type StatusFilter = 'active' | 'redeemed' | 'closed' | 'defaulted' | 'all';
 
 function AnalyticsCard({ label, value }: { label: string; value: string }) {
   const colors = useTheme();
@@ -88,10 +50,15 @@ export default function AdminDashboardScreen() {
   const { signOut, profile } = useAuth();
 
   const [tab, setTab] = useState<CustomerTab>('retail_customer');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [search, setSearch] = useState('');
   const [loans, setLoans] = useState<LoanWithCustomer[]>([]);
+  const [overdue, setOverdue] = useState<OverdueLoan[]>([]);
+  const [yieldRows, setYieldRows] = useState<RateYield[]>([]);
+  const [notices, setNotices] = useState<LoanNotice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const loadLoans = useCallback(async () => {
     const { data, error } = await supabase
@@ -102,7 +69,6 @@ export default function AdminDashboardScreen() {
         profiles:customer_id ( full_name, phone_number, address, role )
       `,
       )
-      .eq('status', 'active')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -113,19 +79,39 @@ export default function AdminDashboardScreen() {
     setLoans((data ?? []) as LoanWithCustomer[]);
   }, []);
 
+  const loadShopPanels = useCallback(async () => {
+    try {
+      const [overdueRows, rateRows, noticeRows] = await Promise.all([
+        fetchOverdueLoans(),
+        fetchRateYield(),
+        fetchLoanNotices(20),
+      ]);
+      setOverdue(overdueRows);
+      setYieldRows(rateRows);
+      setNotices(noticeRows);
+    } catch (err) {
+      console.warn(err instanceof Error ? err.message : err);
+    }
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadLoans(), loadShopPanels()]);
+  }, [loadLoans, loadShopPanels]);
+
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
-      await loadLoans();
+      await loadAll();
       setIsLoading(false);
     })();
-  }, [loadLoans]);
+  }, [loadAll]);
 
   const filteredLoans = useMemo(() => {
     const query = search.trim().toLowerCase();
     return loans.filter((loan) => {
       const role = loan.profiles?.role ?? 'retail_customer';
       if (role !== tab) return false;
+      if (statusFilter !== 'all' && loan.status !== statusFilter) return false;
       if (!query) return true;
 
       const name = loan.profiles?.full_name?.toLowerCase() ?? '';
@@ -133,10 +119,38 @@ export default function AdminDashboardScreen() {
       const serial = loan.serial_number.toLowerCase();
       return name.includes(query) || phone.includes(query) || serial.includes(query);
     });
-  }, [loans, search, tab]);
+  }, [loans, search, tab, statusFilter]);
 
-  const analytics = useMemo(() => computeAnalytics(loans), [loans]);
   const isOwner = profile?.role === 'owner';
+  const totalCapitalPaise = yieldRows.reduce((sum, row) => sum + row.principal_paise, 0);
+  const totalOnePeriodPaise = yieldRows.reduce((sum, row) => sum + row.one_period_yield_paise, 0);
+
+  const onGenerateNotices = useCallback(async () => {
+    setIsGenerating(true);
+    try {
+      const inserted = await generateLoanNotices();
+      await loadShopPanels();
+      Alert.alert(
+        'In-app notices',
+        inserted === 0
+          ? 'No new notices. Existing rows were left in place.'
+          : `Wrote ${inserted} in-app notice(s).`,
+      );
+    } catch (err) {
+      Alert.alert('Could not generate notices', err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [loadShopPanels]);
+
+  const onExportCallList = useCallback(async () => {
+    const csv = buildOverdueCallListCsv(overdue);
+    try {
+      await Share.share({ message: csv, title: 'Overdue call list' });
+    } catch (err) {
+      Alert.alert('Could not share call list', err instanceof Error ? err.message : 'Unknown error');
+    }
+  }, [overdue]);
 
   return (
     <ThemedView style={styles.container}>
@@ -159,33 +173,82 @@ export default function AdminDashboardScreen() {
           <>
             <View style={styles.analyticsGrid}>
               <AnalyticsCard
-                label="Active Capital Outlay"
-                value={formatPaiseAsInr(analytics.totalActiveCapitalPaise)}
+                label="Active capital outlay"
+                value={formatPaiseAsInr(totalCapitalPaise)}
               />
               <AnalyticsCard
-                label="30-day Interest Revenue"
-                value={formatPaiseAsInr(analytics.periodInterestYieldPaise)}
+                label="Projected 30-day yield"
+                value={formatPaiseAsInr(totalOnePeriodPaise)}
               />
             </View>
 
             <View style={[styles.bracketCard, { backgroundColor: colors.backgroundElement }]}>
-              <ThemedText type="smallBold">300 bps (3%) Bracket</ThemedText>
-              <ThemedText type="small">
-                1P {formatPaiseAsInr(analytics.bracket300.onePeriod)} · 6P{' '}
-                {formatPaiseAsInr(analytics.bracket300.sixPeriods)} · 12P{' '}
-                {formatPaiseAsInr(analytics.bracket300.twelvePeriods)}
-              </ThemedText>
-              <ThemedText type="smallBold" style={styles.bracketSpacer}>
-                400 bps (4%) Bracket
-              </ThemedText>
-              <ThemedText type="small">
-                1P {formatPaiseAsInr(analytics.bracket400.onePeriod)} · 6P{' '}
-                {formatPaiseAsInr(analytics.bracket400.sixPeriods)} · 12P{' '}
-                {formatPaiseAsInr(analytics.bracket400.twelvePeriods)}
-              </ThemedText>
+              <ThemedText type="smallBold">Yield by actual rate (original principal)</ThemedText>
+              {yieldRows.length === 0 ? (
+                <ThemedText type="small">No active loans to project.</ThemedText>
+              ) : (
+                yieldRows.map((row) => (
+                  <ThemedText type="small" key={row.rate_bps}>
+                    {formatBpsAsPercent(asBps(row.rate_bps))}% · {row.loan_count} loan
+                    {row.loan_count === 1 ? '' : 's'} · 1P{' '}
+                    {formatPaiseAsInr(row.one_period_yield_paise)} · 6P{' '}
+                    {formatPaiseAsInr(row.six_period_yield_paise)} · 12P{' '}
+                    {formatPaiseAsInr(row.twelve_period_yield_paise)}
+                  </ThemedText>
+                ))
+              )}
             </View>
           </>
         ) : null}
+
+        <View style={[styles.bracketCard, { backgroundColor: colors.backgroundElement }]}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="smallBold">Overdue ({overdue.length})</ThemedText>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() => void onGenerateNotices()}
+                disabled={isGenerating}
+                style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
+                <ThemedText type="smallBold">{isGenerating ? 'Generating…' : 'Generate notices'}</ThemedText>
+              </Pressable>
+              {overdue.length > 0 ? (
+                <Pressable
+                  onPress={() => void onExportCallList()}
+                  style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
+                  <ThemedText type="smallBold">Call list CSV</ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+          {overdue.length === 0 ? (
+            <ThemedText type="small">No overdue girvis today.</ThemedText>
+          ) : (
+            overdue.slice(0, 8).map((row) => (
+              <Pressable
+                key={row.loan_id}
+                onPress={() => router.push(`/(admin)/loan/${row.loan_id}`)}>
+                <ThemedText type="smallBold">{row.serial_number}</ThemedText>
+                <ThemedText type="small">
+                  {row.customer_name ?? 'Unknown'} · {row.phone_number ?? '—'} · {row.days_overdue}d
+                  overdue · {formatPaiseAsInr(asPaise(row.total_due_paise))}
+                </ThemedText>
+              </Pressable>
+            ))
+          )}
+          {overdue.length > 8 ? (
+            <ThemedText type="small">And {overdue.length - 8} more — export the CSV for the full list.</ThemedText>
+          ) : null}
+          {notices.length > 0 ? (
+            <ThemedText type="smallBold" style={styles.bracketSpacer}>
+              Recent in-app notices
+            </ThemedText>
+          ) : null}
+          {notices.slice(0, 5).map((notice) => (
+            <ThemedText type="small" key={notice.id}>
+              {noticeTypeLabel(notice.notice_type)} · {notice.scheduled_for} · {notice.channel}
+            </ThemedText>
+          ))}
+        </View>
 
         <View style={styles.tabRow}>
           {(['retail_customer', 'merchant'] as CustomerTab[]).map((value) => (
@@ -200,6 +263,25 @@ export default function AdminDashboardScreen() {
               ]}>
               <ThemedText type="smallBold">
                 {value === 'retail_customer' ? 'Retail Customers' : 'Merchants'}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.statusRow}>
+          {(['active', 'redeemed', 'closed', 'defaulted', 'all'] as StatusFilter[]).map((value) => (
+            <Pressable
+              key={value}
+              onPress={() => setStatusFilter(value)}
+              style={[
+                styles.statusChip,
+                {
+                  backgroundColor:
+                    statusFilter === value ? colors.backgroundSelected : colors.backgroundElement,
+                },
+              ]}>
+              <ThemedText type="smallBold">
+                {value === 'all' ? 'All' : loanStatusLabel(value as LoanStatus)}
               </ThemedText>
             </Pressable>
           ))}
@@ -224,12 +306,12 @@ export default function AdminDashboardScreen() {
                 refreshing={isRefreshing}
                 onRefresh={() => {
                   setIsRefreshing(true);
-                  void loadLoans().finally(() => setIsRefreshing(false));
+                  void loadAll().finally(() => setIsRefreshing(false));
                 }}
               />
             }
             contentContainerStyle={styles.listContent}
-            ListEmptyComponent={<ThemedText style={styles.empty}>No active girvis in this tab.</ThemedText>}
+            ListEmptyComponent={<ThemedText style={styles.empty}>No girvis in this tab.</ThemedText>}
             renderItem={({ item }) => (
               <Pressable
                 style={[styles.loanCard, { backgroundColor: colors.backgroundElement }]}
@@ -238,7 +320,8 @@ export default function AdminDashboardScreen() {
                 <ThemedText>{item.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
                 <ThemedText type="small">{item.profiles?.phone_number ?? '—'}</ThemedText>
                 <ThemedText type="small">
-                  {item.item_name} · {formatPaiseAsInr(asPaise(item.principal_paise))} ·{' '}
+                  {loanStatusLabel(item.status)} · {item.item_name} ·{' '}
+                  {formatPaiseAsInr(asPaise(item.principal_paise))} ·{' '}
                   {formatBpsAsPercent(asBps(item.rate_bps))}% / 30d
                 </ThemedText>
               </Pressable>
@@ -282,6 +365,13 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.one,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
   bracketSpacer: { marginTop: Spacing.two },
   tabRow: {
     flexDirection: 'row',
@@ -290,6 +380,14 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
   },
   tab: { flex: 1, borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
+  statusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
+  },
+  statusChip: { borderRadius: 10, paddingHorizontal: Spacing.two, paddingVertical: Spacing.one },
   search: {
     marginHorizontal: Spacing.four,
     marginTop: Spacing.three,

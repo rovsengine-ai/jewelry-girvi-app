@@ -1,20 +1,27 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
-import {
-  asPaise,
-  percentInputToBps,
-  rupeesInputToPaise,
-  todayInKolkata,
-} from '@/lib/money';
+import { isReminderKind, type LoanReminderSlot } from '@/lib/loan-reminders';
+import { asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { toE164India } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
-import type { InterestModel, LoanBalances, LoanFormData, ShopDefaults } from '@/types/database';
+import type {
+  InterestModel,
+  LoanBalances,
+  LoanFormData,
+  LoanItem,
+  LoanNotice,
+  OverdueLoan,
+  RateYield,
+  RedeemLoanResult,
+  RenewLoanResult,
+  ShopDefaults,
+} from '@/types/database';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const CUSTOMER_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SAFE_STORAGE_PATH_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(receipts|signatures)\/[A-Za-z0-9._-]+$/i;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(receipts|signatures|items)\/[A-Za-z0-9._-]+$/i;
 
 /** Reject path traversal and non-namespaced storage keys before SDK calls. */
 function assertSafeStoragePath(path: string): string {
@@ -82,7 +89,7 @@ export async function resolveReceiptDisplayUrl(stored: string | null): Promise<s
 
 export async function uploadImageToStorage(
   localUri: string,
-  folder: 'receipts' | 'signatures',
+  folder: 'receipts' | 'signatures' | 'items',
   customerId: string,
 ): Promise<string> {
   const safeCustomerId = assertCustomerId(customerId);
@@ -131,6 +138,39 @@ export async function uploadSignatureDataUrl(
   return uploadImageToStorage(fileUri, 'signatures', customerId);
 }
 
+/**
+ * Creates a confirmed account for a customer standing at the counter, so staff
+ * never have to send them away to install the app first. Runs in an Edge
+ * Function because it needs the service-role key; no SMS is sent, and the
+ * customer signs in later with OTP on the same number.
+ */
+export async function createWalkInCustomer(
+  phoneNumber: string,
+  fullName: string,
+  address: string,
+): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<{
+    customer_id?: string;
+    created?: boolean;
+    error?: string;
+  }>('create-walkin-customer', {
+    body: {
+      phone_number: toE164India(phoneNumber),
+      full_name: fullName,
+      address,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data?.customer_id) {
+    throw new Error(data?.error ?? 'Could not register the customer.');
+  }
+
+  return data.customer_id;
+}
+
 export async function findCustomerIdByPhone(phoneNumber: string): Promise<string | null> {
   const normalized = toE164India(phoneNumber);
 
@@ -160,12 +200,11 @@ export async function createLoanWithCustomer(
   receiptLocalUri: string,
   signatureDataUrl: string | null,
 ): Promise<string> {
-  const customerId = await findCustomerIdByPhone(form.phone_number);
-  if (!customerId) {
-    throw new Error(
-      'No registered customer found for this phone number. Ask the customer to sign up via OTP first, then retry.',
-    );
-  }
+  // A walk-in customer no longer has to sign up before staff can write the
+  // loan: if the number is unknown, register it at the counter and carry on.
+  const customerId =
+    (await findCustomerIdByPhone(form.phone_number)) ??
+    (await createWalkInCustomer(form.phone_number, form.customer_name, form.address));
 
   const receiptPath = await uploadImageToStorage(receiptLocalUri, 'receipts', customerId);
   const signaturePath = signatureDataUrl
@@ -205,33 +244,41 @@ export async function createLoanWithCustomer(
 
   const disbursedOn = form.disbursed_on.trim() || todayInKolkata();
 
-  const { data, error } = await supabase
-    .from('loans')
-    .insert({
-      customer_id: customerId,
-      serial_number: form.serial_number.trim(),
-      receipt_image_url: receiptPath,
-      item_name: form.item_name.trim(),
-      weight_grams: Number(form.weight_grams),
-      principal_paise: principalPaise,
-      rate_bps: rateBps,
-      disbursed_on: disbursedOn,
-      interest_model: interestModel,
-      simple_period_days: defaults.simple_period_days,
-      compound_every_days: defaults.compound_every_days,
-      grace_days: defaults.grace_days,
-      partial_period_mode: defaults.partial_period_mode,
-      status: 'active',
-      digital_signature_url: signaturePath,
-    })
-    .select('id')
-    .single();
+  const weightMg = Math.round(Number(form.weight_grams) * 1000);
+  if (!Number.isInteger(weightMg) || weightMg <= 0) {
+    throw new Error('Weight must convert to a positive whole milligram.');
+  }
+
+  const { data, error } = await supabase.rpc('create_loan', {
+    p_customer_id: customerId,
+    p_serial_number: form.serial_number.trim(),
+    p_receipt_image_url: receiptPath,
+    p_principal_paise: principalPaise,
+    p_rate_bps: rateBps,
+    p_disbursed_on: disbursedOn,
+    p_interest_model: interestModel,
+    p_digital_signature_url: signaturePath,
+    p_items: [
+      {
+        ornament_type: form.item_name.trim(),
+        description: null,
+        gross_weight_mg: weightMg,
+        net_weight_mg: weightMg,
+        stone_deduction_mg: 0,
+        purity_karat: null,
+        quantity: 1,
+      },
+    ],
+  });
 
   if (error) {
     throw new Error(error.message);
   }
+  if (!data) {
+    throw new Error('Could not create the loan.');
+  }
 
-  return data.id;
+  return data;
 }
 
 export async function fetchLoanBalances(
@@ -283,15 +330,204 @@ export async function logPayment(
   }
 }
 
-/** Owner-only: close when balances are cleared. Staff must not call this. */
-export async function closeLoanIfFullyPaid(loanId: string, asOf: string = todayInKolkata()): Promise<void> {
-  const balances = await fetchLoanBalances(loanId, asOf);
-  if (balances.outstandingPrincipalPaise > 0 || balances.accruedInterestPaise > 0) {
-    return;
-  }
+export async function fetchLoanItems(loanId: string): Promise<LoanItem[]> {
+  const { data, error } = await supabase
+    .from('loan_items')
+    .select('*')
+    .eq('loan_id', loanId)
+    .order('created_at', { ascending: true });
 
-  const { error } = await supabase.from('loans').update({ status: 'closed' }).eq('id', loanId);
   if (error) {
     throw new Error(error.message);
   }
+
+  return (data ?? []) as LoanItem[];
+}
+
+export async function fetchLatestMaturityOn(loanId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('loan_renewals')
+    .select('new_maturity_on')
+    .eq('loan_id', loanId)
+    .order('renewed_on', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.new_maturity_on ?? null;
+}
+
+/**
+ * Owner-only redemption. Idempotent: a second call returns the original
+ * snapshot and does not insert another payment. Replaces closeLoanIfFullyPaid,
+ * which flipped status='closed' from the client and skipped the checklist.
+ */
+export async function redeemLoan(input: {
+  loanId: string;
+  redeemedOn: string;
+  releasedToName: string;
+  itemIds: string[];
+  finalPaymentPaise: number;
+  releaseNote?: string | null;
+  releaseSignatureUrl?: string | null;
+}): Promise<RedeemLoanResult> {
+  const { data, error } = await supabase.rpc('redeem_loan', {
+    p_loan_id: input.loanId,
+    p_redeemed_on: input.redeemedOn,
+    p_released_to_name: input.releasedToName,
+    p_item_ids: input.itemIds,
+    p_final_payment_paise: asPaise(input.finalPaymentPaise),
+    p_release_note: input.releaseNote ?? null,
+    p_release_signature_url: input.releaseSignatureUrl ?? null,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('redeem_loan returned no row');
+  }
+
+  return {
+    loan_id: row.loan_id,
+    status: row.status,
+    redeemed_on: row.redeemed_on,
+    redeemed_by: row.redeemed_by,
+    closure_balance_paise: asPaise(row.closure_balance_paise),
+    already_redeemed: row.already_redeemed,
+  };
+}
+
+export async function renewLoan(input: {
+  loanId: string;
+  renewedOn: string;
+  interestPaidPaise: number;
+  newMaturityOn: string;
+  note?: string | null;
+}): Promise<RenewLoanResult> {
+  const { data, error } = await supabase.rpc('renew_loan', {
+    p_loan_id: input.loanId,
+    p_renewed_on: input.renewedOn,
+    p_interest_paid_paise: asPaise(input.interestPaidPaise),
+    p_new_maturity_on: input.newMaturityOn,
+    p_note: input.note ?? null,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('renew_loan returned no row');
+  }
+
+  return {
+    renewal_id: row.renewal_id,
+    loan_id: row.loan_id,
+    renewed_on: row.renewed_on,
+    interest_paid_paise: asPaise(row.interest_paid_paise),
+    new_maturity_on: row.new_maturity_on,
+    already_renewed: row.already_renewed,
+  };
+}
+
+function coerceOverdueLoan(row: OverdueLoan): OverdueLoan {
+  return {
+    ...row,
+    days_overdue: Number(row.days_overdue),
+    outstanding_principal_paise: asPaise(row.outstanding_principal_paise),
+    accrued_interest_paise: asPaise(row.accrued_interest_paise),
+    total_due_paise: asPaise(row.total_due_paise),
+  };
+}
+
+/** Overdue-ness is decided in SQL. The client must not compare dates. */
+export async function fetchOverdueLoans(asOf?: string): Promise<OverdueLoan[]> {
+  const { data, error } = await supabase.rpc(
+    'loans_overdue_as_of',
+    asOf ? { p_as_of: asOf } : {},
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as OverdueLoan[]).map(coerceOverdueLoan);
+}
+
+/** Owner-only. Staff and customers get an empty list from the RPC. */
+export async function fetchRateYield(): Promise<RateYield[]> {
+  const { data, error } = await supabase.rpc('shop_rate_yield');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as RateYield[]).map((row) => ({
+    rate_bps: Number(row.rate_bps),
+    loan_count: Number(row.loan_count),
+    principal_paise: asPaise(row.principal_paise),
+    one_period_yield_paise: asPaise(row.one_period_yield_paise),
+    six_period_yield_paise: asPaise(row.six_period_yield_paise),
+    twelve_period_yield_paise: asPaise(row.twelve_period_yield_paise),
+  }));
+}
+
+export async function generateLoanNotices(asOf?: string): Promise<number> {
+  const { data, error } = await supabase.rpc(
+    'generate_loan_notices',
+    asOf ? { p_as_of: asOf } : {},
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const n = typeof data === 'string' ? Number.parseInt(data, 10) : (data ?? 0);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(`generate_loan_notices returned an invalid count: ${data}`);
+  }
+  return n;
+}
+
+export async function fetchLoanNotices(limit = 50): Promise<LoanNotice[]> {
+  const { data, error } = await supabase
+    .from('loan_notices')
+    .select('*')
+    .order('scheduled_for', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as LoanNotice[];
+}
+
+export async function fetchCustomerLoanReminders(asOf?: string): Promise<LoanReminderSlot[]> {
+  const { data, error } = await supabase.rpc(
+    'customer_loan_reminder_schedule',
+    asOf ? { p_as_of: asOf } : {},
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as LoanReminderSlot[]).filter((row) => isReminderKind(row.reminder_kind));
+}
+
+export async function fetchLoanCurrentDueOn(loanId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('loan_current_due_on', { p_loan_id: loanId });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data ?? null;
 }

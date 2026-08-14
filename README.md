@@ -1,56 +1,83 @@
-# Welcome to your Expo app 👋
+# Girvi Shop
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 57 app for a jewellery pawn-broking (girvi) counter. Shop users
+(`owner` / `staff`) issue and redeem loans. Customers see only their own
+receipts. Domain rules live in [`docs/RULES.md`](docs/RULES.md). The last
+read-only pass of this tree is [`docs/AUDIT.md`](docs/AUDIT.md).
 
-## Get started
+## Stack
 
-1. Install dependencies
+- React Native + Expo Router (SDK 57)
+- Supabase (Postgres, Auth phone OTP, Storage, Edge Functions)
+- TypeScript strict
 
-   ```bash
-   npm install
-   ```
+Admin routes are under `src/app/(admin)/`. Customer routes are under
+`src/app/(customer)/`. Do not mix them.
 
-2. Start the app
+## Prerequisites
 
-   ```bash
-   npx expo start
-   ```
+- Node 20+
+- [Supabase CLI](https://supabase.com/docs/guides/cli)
+- Docker (for local Postgres + `supabase test db`)
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Local Supabase
 
 ```bash
-npm run reset-project
+npx supabase start
+npx supabase db reset
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`db reset` applies every file in `supabase/migrations/` to the **local**
+database only. It is destructive locally. Hosted production is not updated by
+this command.
 
-### Other setup steps
+Edge Function secrets (never `EXPO_PUBLIC_*`):
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npx supabase secrets set MOONSHOT_API_KEY=sk-...   # OCR, if used
+```
 
-## Learn more
+Copy `.env.example` to `.env` and fill the **anon** URL and key from
+`npx supabase status`.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Run the app
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm install
+npx expo start
+```
 
-## Join the community
+Then open iOS simulator, Android emulator, or a dev client. Expo Go may not
+include every native module this app uses (`expo-notifications`, `expo-print`,
+camera). Prefer a development build.
 
-Join our community of developers creating universal apps.
+## Tests
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx supabase test db   # pgTAP against local Postgres
+npm test               # Jest (jest-expo)
+npx tsc --noEmit       # TypeScript
+```
+
+Interest, redemption, RLS, and `create_loan` are asserted in SQL. Jest covers
+money/phone helpers, storage path allowlisting, and UI units. Do not add money
+or weight arithmetic in JavaScript except input parsing and display formatting.
+
+## Admin vs customer
+
+| Role | App |
+| --- | --- |
+| `owner`, `staff` | `/(admin)/dashboard` — all loans, scanner, redeem/renew |
+| `retail_customer`, `merchant` | `/(customer)/dashboard` — own receipts only |
+
+Row Level Security in the migrations is the isolation boundary, not the
+client `.eq('customer_id', …)` filter.
+
+Walk-in customers are created at the counter by
+`supabase/functions/create-walkin-customer` (service role). They sign in later
+with OTP on the same number.
+
+## Money, rates, weights
+
+See `docs/RULES.md`. Amounts are integer paise, rates integer basis points,
+weights integer milligrams, shop calendar `Asia/Kolkata`.

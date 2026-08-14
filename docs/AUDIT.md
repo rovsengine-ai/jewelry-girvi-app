@@ -1,14 +1,18 @@
 # jewelry-girvi-app — read-only audit
 
-`src/app/` is majority domain code (OTP auth, admin scanner/dashboard/loan detail, customer receipts), not the create-expo-app tabs starter. Orphan starter components still exist outside the router.
+Audited against the working tree after Stages 0–5 plus Defect C (`create_loan`).
+Hosted production schema, bucket privacy, and applied RLS on any remote
+Supabase project are **NOT VERIFIABLE FROM REPO**.
+
+`src/app/` is domain code (OTP auth, shop scanner/dashboard/loan lifecycle,
+customer receipts). Orphan starter components may still exist outside the
+router; they are not mounted.
 
 ---
 
 ## STEP 0 — DOC GATE
 
 Fetched: https://docs.expo.dev/versions/v57.0.0/
-
-Doc pages successfully read:
 
 | Package | URL | Title / date from page |
 | --- | --- | --- |
@@ -18,43 +22,73 @@ Doc pages successfully read:
 | expo-camera | https://docs.expo.dev/versions/v57.0.0/sdk/camera/ | Camera (mod. August 13, 2026) |
 | expo-image-picker | https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/ | ImagePicker (mod. August 12, 2026) |
 | expo-file-system | https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/ | FileSystem (mod. June 29, 2026) |
+| expo-notifications | https://docs.expo.dev/versions/v57.0.0/sdk/notifications/ | Notifications (mod. August 13, 2026) |
+| expo-print | https://docs.expo.dev/versions/v57.0.0/sdk/print/ | Print (mod. August 12, 2026) |
+| expo-sharing | https://docs.expo.dev/versions/v57.0.0/sdk/sharing/ | Sharing (mod. August 12, 2026) |
 
-DOC GATE: passed.
-
-Note: `package.json` currently declares `"expo": "^53.0.27"` and `"react-native": "^0.72.17"` while listing many `~57.0.x` packages (`package.json:8–36`). That mismatch is recorded as a red flag; version claims below about app code cite repo files, not resolved install trees.
+`package.json` declares `"expo": "~57.0.12"` and `"react-native": "0.86.2"`.
 
 ---
 
 ## STEP 1 — WHERE DOES THE SCHEMA LIVE?
 
-- There is **no** `supabase/` directory and **no** migration history in this repo.
-- There is an unversioned SQL artifact at `database/schema.sql` (tables, helpers, proposed RLS, storage bucket insert). That file is **not** a versioned migration chain and does **not** prove what is applied on any hosted Supabase project.
-- Therefore: **the live schema is unversioned from this repo’s perspective; whether `database/schema.sql` matches the hosted dashboard is NOT VERIFIABLE FROM REPO.**
-- **Every RLS / policy question below is marked `NOT VERIFIABLE FROM REPO`.** Policy text in `database/schema.sql` is treated as proposed DDL only, not as confirmed live enforcement. No policy contents are asserted as applied.
+Versioned migrations live in `supabase/migrations/` (12 files). They are the
+source of truth **for the local CLI database**. Whether they have been applied
+to any hosted project is **NOT VERIFIABLE FROM REPO**.
+
+| File | Role |
+| --- | --- |
+| `20260813120000_baseline_live_schema.sql` | profiles, loans, payments, storage bucket |
+| `20260813130100_integer_money_roles_terms.sql` | paise/bps, shop_defaults, roles |
+| `20260813190000_loan_interest_engine.sql` | SQL interest engine |
+| `20260813200000_security_rls_storage_phone.sql` | RLS, private receipts, phone |
+| `20260815000000_fix_unpaid_interest_carry.sql` | unpaid interest capitalizes |
+| `20260815010000_partial_period_mode_min_month.sql` | enum `ADD VALUE` (own transaction) |
+| `20260815020000_interest_min_month_threshold.sql` | `min_month_then_pro_rata` + threshold |
+| `20260815030000_lifecycle_items_kyc_notices.sql` | `loan_status`, `loan_items`, KYC, notices |
+| `20260815040000_redeem_and_renew_rpcs.sql` | `redeem_loan` / `renew_loan` |
+| `20260815050000_shop_yield_and_notices.sql` | `shop_rate_yield`, `generate_loan_notices` |
+| `20260815060000_customer_loan_reminders.sql` | `customer_loan_reminder_schedule` |
+| `20260815070000_atomic_create_loan.sql` | `create_loan` + empty-item redeem refuse |
+
+pgTAP lives in `supabase/tests/` (`000`–`090`). RLS claims below are about
+**this migration chain**, exercised by `050-rls-and-permissions_test.sql`.
+They are not a statement about hosted production.
+
+There is no `database/schema.sql` in this tree.
 
 ---
 
 ## STEP 2 — IS THIS STILL THE STARTER TEMPLATE?
 
-There is no root `app/` directory. Expo Router files live under `src/app/` (`tsconfig.json` paths `@/*` → `./src/*`). Classification of every route file:
+There is no root `app/` directory. Expo Router files live under `src/app/`
+(`tsconfig.json` paths `@/*` → `./src/*`).
 
 | File | Classification |
 | --- | --- |
-| `src/app/_layout.tsx` | DOMAIN CODE — `AuthProvider`, session `AuthGate`, stack for auth/admin/customer |
-| `src/app/index.tsx` | DOMAIN CODE — loading / login / role redirect |
-| `src/app/(auth)/_layout.tsx` | DOMAIN CODE — auth stack shell |
-| `src/app/(auth)/login.tsx` | DOMAIN CODE — phone OTP send/verify |
-| `src/app/(admin)/_layout.tsx` | DOMAIN CODE — admin stack (dashboard, scanner, loan/[id]) |
-| `src/app/(admin)/dashboard.tsx` | DOMAIN CODE — loans list, search, analytics |
-| `src/app/(admin)/scanner.tsx` | DOMAIN CODE — camera, OCR, signature, create loan |
-| `src/app/(admin)/loan/[id].tsx` | DOMAIN CODE — loan detail, payments |
-| `src/app/(customer)/_layout.tsx` | DOMAIN CODE — customer stack |
-| `src/app/(customer)/index.tsx` | DOMAIN CODE — redirect to customer dashboard |
-| `src/app/(customer)/dashboard.tsx` | DOMAIN CODE — own receipts list |
+| `src/app/_layout.tsx` | DOMAIN — `AuthProvider`, `AuthGate` |
+| `src/app/index.tsx` | DOMAIN — login / role redirect |
+| `src/app/(auth)/_layout.tsx` | DOMAIN — auth stack |
+| `src/app/(auth)/login.tsx` | DOMAIN — phone OTP |
+| `src/app/(admin)/_layout.tsx` | DOMAIN — shop stack; redirects non-shop roles |
+| `src/app/(admin)/dashboard.tsx` | DOMAIN — loans, search, yield, overdue CSV |
+| `src/app/(admin)/scanner.tsx` | DOMAIN — camera, OCR, signature, create loan |
+| `src/app/(admin)/loan/[id]/_layout.tsx` | DOMAIN — nested stack for detail / redeem / renew |
+| `src/app/(admin)/loan/[id]/index.tsx` | DOMAIN — loan detail and payments |
+| `src/app/(admin)/loan/[id]/redeem.tsx` | DOMAIN — owner redemption checklist |
+| `src/app/(admin)/loan/[id]/renew.tsx` | DOMAIN — interest-only renewal |
+| `src/app/(customer)/_layout.tsx` | DOMAIN — customer stack; local DATE reminders |
+| `src/app/(customer)/index.tsx` | DOMAIN — redirect to customer dashboard |
+| `src/app/(customer)/dashboard.tsx` | DOMAIN — own receipts |
 
-**Ratio (route files):** DOMAIN CODE 11 / CREATE-EXPO-APP BOILERPLATE 0 / EMPTY-OR-TODO 0.
+**Ratio (route files):** DOMAIN CODE 14 / CREATE-EXPO-APP BOILERPLATE 0.
 
-Unused starter leftovers still in repo but **not** mounted by current routes: `src/components/app-tabs.tsx` (Home/Explore `NativeTabs`), `src/components/hint-row.tsx` (“Try editing”), `src/components/web-badge.tsx`, `src/components/ui/collapsible.tsx`, `scripts/reset-project.js`, template `README.md`.
+The old single file `src/app/(admin)/loan/[id].tsx` is gone. Expo Router
+resolves `/(admin)/loan/[id]` to `loan/[id]/index.tsx`.
+
+Unused starter leftovers still in the repo but **not** mounted: template
+`scripts/reset-project.js`. `@expo/ui` and `expo-glass-effect` are declared
+and unused.
 
 ---
 
@@ -62,17 +96,17 @@ Unused starter leftovers still in repo but **not** mounted by current routes: `s
 
 | Check | Result |
 | --- | --- |
-| Client created | `src/lib/supabase.ts:33` — `createClient<Database>(supabaseUrl, supabaseAnonKey, …)` |
-| Env mechanism | `process.env.EXPO_PUBLIC_SUPABASE_URL` and `process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY` with `?? ''` (`src/lib/supabase.ts:9–10`). Not `expo-constants`. Not hardcoded URL/key values. |
-| SecureStore auth adapter | Yes on native: `ExpoSecureStoreAdapter` with `getItem`/`setItem`/`removeItem` (`src/lib/supabase.ts:12–16`, wired at `:35`). Web uses `localStorage` adapter (`src/lib/supabase.ts:18–31`, `:35`). |
-| `react-native-url-polyfill` at entry | Imported at top of client module: `import 'react-native-url-polyfill/auto'` (`src/lib/supabase.ts:1`). Not separately in `src/app/_layout.tsx`; loads when `@/lib/supabase` is first imported (via auth provider). |
-| `autoRefreshToken` | `true` (`src/lib/supabase.ts:36`) |
-| AppState refresh handling | **MISSING** — no `AppState` listener calling `supabase.auth.startAutoRefresh` / `stopAutoRefresh` anywhere under `src/`. |
-| Keys committed | **No live secrets found in tracked source.** Exhaustive checks: |
-| | `.env` — **MISSING** (only `.env.example` present with placeholders: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_MOONSHOT_API_KEY` at `.env.example:2–7`). |
-| | `app.json` `extra` — **MISSING**; no Supabase keys (`app.json` entire file). |
-| | Source — no `eyJ…` JWTs, no `service_role` key strings, no real project URLs. `service_role` appears only as SQL role names in `database/schema.sql:280–285`. |
-| | `.gitignore` ignores `.env*.local` (`.gitignore:34`) but **does not ignore `.env`**, so a future real `.env` could be committed unnoticed. |
+| Client created | `src/lib/supabase.ts` — `createClient<Database>(…)` |
+| Env | `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (`?? ''`). Not hardcoded. |
+| SecureStore adapter | Native: `ExpoSecureStoreAdapter`. Web: `localStorage`. |
+| `react-native-url-polyfill` | Imported at top of `src/lib/supabase.ts`. |
+| `autoRefreshToken` | `true` |
+| AppState refresh | Present: `startAutoRefresh` / `stopAutoRefresh` on `AppState` (`src/lib/supabase.ts`). |
+| Keys committed | No live secrets found in tracked source. `.env.example` has placeholders only. Moonshot is documented as an Edge Function secret, not `EXPO_PUBLIC_*`. |
+| `.gitignore` | Ignores `.env` and `.env*.local`. |
+
+Walk-in customer creation is `supabase/functions/create-walkin-customer/`
+(service-role, shop JWT). The service-role key must not reach the client.
 
 ---
 
@@ -82,86 +116,90 @@ Unused starter leftovers still in repo but **not** mounted by current routes: `s
 
 | Link | Status | Evidence |
 | --- | --- | --- |
-| Send OTP | Present | `supabase.auth.signInWithOtp({ phone })` — `src/app/(auth)/login.tsx:52` |
-| Verify OTP | Present | `supabase.auth.verifyOtp({ phone, token, type: 'sms' })` — `src/app/(auth)/login.tsx:72–76` |
-| Session persist | Present | `persistSession: true` + SecureStore/localStorage adapter — `src/lib/supabase.ts:35–37`; restore via `getSession` — `src/providers/auth-provider.tsx:43–46` |
-| Refresh | Partial | `autoRefreshToken: true` (`src/lib/supabase.ts:36`); **MISSING** AppState foreground/background refresh wiring |
-| Sign-out | Present | `supabase.auth.signOut()` — `src/providers/auth-provider.tsx:68–69`; UI buttons `src/app/(admin)/dashboard.tsx:148`, `src/app/(customer)/dashboard.tsx:78` |
-| Auth state listener | Present | `onAuthStateChange` — `src/providers/auth-provider.tsx:49–52` |
+| Send OTP | Present | `supabase.auth.signInWithOtp({ phone })` — `src/app/(auth)/login.tsx` |
+| Verify OTP | Present | `supabase.auth.verifyOtp({ phone, token, type: 'sms' })` |
+| Session persist | Present | `persistSession: true` + SecureStore / localStorage |
+| Refresh | Present | `autoRefreshToken` + AppState listener |
+| Sign-out | Present | `supabase.auth.signOut()` via `useAuth().signOut` |
+| Auth state listener | Present | `onAuthStateChange` — `src/providers/auth-provider.tsx` |
 
-Post-verify: updates `profiles.phone_number` (`src/app/(auth)/login.tsx:89–92`), reloads profile, routes by role (`src/app/(auth)/login.tsx:94–103`).
-
-### How admin vs customer is determined
+### How shop vs customer is determined
 
 - **Not** a JWT custom claim read in app code.
-- **`profiles.role`** loaded from Supabase: `supabase.from('profiles').select('*').eq('id', userId)` — `src/providers/auth-provider.tsx:17–23`.
-- Routing helper: `role === 'admin'` → `/(admin)/dashboard`, else `/(customer)/dashboard` — `src/providers/auth-provider.tsx:89–94`.
-- Types allow `'admin' | 'retail_customer' | 'merchant'` — `src/types/database.ts:1`.
-- How a user becomes `admin` in the database (seed, dashboard edit, trigger metadata) is **NOT VERIFIABLE FROM REPO** beyond proposed trigger reading `raw_user_meta_data.role` in unversioned `database/schema.sql` (not asserted as live).
+- `profiles.role` from Supabase (`owner` \| `staff` \| `retail_customer` \| `merchant`).
+- `routeForRole`: `owner`/`staff` → `/(admin)/dashboard`, else customer dashboard.
 
 ### Are admin routes gated or only hidden?
 
-- **Not gated by role on the admin route group.** `src/app/(admin)/_layout.tsx:1–10` is an ungated `Stack` with no `profile.role` check.
-- Root `AuthGate` only: (1) sends unauthenticated users to login; (2) sends authenticated users *out of* `(auth)` via `routeForRole` — `src/app/_layout.tsx:17–31`. It does **not** block a non-admin session from opening `/(admin)/*`.
-- `src/app/index.tsx:17–21` and login `router.replace(routeForRole(…))` only choose the initial destination.
-- Conclusion: admin vs customer is **client navigation preference**, not an enforced route gate. Any data isolation depends on hosted RLS — **NOT VERIFIABLE FROM REPO**.
+- `(admin)/_layout.tsx` redirects anyone who is not `owner` or `staff`.
+- `(customer)/_layout.tsx` redirects anyone who is not `retail_customer` or `merchant`.
+- Root `AuthGate` sends unauthenticated users to login.
+- Data isolation is RLS in the migration chain (shop vs own-rows). Hosted
+  enforcement: **NOT VERIFIABLE FROM REPO**.
 
 ---
 
 ## STEP 5 — DOMAIN FEATURE INVENTORY
 
-Constraint: without confirmed applied RLS, maximum status is **PARTIAL**.
+Statuses describe **this repo**, not hosted production.
 
 | # | Feature | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | Customer/borrower registry (KYC, phone identity) | PARTIAL | Phone OTP identity: `login.tsx:52`, `:72–76`. Profile fields used: `full_name`, `phone_number`, `address`, `role` (`database.ts:7–15`; updates in `loanService.ts:68–74`, `login.tsx:89–92`). No KYC fields (Aadhaar/PAN/doc photos) in types or UI. No dedicated registry screen. RLS: **NOT VERIFIABLE FROM REPO**. |
-| 2 | Pledged item entry (type, gross/net, purity, valuation) | PARTIAL | Form/DB: `item_name`, single `weight_grams` (`scanner.tsx:224–230`; `loanService.ts:82–83`; `database.ts:22–23`). No ornament type, gross/net split, or purity columns/UI. Client gold estimate: `goldRateService.ts:41–45`, shown `scanner.tsx:205–212`. RLS: **NOT VERIFIABLE FROM REPO**. |
-| 3 | Item photographs per-loan | PARTIAL | Stores **receipt-pad** image URL on loan (`receipt_image_url`) via `uploadImageToStorage` → bucket `receipts` (`loanService.ts:10–37`, `scanner.tsx:112–113`). Not a separate item-photo gallery. RLS/storage policies: **NOT VERIFIABLE FROM REPO**. |
-| 4 | Loan issuance (principal, rate, tenure, issue date) | PARTIAL | Insert: principal, monthly rate, status, serial, customer (`loanService.ts:76–88`). UI fields `scanner.tsx:215–242`. **No tenure field.** Issue time is `created_at` only (`database.ts:28`). RLS: **NOT VERIFIABLE FROM REPO**. |
-| 5 | Interest accrual / outstanding | PARTIAL | **Client-side only:** `calculateLoanBalances` uses JS `Date` month difference × rate × remaining principal (`loanService.ts:99–132`); displayed `loan/[id].tsx:82–91`, `:154–155`. No DB function/trigger for accrual in app queries. |
-| 6 | Repayment recording | PARTIAL | `logPayment` insert (`loanService.ts:135–148`); UI type chips + amount (`loan/[id].tsx:159–190`); history list (`loan/[id].tsx:196–207`). Auto-close when remaining principal ≤ 0 (`loanService.ts:151–159`, `loan/[id].tsx:108–111`). RLS: **NOT VERIFIABLE FROM REPO**. |
-| 7 | Handwritten receipt-pad scanning / OCR | PARTIAL | Camera capture `expo-camera` (`scanner.tsx:11`, `:179`, `:104`); OCR via Moonshot Kimi (`ocrService.ts:97–149`) using `EXPO_PUBLIC_MOONSHOT_API_KEY` (`ocrService.ts:98–100`); then upload + review form (`scanner.tsx:109–124`). Not photo-storage-only. |
-| 8 | Borrower signature on pledge | PARTIAL | `react-native-signature-canvas` (`scanner.tsx:15`, `:246–255`); upload path `signatures/…` inside same `receipts` bucket (`scanner.tsx:269–274`, `loanService.ts:12–15`, `:27`); stored as `digital_signature_url` (`loanService.ts:87`). RLS/storage: **NOT VERIFIABLE FROM REPO**. |
-| 9 | Redemption / item release | SCAFFOLD ONLY | Closing sets `status: 'closed'` when principal remaining is 0 (`loanService.ts:151–159`). No release checklist, physical return confirmation, or redemption-specific screen. |
-| 10 | Overdue / forfeiture / auction | NOT STARTED | No matches for overdue/forfeit/auction flows in `src/`. Loan status is only `active` \| `closed` (`database.ts:3`). |
-| 11 | Admin dashboard: all-loans, search, filters | PARTIAL | Loads active loans with customer join (`dashboard.tsx:93–110`); client search + retail/merchant tabs (`dashboard.tsx:121–133`, `:177–201`); analytics cards (`dashboard.tsx:154–175`). Route not role-gated (Step 4). RLS: **NOT VERIFIABLE FROM REPO**. |
-| 12 | Customer view: own loans / own receipts | PARTIAL | Selects `id, receipt_image_url, status` with `.eq('customer_id', session.user.id)` (`dashboard.tsx:45–49`). Client filter is UX; server isolation **NOT VERIFIABLE FROM REPO**. |
-| 13 | Storage bucket structure / path namespacing | PARTIAL | Code always uses bucket id `'receipts'` (`loanService.ts:27`); paths `${folder}/${Date.now()}-…` where folder is `receipts` or `signatures` (`loanService.ts:15`) — **no `auth.uid()` / user-id namespace**. Public URL via `getPublicUrl` (`loanService.ts:36–37`). Hosted bucket privacy: **NOT VERIFIABLE FROM REPO** (proposed `public: true` exists only in unversioned `database/schema.sql`). |
-| 14 | Printable / exportable receipt or agreement | NOT STARTED | No print/PDF/share/export implementation under `src/`. |
+| 1 | Customer registry (KYC, phone) | PARTIAL | Phone OTP + walk-in Edge Function. KYC columns and `kyc` bucket exist in `20260815030000`. No shop KYC screen yet. |
+| 2 | Pledged item entry | PARTIAL | `loan_items` (integer mg, nullable `purity_karat`). Scanner still sends one `item_name` / `weight_grams` pair through `create_loan`. No metal / multi-item UI yet. |
+| 3 | Item photographs | PARTIAL | Schema `loan_item_photos` + path CHECK `{uuid}/items/…`. `uploadImageToStorage(…, 'items', …)` exists. Scanner does not capture per-item photos yet. Receipt-pad image is stored on the loan. |
+| 4 | Loan issuance | PRESENT | `create_loan` RPC (shop-only, ≥1 item, copies shop defaults). Client: `createLoanWithCustomer`. |
+| 5 | Interest accrual | PRESENT | SQL `loan_balances_as_of`. Spec in `docs/RULES.md`. No JS accrual. |
+| 6 | Repayment recording | PRESENT | `payments.amount_paid_paise`. Allocation is SQL. |
+| 7 | Receipt-pad OCR | PRESENT | `expo-camera` + `src/services/ocrService.ts`. |
+| 8 | Borrower signature | PRESENT | `react-native-signature-canvas`; private `receipts` bucket `{customer_id}/signatures/…`. |
+| 9 | Redemption / item release | PRESENT | `redeem_loan` (owner-only, checklist, audit snapshot). Empty `loan_items` is refused. UI: `loan/[id]/redeem.tsx`. |
+| 10 | Overdue / forfeiture | PARTIAL | `loans_overdue_as_of`, `generate_loan_notices`, overdue CSV share. No auction workflow. |
+| 11 | Admin dashboard | PRESENT | All loans, search, yield RPC, overdue export. Layout role-gated. |
+| 12 | Customer view | PRESENT | Own loans / receipts. Local DATE notifications from `customer_loan_reminder_schedule` — not remote push. |
+| 13 | Storage path namespacing | PRESENT | `{customer_id}/{receipts\|signatures\|items}/…`. Signed URLs. `SAFE_STORAGE_PATH_RE` matches `loan_item_photos_path_chk`. |
+| 14 | Printable pledge / redemption | PRESENT | `expo-print` + `expo-sharing`; HTML from frozen loan terms (`src/lib/print-documents.ts`). |
 
 ---
 
 ## STEP 6 — PLATFORM PARITY (`@expo/ui` / `expo-glass-effect`)
 
-| Library | Declared | Usage in `src/` | Android path |
-| --- | --- | --- | --- |
-| `@expo/ui` | `package.json:6` | **No imports** (grep of `src/` empty) | N/A — unused |
-| `expo-glass-effect` | `package.json:14` | **No imports** | N/A — unused |
+| Library | Declared | Usage in `src/` |
+| --- | --- | --- |
+| `@expo/ui` | `package.json` | **No imports** |
+| `expo-glass-effect` | `package.json` | **No imports** |
+| `expo-image-picker` | `package.json` | **No imports** (scanner uses `expo-camera`) |
 
-No iOS-only `@expo/ui` / glass components are rendered, so there are no missing Android fallbacks for those libraries today. UI is React Native primitives + local themed components (`ThemedText`, `ThemedView`).
-
-Related unused dependency: `expo-image-picker` is in `package.json:16` but never imported under `src/` (camera path uses `expo-camera` only).
+No iOS-only glass UI is rendered. Unused deps are listed, not removed.
 
 ---
 
 ## STEP 7 — RED FLAGS (severity descending)
 
-1. **RLS / live schema not auditable from repo** — no `supabase/migrations`; hosted policies **NOT VERIFIABLE FROM REPO**. Client `.eq('customer_id', …)` (`customer/dashboard.tsx:48`) is not a security boundary.
-2. **Admin privilege is client-routed only** — non-admin can be sent to customer UI by default, but `(admin)` layouts never check `profile.role` (`(admin)/_layout.tsx`; contrast `routeForRole` in `auth-provider.tsx:89–94`).
-3. **Storage uses public URLs** — `getPublicUrl` after upload (`loanService.ts:36–37`). Object paths are not user-namespaced (`loanService.ts:15`). Hosted bucket public/private: **NOT VERIFIABLE FROM REPO**.
-4. **OCR vendor API key is designed as `EXPO_PUBLIC_*`** — `EXPO_PUBLIC_MOONSHOT_API_KEY` read in client (`ocrService.ts:98–100`; `.env.example:7`). Any real key in that slot ships in the app bundle.
-5. **Money as JavaScript `number` / float arithmetic** — `Number(loan.loan_amount)`, `projectYield` multiplies floats (`dashboard.tsx:31–32`, `:38–42`); payments `Number(amount)` (`loan/[id].tsx:97`); balances use float math then `Math.round(…*100)/100` (`loanService.ts:105–131`). Types/DB proposed as `numeric` in SQL artifact only; app has no integer paise representation.
-6. **Timezone / interest month math is client calendar months** — `getFullYear`/`getMonth` local device time (`loanService.ts:115–120`); loan “issue date” is `created_at` timestamptz string with no shop-timezone policy in app code.
-7. **Phone normalization inconsistency** — login forces `+91…` (`login.tsx:23–31`); `findCustomerIdByPhone` only strips spaces/leading zeros (`loanService.ts:6–7`, `:41–46`). OCR/admin-entered phones may fail customer lookup.
-8. **`.gitignore` does not ignore `.env`** — only `.env*.local` (`.gitignore:34`); real env files are one mistake away from commit.
-9. **`package.json` Expo/RN version skew** — `expo` `^53.0.27` and `react-native` `^0.72.17` alongside many SDK 57 packages (`package.json:8–27`).
-10. **No AppState-based auth refresh** — `autoRefreshToken: true` only (`supabase.ts:36`); background resume refresh pattern **MISSING**.
-11. **Declared UI stack unused** — `@expo/ui` and `expo-glass-effect` installed but never used; platform-parity debt deferred until first adoption.
+1. **Hosted production drift is unknown** — migrations and pgTAP describe local
+   CLI state only. Remote apply / dashboard edits: **NOT VERIFIABLE FROM REPO**.
+2. **Live gold rate is a dead/demo path** — `goldRateService.ts` calls
+   `https://api.metals.live/v1/spot/gold` and uses `usdToInr = 83.5`. Not IBJA.
+   Valuation is not frozen in SQL.
+3. **Scanner still one item, no metal, float gram input** — milligram conversion
+   is `Math.round(Number(weight) * 1000)` until Stage 6.1 `gramsInputToMg`.
+4. **KYC UI is missing** — columns and the Aadhaar-photo CHECK exist; staff
+   cannot capture or mark verified from the app yet.
+5. **OCR vendor key must stay off the client** — `.env.example` says so;
+   confirm no `EXPO_PUBLIC_MOONSHOT_*` is introduced.
+6. **`enforce_loan_mutation_permissions` raises if `auth.uid()` is NULL** —
+   service-role `UPDATE` of `loans` is unsafe. Known, not widened here.
+7. **Phone leading-zero mangling** — `toE164India`, SQL `normalize_phone_e164`,
+   and the walk-in function must stay in lockstep. Known.
+8. **Declared UI stack unused** — `@expo/ui`, `expo-glass-effect`.
 
 ---
 
-## STEP 8 — THREE QUESTIONS
+## STEP 8 — OPEN QUESTIONS (not inventable from the repo)
 
-1. Has any Supabase project already applied a schema (and if so, which environment URL), and are the `receipts` bucket and table RLS policies currently matching anything you consider source of truth — or is the hosted DB still empty / hand-edited?
-2. How must the first shop-owner `admin` account be created in production (manual SQL role flip, invite metadata, allowlist of phone numbers), and will there ever be more than one admin or more than one shop?
-3. What is the shop’s real interest and overdue rule set (simple monthly on remaining principal vs 30-day periods, grace days, compounding, forfeiture/auction timeline), since the app currently estimates accrual only as local calendar-month × rate on the device?
+1. Has any hosted Supabase project applied this 12-file chain, or does
+   production still differ?
+2. Will the shop subscribe to official IBJA rates, or use an indicative feed
+   plus owner override?
+3. Who mints the first `owner` row in production (SQL, invite metadata, phone
+   allowlist), and is there more than one shop?

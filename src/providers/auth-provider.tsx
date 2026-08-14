@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
+import { clearLoanReminderNotifications } from '@/services/loanReminderNotifications';
 import type { Profile, UserRole } from '@/types/database';
 
 interface AuthContextValue {
@@ -66,6 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session?.user.id, refreshProfile]);
 
   const signOut = useCallback(async () => {
+    await clearLoanReminderNotifications().catch((err) => {
+      console.warn(err instanceof Error ? err.message : err);
+    });
     await supabase.auth.signOut();
     setProfile(null);
   }, []);

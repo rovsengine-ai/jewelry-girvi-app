@@ -3,6 +3,8 @@ import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 
 import { routeForRole, useAuth } from '@/providers/auth-provider';
+import { fetchCustomerLoanReminders } from '@/services/loanService';
+import { syncLoanReminderNotifications } from '@/services/loanReminderNotifications';
 
 function isCustomerRole(role: string | undefined): boolean {
   return role === 'retail_customer' || role === 'merchant';
@@ -23,6 +25,24 @@ export default function CustomerLayout() {
       router.replace(routeForRole(profile?.role));
     }
   }, [session, profile, isLoading, waitingForProfile, router]);
+
+  useEffect(() => {
+    if (!session || !isCustomerRole(profile?.role)) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const slots = await fetchCustomerLoanReminders();
+        if (!cancelled) {
+          await syncLoanReminderNotifications(slots);
+        }
+      } catch (err) {
+        console.warn(err instanceof Error ? err.message : err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, profile?.role]);
 
   if (isLoading || waitingForProfile || !session || !isCustomerRole(profile?.role)) {
     return (

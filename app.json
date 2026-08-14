@@ -39,7 +39,15 @@
         {
           "cameraPermission": "Allow Girvi Shop to scan handwritten receipt pads."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#208AEF",
+          "defaultChannel": "loan-reminders"
+        }
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
