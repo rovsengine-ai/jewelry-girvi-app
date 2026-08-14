@@ -5,6 +5,7 @@ import {
   fetchOverdueLoans,
   fetchRateYield,
   generateLoanNotices,
+  LoanPhotosIncompleteError,
   redeemLoan,
   renewLoan,
   resolveReceiptDisplayUrl,
@@ -322,7 +323,10 @@ describe('createLoanWithCustomer', () => {
     },
   ];
 
+  const photoInserts: { loan_item_id: string; storage_path: string }[] = [];
+
   beforeEach(() => {
+    photoInserts.length = 0;
     const { supabase } = jest.requireMock('@/lib/supabase') as {
       supabase: { from: jest.Mock };
     };
@@ -334,6 +338,7 @@ describe('createLoanWithCustomer', () => {
       const chain: {
         select: jest.Mock;
         update: jest.Mock;
+        insert: jest.Mock;
         eq: jest.Mock;
         maybeSingle: jest.Mock;
         single: jest.Mock;
@@ -341,6 +346,12 @@ describe('createLoanWithCustomer', () => {
       } = {
         select: jest.fn(),
         update: jest.fn(),
+        insert: jest.fn(async (row: { loan_item_id: string; storage_path: string }) => {
+          if (table === 'loan_item_photos') {
+            photoInserts.push(row);
+          }
+          return { error: null };
+        }),
         eq: jest.fn(),
         maybeSingle: jest.fn(async () => result),
         single: jest.fn(async () => result),
@@ -351,7 +362,10 @@ describe('createLoanWithCustomer', () => {
       chain.eq.mockReturnValue(chain);
       return chain;
     });
-    rpc.mockResolvedValue({ data: 'loan-uuid', error: null });
+    rpc.mockResolvedValue({
+      data: [{ loan_id: 'loan-uuid', item_ids: ['item-a'] }],
+      error: null,
+    });
   });
 
   test('creates the loan and items in one RPC after converting grams to milligrams', async () => {
@@ -405,6 +419,69 @@ describe('createLoanWithCustomer', () => {
     await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).rejects.toThrow(
       'items_required: create_loan needs at least one pledged item',
     );
+  });
+
+  test('attaches photo N to item N using ids returned by create_loan', async () => {
+    const itemIds = ['item-a', 'item-b', 'item-c'];
+    rpc.mockResolvedValue({
+      data: [{ loan_id: 'loan-uuid', item_ids: itemIds }],
+      error: null,
+    });
+    const photographed: ScannerItemDraft[] = [
+      { ...items[0]!, key: 'i1', ornament_type: 'Chain', localPhotoUri: 'file:///tmp/chain.jpg' },
+      { ...items[0]!, key: 'i2', ornament_type: 'Bangle', localPhotoUri: 'file:///tmp/bangle.jpg' },
+      { ...items[0]!, key: 'i3', ornament_type: 'Ring', localPhotoUri: 'file:///tmp/ring.jpg' },
+    ];
+
+    await expect(
+      createLoanWithCustomer(form, photographed, 'file:///tmp/receipt.jpg', null),
+    ).resolves.toBe('loan-uuid');
+
+    expect(photoInserts.map((row) => row.loan_item_id)).toEqual(itemIds);
+    expect(photoInserts.every((row) => row.storage_path.startsWith(`${CUSTOMER}/items/`))).toBe(
+      true,
+    );
+  });
+
+  test('a mid-loop upload failure reports that the loan exists, not a generic save failure', async () => {
+    const itemIds = ['item-a', 'item-b', 'item-c'];
+    rpc.mockResolvedValue({
+      data: [{ loan_id: 'loan-uuid', item_ids: itemIds }],
+      error: null,
+    });
+    let uploadCount = 0;
+    upload.mockImplementation(async () => {
+      uploadCount += 1;
+      // 1 = receipt (before RPC), 2 = item 1, 3 = item 2 (fails)
+      if (uploadCount === 3) {
+        return { error: { message: 'storage full' } };
+      }
+      return { error: null };
+    });
+    const photographed: ScannerItemDraft[] = [
+      { ...items[0]!, key: 'i1', ornament_type: 'Chain', localPhotoUri: 'file:///tmp/chain.jpg' },
+      { ...items[0]!, key: 'i2', ornament_type: 'Bangle', localPhotoUri: 'file:///tmp/bangle.jpg' },
+      { ...items[0]!, key: 'i3', ornament_type: 'Ring', localPhotoUri: 'file:///tmp/ring.jpg' },
+    ];
+
+    const thrown = await createLoanWithCustomer(
+      form,
+      photographed,
+      'file:///tmp/receipt.jpg',
+      null,
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(LoanPhotosIncompleteError);
+    const incomplete = thrown as LoanPhotosIncompleteError;
+    expect(incomplete.code).toBe('LOAN_PHOTOS_INCOMPLETE');
+    expect(incomplete.loanId).toBe('loan-uuid');
+    expect(incomplete.serialNumber).toBe('T-1');
+    expect(incomplete.nextIndex).toBe(1);
+    expect(incomplete.message).toMatch(/Loan T-1 was created/);
+    expect(incomplete.message).toMatch(/retry attaching photos/);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(photoInserts).toHaveLength(1);
+    expect(photoInserts[0]?.loan_item_id).toBe('item-a');
   });
 });
 
