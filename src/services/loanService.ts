@@ -197,6 +197,92 @@ async function loadShopDefaults(): Promise<ShopDefaults> {
   return data as ShopDefaults;
 }
 
+/**
+ * Loan row exists; item photos did not all land. Retry with
+ * attachItemPhotos — do not call createLoanWithCustomer again (serial UNIQUE).
+ */
+export class LoanPhotosIncompleteError extends Error {
+  readonly code = 'LOAN_PHOTOS_INCOMPLETE' as const;
+
+  constructor(
+    readonly loanId: string,
+    readonly serialNumber: string,
+    readonly customerId: string,
+    readonly itemIds: string[],
+    readonly nextIndex: number,
+    cause?: unknown,
+  ) {
+    super(
+      `Loan ${serialNumber} was created but item photos are incomplete. The loan exists; retry attaching photos instead of saving again.`,
+    );
+    this.name = 'LoanPhotosIncompleteError';
+    if (cause instanceof Error) {
+      this.cause = cause;
+    }
+  }
+}
+
+type CreateLoanRow = { loan_id: string; item_ids: string[] };
+
+function parseCreateLoanResult(data: unknown): CreateLoanRow {
+  const row = (Array.isArray(data) ? data[0] : data) as CreateLoanRow | null;
+  if (!row || typeof row.loan_id !== 'string' || row.loan_id.length === 0) {
+    throw new Error('Could not create the loan.');
+  }
+  if (!Array.isArray(row.item_ids) || row.item_ids.some((id) => typeof id !== 'string')) {
+    throw new Error('Could not create the loan.');
+  }
+  return row;
+}
+
+/** Attach local item photos using ids returned by create_loan, in input order. */
+export async function attachItemPhotos(input: {
+  loanId: string;
+  serialNumber: string;
+  customerId: string;
+  items: ScannerItemDraft[];
+  itemIds: string[];
+  fromIndex?: number;
+}): Promise<void> {
+  if (input.itemIds.length !== input.items.length) {
+    throw new LoanPhotosIncompleteError(
+      input.loanId,
+      input.serialNumber,
+      input.customerId,
+      input.itemIds,
+      input.fromIndex ?? 0,
+    );
+  }
+
+  const start = input.fromIndex ?? 0;
+  for (let index = start; index < input.items.length; index += 1) {
+    const uri = input.items[index]?.localPhotoUri;
+    const itemId = input.itemIds[index];
+    if (!uri || !itemId) {
+      continue;
+    }
+    try {
+      const storagePath = await uploadImageToStorage(uri, 'items', input.customerId);
+      const { error: photoError } = await supabase.from('loan_item_photos').insert({
+        loan_item_id: itemId,
+        storage_path: storagePath,
+      });
+      if (photoError) {
+        throw new Error(photoError.message);
+      }
+    } catch (cause) {
+      throw new LoanPhotosIncompleteError(
+        input.loanId,
+        input.serialNumber,
+        input.customerId,
+        input.itemIds,
+        index,
+        cause,
+      );
+    }
+  }
+}
+
 export async function createLoanWithCustomer(
   form: LoanFormData,
   items: ScannerItemDraft[],
@@ -252,10 +338,11 @@ export async function createLoanWithCustomer(
   }
 
   const converted = items.map((item) => convertScannerItem(item));
+  const serialNumber = form.serial_number.trim();
 
   const { data, error } = await supabase.rpc('create_loan', {
     p_customer_id: customerId,
-    p_serial_number: form.serial_number.trim(),
+    p_serial_number: serialNumber,
     p_receipt_image_url: receiptPath,
     p_principal_paise: principalPaise,
     p_rate_bps: rateBps,
@@ -268,33 +355,20 @@ export async function createLoanWithCustomer(
   if (error) {
     throw new Error(error.message);
   }
-  if (!data) {
-    throw new Error('Could not create the loan.');
-  }
 
-  const createdItems = items.some((item) => item.localPhotoUri)
-    ? await fetchLoanItems(data)
-    : [];
-  if (items.some((item) => item.localPhotoUri) && createdItems.length !== items.length) {
-    throw new Error('Loan was created but pledged items could not be matched for photos.');
-  }
-  for (let index = 0; index < items.length; index += 1) {
-    const uri = items[index]?.localPhotoUri;
-    const itemId = createdItems[index]?.id;
-    if (!uri || !itemId) {
-      continue;
-    }
-    const storagePath = await uploadImageToStorage(uri, 'items', customerId);
-    const { error: photoError } = await supabase.from('loan_item_photos').insert({
-      loan_item_id: itemId,
-      storage_path: storagePath,
+  const created = parseCreateLoanResult(data);
+
+  if (items.some((item) => item.localPhotoUri)) {
+    await attachItemPhotos({
+      loanId: created.loan_id,
+      serialNumber,
+      customerId,
+      items,
+      itemIds: created.item_ids,
     });
-    if (photoError) {
-      throw new Error(photoError.message);
-    }
   }
 
-  return data;
+  return created.loan_id;
 }
 
 export async function fetchLoanBalances(
@@ -351,7 +425,8 @@ export async function fetchLoanItems(loanId: string): Promise<LoanItem[]> {
     .from('loan_items')
     .select('*')
     .eq('loan_id', loanId)
-    .order('created_at', { ascending: true });
+    .order('position', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     throw new Error(error.message);

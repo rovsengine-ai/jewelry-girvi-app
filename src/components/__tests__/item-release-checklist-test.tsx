@@ -8,6 +8,7 @@ const ITEMS: LoanItem[] = [
   {
     id: 'item-chain',
     loan_id: 'loan-1',
+    position: 1,
     ornament_type: 'Gold chain',
     description: null,
     metal: 'gold',
@@ -22,6 +23,7 @@ const ITEMS: LoanItem[] = [
   {
     id: 'item-bangle',
     loan_id: 'loan-1',
+    position: 2,
     ornament_type: 'Gold bangle',
     description: 'backfilled',
     metal: 'gold',

@@ -136,6 +136,8 @@ export interface Payment {
 export interface LoanItem {
   id: string;
   loan_id: string;
+  /** 1-based order from the create_loan items array. Unique per loan. */
+  position: number;
   ornament_type: string;
   description: string | null;
   /** null only on rows that predate the metal column. New loans require gold or silver. */

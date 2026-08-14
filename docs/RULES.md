@@ -88,6 +88,10 @@
   function then uses `new_maturity_on`. Idempotent on `(loan_id, renewed_on)`.
 ## Pledged items
 - A girvi ticket pledges one or more ornaments, held in `loan_items`.
+- Each item has a 1-based `position` unique per loan, set from the
+  `create_loan` input array (`jsonb_array_elements WITH ORDINALITY`). Photos,
+  the printed pledge, and the release checklist follow `position`, never
+  `created_at` (that timestamp is identical for every item in one transaction).
 - Each new item is `gold` or `silver` (required on `create_loan`). Historic
   rows may have NULL metal; never default missing metal to gold.
 - Weights are INTEGER MILLIGRAMS (`gross_weight_mg`, `net_weight_mg`), same

@@ -26,7 +26,11 @@ import {
   type ScannerItemDraft,
 } from '@/lib/scanner-items';
 import { gramsInputToMg } from '@/lib/weight';
-import { createLoanWithCustomer } from '@/services/loanService';
+import {
+  attachItemPhotos,
+  createLoanWithCustomer,
+  LoanPhotosIncompleteError,
+} from '@/services/loanService';
 import { extractReceiptData } from '@/services/ocrService';
 import type { LoanFormData } from '@/types/database';
 
@@ -273,6 +277,48 @@ export default function AdminScannerScreen() {
         { text: 'Dashboard', onPress: () => router.replace('/(admin)/dashboard') },
       ]);
     } catch (error) {
+      if (error instanceof LoanPhotosIncompleteError) {
+        Alert.alert('Loan saved, photos incomplete', error.message, [
+          {
+            text: 'Retry photos',
+            onPress: () => {
+              void (async () => {
+                setIsBusy(true);
+                try {
+                  await attachItemPhotos({
+                    loanId: error.loanId,
+                    serialNumber: error.serialNumber,
+                    customerId: error.customerId,
+                    items,
+                    itemIds: error.itemIds,
+                    fromIndex: error.nextIndex,
+                  });
+                  Alert.alert('Saved', 'Item photos attached.', [
+                    {
+                      text: 'View loan',
+                      onPress: () => router.replace(`/(admin)/loan/${error.loanId}`),
+                    },
+                  ]);
+                } catch (retryError) {
+                  Alert.alert(
+                    retryError instanceof LoanPhotosIncompleteError
+                      ? 'Loan saved, photos incomplete'
+                      : 'Save failed',
+                    retryError instanceof Error ? retryError.message : 'Unknown error',
+                  );
+                } finally {
+                  setIsBusy(false);
+                }
+              })();
+            },
+          },
+          {
+            text: 'View loan',
+            onPress: () => router.replace(`/(admin)/loan/${error.loanId}`),
+          },
+        ]);
+        return;
+      }
       Alert.alert('Save failed', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsBusy(false);

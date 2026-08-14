@@ -228,6 +228,7 @@ export interface Database {
         Row: {
           id: string;
           loan_id: string;
+          position: number;
           ornament_type: string;
           description: string | null;
           metal: 'gold' | 'silver' | null;
@@ -242,6 +243,7 @@ export interface Database {
         Insert: {
           id?: string;
           loan_id: string;
+          position: number;
           ornament_type: string;
           description?: string | null;
           metal?: 'gold' | 'silver' | null;
@@ -255,6 +257,7 @@ export interface Database {
         };
         Update: {
           loan_id?: string;
+          position?: number;
           ornament_type?: string;
           description?: string | null;
           metal?: 'gold' | 'silver' | null;
@@ -516,7 +519,10 @@ export interface Database {
           p_digital_signature_url: string | null;
           p_items: Json;
         };
-        Returns: string;
+        Returns: {
+          loan_id: string;
+          item_ids: string[];
+        }[];
       };
       redeem_loan: {
         Args: {

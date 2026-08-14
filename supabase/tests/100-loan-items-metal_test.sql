@@ -21,9 +21,9 @@ insert into public.loans (
 );
 
 insert into public.loan_items (
-  loan_id, ornament_type, gross_weight_mg, net_weight_mg, quantity
+  loan_id, position, ornament_type, gross_weight_mg, net_weight_mg, quantity
 ) values (
-  '08000000-0000-4000-8000-000000000001', 'Old chain', 10000, 10000, 1
+  '08000000-0000-4000-8000-000000000001', 1, 'Old chain', 10000, 10000, 1
 );
 
 select is(
@@ -87,9 +87,9 @@ select results_eq(
 select throws_ok(
   $$
     insert into public.loan_items (
-      loan_id, ornament_type, metal, gross_weight_mg, net_weight_mg, quantity
+      loan_id, position, ornament_type, metal, gross_weight_mg, net_weight_mg, quantity
     ) values (
-      '08000000-0000-4000-8000-000000000001', 'Fake', 'platinum', 1000, 1000, 1
+      '08000000-0000-4000-8000-000000000001', 2, 'Fake', 'platinum', 1000, 1000, 1
     )
   $$,
   'new row for relation "loan_items" violates check constraint "loan_items_metal_chk"',
