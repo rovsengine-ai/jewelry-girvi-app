@@ -40,7 +40,7 @@ select throws_ok(
       DATE '2024-01-01',
       'retail'::public.interest_model,
       null,
-      '[{"ornament_type":"Gold chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1}]'::jsonb
+      '[{"metal":"gold","ornament_type":"Gold chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1}]'::jsonb
     )
   $$,
   'shop_only: only shop users may create a loan',
@@ -64,8 +64,8 @@ select lives_ok(
       'retail'::public.interest_model,
       null,
       '[
-        {"ornament_type":"Gold chain","gross_weight_mg":10500,"net_weight_mg":10000,"stone_deduction_mg":500,"quantity":1},
-        {"ornament_type":"Gold ring","gross_weight_mg":4000,"net_weight_mg":4000,"quantity":1}
+        {"metal":"gold","ornament_type":"Gold chain","gross_weight_mg":10500,"net_weight_mg":10000,"stone_deduction_mg":500,"quantity":1},
+        {"metal":"gold","ornament_type":"Gold ring","gross_weight_mg":4000,"net_weight_mg":4000,"quantity":1}
       ]'::jsonb
     )
   $$,
@@ -124,8 +124,8 @@ select throws_ok(
       'retail'::public.interest_model,
       null,
       '[
-        {"ornament_type":"Gold chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1},
-        {"ornament_type":"Gold ring","gross_weight_mg":4000,"net_weight_mg":5000,"quantity":1}
+        {"metal":"gold","ornament_type":"Gold chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1},
+        {"metal":"gold","ornament_type":"Gold ring","gross_weight_mg":4000,"net_weight_mg":5000,"quantity":1}
       ]'::jsonb
     )
   $$,

@@ -230,6 +230,7 @@ export interface Database {
           loan_id: string;
           ornament_type: string;
           description: string | null;
+          metal: 'gold' | 'silver' | null;
           gross_weight_mg: number;
           net_weight_mg: number;
           purity_karat: number | null;
@@ -243,6 +244,7 @@ export interface Database {
           loan_id: string;
           ornament_type: string;
           description?: string | null;
+          metal?: 'gold' | 'silver' | null;
           gross_weight_mg: number;
           net_weight_mg: number;
           purity_karat?: number | null;
@@ -255,6 +257,7 @@ export interface Database {
           loan_id?: string;
           ornament_type?: string;
           description?: string | null;
+          metal?: 'gold' | 'silver' | null;
           gross_weight_mg?: number;
           net_weight_mg?: number;
           purity_karat?: number | null;

@@ -11,6 +11,9 @@ export type InterestModel = 'retail' | 'merchant';
 
 export type PartialPeriodMode = 'pro_rata' | 'full_period' | 'min_month_then_pro_rata';
 
+export type Metal = 'gold' | 'silver';
+export type PledgeMetal = Metal;
+
 export type IdDocumentType = 'aadhaar' | 'pan' | 'voter_id' | 'driving_licence' | 'passport';
 
 export type NoticeType = 'due_soon' | 'overdue' | 'renewal_offer' | 'forfeiture_warning';
@@ -126,6 +129,8 @@ export interface LoanItem {
   loan_id: string;
   ornament_type: string;
   description: string | null;
+  /** null only on rows that predate the metal column. New loans require gold or silver. */
+  metal: Metal | null;
   gross_weight_mg: number;
   net_weight_mg: number;
   /** null means not assessed. Never default this to 22. */
@@ -219,14 +224,12 @@ export interface OcrExtractionResult {
   interest_rate: number;
 }
 
-/** Form fields are display strings; convert to paise/bps on save. */
+/** Form fields are display strings; convert to paise/bps/mg on save. */
 export interface LoanFormData {
   serial_number: string;
   customer_name: string;
   phone_number: string;
   address: string;
-  item_name: string;
-  weight_grams: string;
   loan_amount_rupees: string;
   interest_percent_monthly: string;
   disbursed_on: string;

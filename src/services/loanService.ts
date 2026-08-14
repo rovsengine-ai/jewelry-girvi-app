@@ -3,7 +3,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { isReminderKind, type LoanReminderSlot } from '@/lib/loan-reminders';
 import { asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { toE164India } from '@/lib/phone';
+import { convertScannerItem, type ScannerItemDraft } from '@/lib/scanner-items';
 import { supabase } from '@/lib/supabase';
+import type { Json } from '@/types/supabase';
 import type {
   InterestModel,
   LoanBalances,
@@ -197,6 +199,7 @@ async function loadShopDefaults(): Promise<ShopDefaults> {
 
 export async function createLoanWithCustomer(
   form: LoanFormData,
+  items: ScannerItemDraft[],
   receiptLocalUri: string,
   signatureDataUrl: string | null,
 ): Promise<string> {
@@ -244,10 +247,11 @@ export async function createLoanWithCustomer(
 
   const disbursedOn = form.disbursed_on.trim() || todayInKolkata();
 
-  const weightMg = Math.round(Number(form.weight_grams) * 1000);
-  if (!Number.isInteger(weightMg) || weightMg <= 0) {
-    throw new Error('Weight must convert to a positive whole milligram.');
+  if (items.length < 1) {
+    throw new Error('Add at least one pledged item.');
   }
+
+  const converted = items.map((item) => convertScannerItem(item));
 
   const { data, error } = await supabase.rpc('create_loan', {
     p_customer_id: customerId,
@@ -258,17 +262,7 @@ export async function createLoanWithCustomer(
     p_disbursed_on: disbursedOn,
     p_interest_model: interestModel,
     p_digital_signature_url: signaturePath,
-    p_items: [
-      {
-        ornament_type: form.item_name.trim(),
-        description: null,
-        gross_weight_mg: weightMg,
-        net_weight_mg: weightMg,
-        stone_deduction_mg: 0,
-        purity_karat: null,
-        quantity: 1,
-      },
-    ],
+    p_items: converted as unknown as Json,
   });
 
   if (error) {

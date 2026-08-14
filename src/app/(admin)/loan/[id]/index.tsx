@@ -24,6 +24,7 @@ import {
   rupeesInputToPaise,
   todayInKolkata,
 } from '@/lib/money';
+import { mgToGramsInput } from '@/lib/weight';
 import { buildPledgeAgreementHtml, buildRedemptionReceiptHtml } from '@/lib/print-documents';
 import { isRenewalEligible, loanStatusLabel } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
@@ -246,6 +247,22 @@ export default function LoanDetailScreen() {
               {loan.released_to_name ?? '—'}
             </ThemedText>
           ) : null}
+        </View>
+
+        <View style={[styles.summaryCard, { backgroundColor: colors.backgroundElement }]}>
+          <ThemedText type="smallBold">Pledged items</ThemedText>
+          {items.length === 0 ? (
+            <ThemedText type="small">No item rows on this loan.</ThemedText>
+          ) : (
+            items.map((item) => (
+              <ThemedText type="small" key={item.id}>
+                {item.metal ?? 'metal unknown'} · {item.ornament_type} ·{' '}
+                {mgToGramsInput(item.net_weight_mg)}g net
+                {item.purity_karat != null ? ` · ${item.purity_karat}K` : ' · purity not assessed'}
+                {item.quantity > 1 ? ` · ×${item.quantity}` : ''}
+              </ThemedText>
+            ))
+          )}
         </View>
 
         {loan.status === 'active' ? (

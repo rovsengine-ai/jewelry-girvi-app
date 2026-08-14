@@ -88,10 +88,13 @@
   function then uses `new_maturity_on`. Idempotent on `(loan_id, renewed_on)`.
 ## Pledged items
 - A girvi ticket pledges one or more ornaments, held in `loan_items`.
+- Each new item is `gold` or `silver` (required on `create_loan`). Historic
+  rows may have NULL metal; never default missing metal to gold.
 - Weights are INTEGER MILLIGRAMS (`gross_weight_mg`, `net_weight_mg`), same
   discipline as paise and basis points. Never a decimal gram.
 - `purity_karat` NULL means NOT ASSESSED. Never assume 22: an invented purity
-  flows into valuation and misprices the pledge.
+  flows into valuation and misprices the pledge. Silver has no karat; leave it
+  NULL (do not invent a millesimal).
 - Item photos live in the private `receipts` bucket at
   `{customer_id}/items/...`, reachable only through a signed URL.
 ## KYC

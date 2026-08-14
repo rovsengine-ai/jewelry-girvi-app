@@ -10,6 +10,7 @@ import {
   resolveReceiptDisplayUrl,
   uploadImageToStorage,
 } from '@/services/loanService';
+import type { ScannerItemDraft } from '@/lib/scanner-items';
 import type { LoanFormData, ShopDefaults } from '@/types/database';
 
 jest.mock('@/lib/supabase', () => {
@@ -300,12 +301,25 @@ describe('createLoanWithCustomer', () => {
     customer_name: 'Asha Patil',
     phone_number: '9876543210',
     address: 'Pune',
-    item_name: 'Gold chain',
-    weight_grams: '10.5',
     loan_amount_rupees: '10000',
     interest_percent_monthly: '',
     disbursed_on: '2024-01-01',
   };
+
+  const items: ScannerItemDraft[] = [
+    {
+      key: 'item-1',
+      metal: 'gold',
+      ornament_type: 'Gold chain',
+      description: '',
+      gross_grams: '10.5',
+      stone_grams: '0',
+      net_grams: '10.5',
+      netManuallyEdited: false,
+      purity_karat: null,
+      quantity: '1',
+    },
+  ];
 
   beforeEach(() => {
     const { supabase } = jest.requireMock('@/lib/supabase') as {
@@ -340,7 +354,7 @@ describe('createLoanWithCustomer', () => {
   });
 
   test('creates the loan and items in one RPC after converting grams to milligrams', async () => {
-    await expect(createLoanWithCustomer(form, 'file:///tmp/a.jpg', null)).resolves.toBe(
+    await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).resolves.toBe(
       'loan-uuid',
     );
 
@@ -357,6 +371,7 @@ describe('createLoanWithCustomer', () => {
       p_digital_signature_url: null,
       p_items: [
         {
+          metal: 'gold',
           ornament_type: 'Gold chain',
           description: null,
           gross_weight_mg: 10500,
@@ -369,10 +384,15 @@ describe('createLoanWithCustomer', () => {
     });
   });
 
-  test('rejects a non-positive weight before calling create_loan', async () => {
+  test('rejects a missing metal before calling create_loan', async () => {
     await expect(
-      createLoanWithCustomer({ ...form, weight_grams: '0' }, 'file:///tmp/a.jpg', null),
-    ).rejects.toThrow('Weight must convert to a positive whole milligram.');
+      createLoanWithCustomer(
+        form,
+        [{ ...items[0]!, metal: null }],
+        'file:///tmp/a.jpg',
+        null,
+      ),
+    ).rejects.toThrow('Choose gold or silver for every pledged item.');
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -381,7 +401,7 @@ describe('createLoanWithCustomer', () => {
       data: null,
       error: { message: 'items_required: create_loan needs at least one pledged item' },
     });
-    await expect(createLoanWithCustomer(form, 'file:///tmp/a.jpg', null)).rejects.toThrow(
+    await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).rejects.toThrow(
       'items_required: create_loan needs at least one pledged item',
     );
   });
