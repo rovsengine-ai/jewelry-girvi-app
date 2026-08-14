@@ -47,12 +47,12 @@ insert into storage.objects (bucket_id, name) values
 
 -- Stage 2 fixtures: pledged items, their photos, notices, and KYC objects.
 insert into public.loan_items (
-  id, loan_id, ornament_type, gross_weight_mg, net_weight_mg, quantity
+  id, loan_id, position, ornament_type, gross_weight_mg, net_weight_mg, quantity
 ) values
   ('e0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000001',
-   'Gold chain', 10500, 10500, 1),
+   1, 'Gold chain', 10500, 10500, 1),
   ('e0000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000002',
-   'Gold ring', 4250, 4250, 1);
+   1, 'Gold ring', 4250, 4250, 1);
 
 insert into public.loan_item_photos (loan_item_id, storage_path) values
   ('e0000000-0000-4000-8000-000000000001',
@@ -352,9 +352,9 @@ select results_eq(
 
 select throws_ok(
   $$ insert into public.loan_items (
-       loan_id, ornament_type, gross_weight_mg, net_weight_mg
+       loan_id, position, ornament_type, gross_weight_mg, net_weight_mg
      ) values (
-       'a0000000-0000-4000-8000-000000000001', 'Self-added', 1000, 1000
+       'a0000000-0000-4000-8000-000000000001', 2, 'Self-added', 1000, 1000
      ) $$,
   '42501',
   NULL,
@@ -410,9 +410,9 @@ select throws_ok(
 
 select lives_ok(
   $$ insert into public.loan_items (
-       loan_id, ornament_type, gross_weight_mg, net_weight_mg
+       loan_id, position, ornament_type, gross_weight_mg, net_weight_mg
      ) values (
-       'a0000000-0000-4000-8000-000000000001', 'Counter-added bangle', 8000, 7800
+       'a0000000-0000-4000-8000-000000000001', 2, 'Counter-added bangle', 8000, 7800
      ) $$,
   'staff CAN add a pledged item at the counter'
 );

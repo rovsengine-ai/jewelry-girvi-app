@@ -35,12 +35,12 @@ insert into public.loans (
    1000000, 150, DATE '2024-01-01', 'merchant', 180, 30, 0, 'pro_rata', 24);
 
 insert into public.loan_items (
-  id, loan_id, ornament_type, gross_weight_mg, net_weight_mg, quantity
+  id, loan_id, position, ornament_type, gross_weight_mg, net_weight_mg, quantity
 ) values
   ('bb000000-0000-4000-8000-000000000001', 'aa000000-0000-4000-8000-000000000001',
-   'Gold chain', 10000, 10000, 1),
+   1, 'Gold chain', 10000, 10000, 1),
   ('bb000000-0000-4000-8000-000000000002', 'aa000000-0000-4000-8000-000000000001',
-   'Gold earring pair', 4000, 3800, 2);
+   2, 'Gold earring pair', 4000, 3800, 2);
 
 -- ---------------------------------------------------------------------------
 -- 1-4. Staff / customer cannot redeem. Owner can, with the exact snapshot.
