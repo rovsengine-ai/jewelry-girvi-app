@@ -7,17 +7,23 @@ import {
   RefreshControl,
   Share,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
+import { Badge } from '@/components/badge';
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
+import { Field } from '@/components/field';
+import { MoneyText } from '@/components/money-text';
+import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { asBps, asPaise, formatBpsAsPercent, formatPaiseAsInr } from '@/lib/money';
+import { asBps, asPaise, formatBpsAsPercent } from '@/lib/money';
 import { buildOverdueCallListCsv, noticeTypeLabel } from '@/lib/notices';
 import { loanStatusLabel } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
@@ -33,14 +39,12 @@ import type { LoanNotice, LoanStatus, LoanWithCustomer, OverdueLoan, RateYield }
 type CustomerTab = 'retail_customer' | 'merchant';
 type StatusFilter = 'active' | 'redeemed' | 'closed' | 'defaulted' | 'all';
 
-function AnalyticsCard({ label, value }: { label: string; value: string }) {
-  const colors = useTheme();
-
+function AnalyticsCard({ label, paise }: { label: string; paise: number }) {
   return (
-    <View style={[styles.analyticsCard, { backgroundColor: colors.backgroundElement }]}>
+    <Card style={styles.analyticsCard}>
       <ThemedText type="small">{label}</ThemedText>
-      <ThemedText type="subtitle">{value}</ThemedText>
-    </View>
+      <MoneyText paise={asPaise(paise)} />
+    </Card>
   );
 }
 
@@ -155,82 +159,70 @@ export default function AdminDashboardScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.headerRow}>
-          <ThemedText type="title">{isOwner ? 'Owner Dashboard' : 'Staff Dashboard'}</ThemedText>
+        <Row style={styles.headerRow}>
+          <ThemedText type="subtitle">{isOwner ? 'Owner Dashboard' : 'Staff Dashboard'}</ThemedText>
           <View style={styles.headerActions}>
-            <Link href="/(admin)/scanner" asChild>
-              <Pressable style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
-                <ThemedText type="smallBold">Scan Receipt</ThemedText>
-              </Pressable>
-            </Link>
-            <Pressable onPress={() => void signOut()}>
-              <ThemedText type="smallBold">Sign out</ThemedText>
-            </Pressable>
+            <Button label="Scan Receipt" onPress={() => router.push('/(admin)/scanner')} />
+            <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
           </View>
-        </View>
+        </Row>
 
         {isOwner ? (
           <>
             <View style={styles.analyticsGrid}>
-              <AnalyticsCard
-                label="Active capital outlay"
-                value={formatPaiseAsInr(totalCapitalPaise)}
-              />
-              <AnalyticsCard
-                label="Projected 30-day yield"
-                value={formatPaiseAsInr(totalOnePeriodPaise)}
-              />
+              <AnalyticsCard label="Active capital outlay" paise={totalCapitalPaise} />
+              <AnalyticsCard label="Projected 30-day yield" paise={totalOnePeriodPaise} />
             </View>
 
-            <View style={[styles.bracketCard, { backgroundColor: colors.backgroundElement }]}>
+            <Card style={styles.sectionCard}>
               <ThemedText type="smallBold">Yield by actual rate (original principal)</ThemedText>
               {yieldRows.length === 0 ? (
-                <ThemedText type="small">No active loans to project.</ThemedText>
+                <EmptyState title="No yield yet" body="No active loans to project." />
               ) : (
                 yieldRows.map((row) => (
-                  <ThemedText type="small" key={row.rate_bps}>
-                    {formatBpsAsPercent(asBps(row.rate_bps))}% · {row.loan_count} loan
-                    {row.loan_count === 1 ? '' : 's'} · 1P{' '}
-                    {formatPaiseAsInr(row.one_period_yield_paise)} · 6P{' '}
-                    {formatPaiseAsInr(row.six_period_yield_paise)} · 12P{' '}
-                    {formatPaiseAsInr(row.twelve_period_yield_paise)}
-                  </ThemedText>
+                  <Row key={row.rate_bps}>
+                    <ThemedText type="small">
+                      {formatBpsAsPercent(asBps(row.rate_bps))}% · {row.loan_count} loan
+                      {row.loan_count === 1 ? '' : 's'}
+                    </ThemedText>
+                    <MoneyText paise={asPaise(row.one_period_yield_paise)} />
+                  </Row>
                 ))
               )}
-            </View>
+            </Card>
           </>
         ) : null}
 
-        <View style={[styles.bracketCard, { backgroundColor: colors.backgroundElement }]}>
-          <View style={styles.sectionHeader}>
+        <Card style={styles.sectionCard}>
+          <Row style={styles.sectionHeader}>
             <ThemedText type="smallBold">Overdue ({overdue.length})</ThemedText>
             <View style={styles.headerActions}>
-              <Pressable
+              <Button
+                label={isGenerating ? 'Generating…' : 'Generate notices'}
+                variant="secondary"
+                loading={isGenerating}
                 onPress={() => void onGenerateNotices()}
-                disabled={isGenerating}
-                style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
-                <ThemedText type="smallBold">{isGenerating ? 'Generating…' : 'Generate notices'}</ThemedText>
-              </Pressable>
+              />
               {overdue.length > 0 ? (
-                <Pressable
-                  onPress={() => void onExportCallList()}
-                  style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}>
-                  <ThemedText type="smallBold">Call list CSV</ThemedText>
-                </Pressable>
+                <Button label="Call list CSV" variant="secondary" onPress={() => void onExportCallList()} />
               ) : null}
             </View>
-          </View>
+          </Row>
           {overdue.length === 0 ? (
-            <ThemedText type="small">No overdue girvis today.</ThemedText>
+            <EmptyState title="None overdue" body="No overdue girvis today." />
           ) : (
             overdue.slice(0, 8).map((row) => (
               <Pressable
                 key={row.loan_id}
-                onPress={() => router.push(`/(admin)/loan/${row.loan_id}`)}>
-                <ThemedText type="smallBold">{row.serial_number}</ThemedText>
+                onPress={() => router.push(`/(admin)/loan/${row.loan_id}`)}
+                style={styles.hit}>
+                <Row>
+                  <ThemedText type="smallBold">{row.serial_number}</ThemedText>
+                  <MoneyText paise={asPaise(row.total_due_paise)} />
+                </Row>
                 <ThemedText type="small">
                   {row.customer_name ?? 'Unknown'} · {row.phone_number ?? '—'} · {row.days_overdue}d
-                  overdue · {formatPaiseAsInr(asPaise(row.total_due_paise))}
+                  overdue
                 </ThemedText>
               </Pressable>
             ))
@@ -239,16 +231,14 @@ export default function AdminDashboardScreen() {
             <ThemedText type="small">And {overdue.length - 8} more — export the CSV for the full list.</ThemedText>
           ) : null}
           {notices.length > 0 ? (
-            <ThemedText type="smallBold" style={styles.bracketSpacer}>
-              Recent in-app notices
-            </ThemedText>
+            <ThemedText type="smallBold">Recent in-app notices</ThemedText>
           ) : null}
           {notices.slice(0, 5).map((notice) => (
             <ThemedText type="small" key={notice.id}>
               {noticeTypeLabel(notice.notice_type)} · {notice.scheduled_for} · {notice.channel}
             </ThemedText>
           ))}
-        </View>
+        </Card>
 
         <View style={styles.tabRow}>
           {(['retail_customer', 'merchant'] as CustomerTab[]).map((value) => (
@@ -258,7 +248,8 @@ export default function AdminDashboardScreen() {
               style={[
                 styles.tab,
                 {
-                  backgroundColor: tab === value ? colors.backgroundSelected : colors.backgroundElement,
+                  backgroundColor: tab === value ? colors.backgroundSelected : colors.elevated,
+                  borderColor: colors.border,
                 },
               ]}>
               <ThemedText type="smallBold">
@@ -277,7 +268,8 @@ export default function AdminDashboardScreen() {
                 styles.statusChip,
                 {
                   backgroundColor:
-                    statusFilter === value ? colors.backgroundSelected : colors.backgroundElement,
+                    statusFilter === value ? colors.backgroundSelected : colors.elevated,
+                  borderColor: colors.border,
                 },
               ]}>
               <ThemedText type="smallBold">
@@ -287,13 +279,14 @@ export default function AdminDashboardScreen() {
           ))}
         </View>
 
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by name, phone, or serial number"
-          placeholderTextColor={colors.textSecondary}
-          style={[styles.search, { borderColor: colors.backgroundSelected, color: colors.text }]}
-        />
+        <View style={styles.searchWrap}>
+          <Field
+            label="Search"
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Name, phone, or serial number"
+          />
+        </View>
 
         {isLoading ? (
           <ActivityIndicator style={styles.loader} />
@@ -311,19 +304,25 @@ export default function AdminDashboardScreen() {
               />
             }
             contentContainerStyle={styles.listContent}
-            ListEmptyComponent={<ThemedText style={styles.empty}>No girvis in this tab.</ThemedText>}
+            ListEmptyComponent={
+              <EmptyState title="No girvis" body="No girvis in this tab." />
+            }
             renderItem={({ item }) => (
-              <Pressable
-                style={[styles.loanCard, { backgroundColor: colors.backgroundElement }]}
-                onPress={() => router.push(`/(admin)/loan/${item.id}`)}>
-                <ThemedText type="smallBold">{item.serial_number}</ThemedText>
-                <ThemedText>{item.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
-                <ThemedText type="small">{item.profiles?.phone_number ?? '—'}</ThemedText>
-                <ThemedText type="small">
-                  {loanStatusLabel(item.status)} · {item.item_name} ·{' '}
-                  {formatPaiseAsInr(asPaise(item.principal_paise))} ·{' '}
-                  {formatBpsAsPercent(asBps(item.rate_bps))}% / 30d
-                </ThemedText>
+              <Pressable onPress={() => router.push(`/(admin)/loan/${item.id}`)}>
+                <Card>
+                  <Row>
+                    <ThemedText type="smallBold">{item.serial_number}</ThemedText>
+                    <Badge status={item.status} />
+                  </Row>
+                  <ThemedText>{item.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
+                  <ThemedText type="small">{item.profiles?.phone_number ?? '—'}</ThemedText>
+                  <Row>
+                    <ThemedText type="small">
+                      {item.item_name} · {formatBpsAsPercent(asBps(item.rate_bps))}% / 30d
+                    </ThemedText>
+                    <MoneyText paise={asPaise(item.principal_paise)} />
+                  </Row>
+                </Card>
               </Pressable>
             )}
           />
@@ -337,49 +336,36 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
-    gap: Spacing.two,
+    flexWrap: 'wrap',
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  actionBtn: { borderRadius: 10, paddingHorizontal: Spacing.two, paddingVertical: Spacing.one },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
   analyticsGrid: {
     flexDirection: 'row',
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
   },
-  analyticsCard: {
-    flex: 1,
-    borderRadius: 14,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  bracketCard: {
-    marginHorizontal: Spacing.four,
-    marginTop: Spacing.three,
-    borderRadius: 14,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  bracketSpacer: { marginTop: Spacing.two },
+  analyticsCard: { flex: 1 },
+  sectionCard: { marginHorizontal: Spacing.four, marginTop: Spacing.three },
+  sectionHeader: { flexWrap: 'wrap' },
+  hit: { minHeight: MinTouchTarget, justifyContent: 'center' },
   tabRow: {
     flexDirection: 'row',
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
   },
-  tab: { flex: 1, borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
+  tab: {
+    flex: 1,
+    minHeight: MinTouchTarget,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   statusRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -387,17 +373,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
   },
-  statusChip: { borderRadius: 10, paddingHorizontal: Spacing.two, paddingVertical: Spacing.one },
-  search: {
-    marginHorizontal: Spacing.four,
-    marginTop: Spacing.three,
+  statusChip: {
+    minHeight: MinTouchTarget,
+    borderRadius: Radii.sm,
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    justifyContent: 'center',
   },
+  searchWrap: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three },
   loader: { marginTop: Spacing.five },
   listContent: { padding: Spacing.four, gap: Spacing.two },
-  loanCard: { borderRadius: 14, padding: Spacing.three, gap: Spacing.one },
-  empty: { textAlign: 'center', opacity: 0.7, marginTop: Spacing.five },
 });
