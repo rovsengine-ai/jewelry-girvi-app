@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -14,10 +13,14 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SignatureCanvas from 'react-native-signature-canvas';
 
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { Field } from '@/components/field';
+import { GoldRateCard } from '@/components/gold-rate-card';
+import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { GoldRateCard } from '@/components/gold-rate-card';
-import { Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayInKolkata } from '@/lib/money';
 import { useAuth } from '@/providers/auth-provider';
@@ -55,32 +58,6 @@ const emptyForm: LoanFormData = {
   disbursed_on: todayInKolkata(),
 };
 
-function FormField({
-  label,
-  value,
-  onChangeText,
-  keyboardType = 'default',
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  keyboardType?: 'default' | 'numeric' | 'phone-pad';
-}) {
-  const colors = useTheme();
-
-  return (
-    <View style={styles.field}>
-      <ThemedText type="smallBold">{label}</ThemedText>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType={keyboardType}
-        style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
-      />
-    </View>
-  );
-}
-
 function ChoiceChip({
   label,
   selected,
@@ -97,7 +74,8 @@ function ChoiceChip({
       style={[
         styles.chip,
         {
-          backgroundColor: selected ? colors.backgroundSelected : colors.backgroundElement,
+          backgroundColor: selected ? colors.backgroundSelected : colors.elevated,
+          borderColor: colors.border,
         },
       ]}>
       <ThemedText type="small">{label}</ThemedText>
@@ -118,18 +96,12 @@ function PledgeItemCard({
   onPatch: (patch: Partial<Omit<ScannerItemDraft, 'key'>>) => void;
   onRemove: () => void;
 }) {
-  const colors = useTheme();
-
   return (
-    <View style={[styles.itemCard, { backgroundColor: colors.backgroundElement }]}>
-      <View style={styles.itemHeader}>
+    <Card>
+      <Row>
         <ThemedText type="smallBold">Item {index + 1}</ThemedText>
-        {canRemove ? (
-          <Pressable onPress={onRemove}>
-            <ThemedText type="small">Remove</ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
+        {canRemove ? <Button label="Remove" variant="secondary" onPress={onRemove} /> : null}
+      </Row>
 
       <ThemedText type="small">Metal (required)</ThemedText>
       <View style={styles.chipRow}>
@@ -143,44 +115,46 @@ function PledgeItemCard({
         ))}
       </View>
 
-      <FormField
+      <Field
         label="Ornament type"
         value={item.ornament_type}
         onChangeText={(ornament_type) => onPatch({ ornament_type })}
       />
-      <FormField
+      <Field
         label="Description"
         value={item.description}
         onChangeText={(description) => onPatch({ description })}
       />
-      <FormField
+      <Field
         label="Gross weight (grams)"
         value={item.gross_grams}
         onChangeText={(gross_grams) => onPatch({ gross_grams })}
         keyboardType="numeric"
       />
-      <FormField
+      <Field
         label="Stone deduction (grams)"
         value={item.stone_grams}
         onChangeText={(stone_grams) => onPatch({ stone_grams })}
         keyboardType="numeric"
       />
-      <FormField
+      <Field
         label="Net weight (grams)"
         value={item.net_grams}
         onChangeText={(net_grams) => onPatch({ net_grams })}
         keyboardType="numeric"
-      />
-      {(() => {
-        try {
-          return gramsInputToMg(item.net_grams) > gramsInputToMg(item.gross_grams);
-        } catch {
-          return false;
+        error={
+          (() => {
+            try {
+              return gramsInputToMg(item.net_grams) > gramsInputToMg(item.gross_grams)
+                ? 'Net weight cannot exceed gross weight.'
+                : null;
+            } catch {
+              return null;
+            }
+          })()
         }
-      })() ? (
-        <ThemedText type="small">Net weight cannot exceed gross weight.</ThemedText>
-      ) : null}
-      <FormField
+      />
+      <Field
         label="Quantity"
         value={item.quantity}
         onChangeText={(quantity) => onPatch({ quantity })}
@@ -208,7 +182,7 @@ function PledgeItemCard({
       ) : (
         <ThemedText type="small">Choose gold or silver before saving. Nothing is pre-selected.</ThemedText>
       )}
-    </View>
+    </Card>
   );
 }
 
@@ -340,9 +314,7 @@ export default function AdminScannerScreen() {
     return (
       <ThemedView style={styles.centered}>
         <ThemedText style={styles.centerText}>Camera permission is required to scan receipts.</ThemedText>
-        <Pressable style={styles.primaryBtn} onPress={() => void requestPermission()}>
-          <ThemedText type="smallBold">Grant permission</ThemedText>
-        </Pressable>
+        <Button label="Grant permission" onPress={() => void requestPermission()} />
       </ThemedView>
     );
   }
@@ -352,18 +324,11 @@ export default function AdminScannerScreen() {
       <ThemedView style={styles.container}>
         <CameraView ref={cameraRef} style={styles.camera} facing="back" />
         <SafeAreaView style={styles.cameraOverlay}>
-          <ThemedText type="title" style={styles.overlayTitle}>
+          <ThemedText type="title" style={{ color: colors.overlay, textShadowColor: colors.overlayShadow, textShadowRadius: 6 }}>
             Scan Girvi Receipt
           </ThemedText>
-          <Pressable
-            style={[styles.primaryBtn, { backgroundColor: colors.backgroundSelected }]}
-            onPress={() => void captureAndProcess()}
-            disabled={isBusy}>
-            {isBusy ? <ActivityIndicator /> : <ThemedText type="smallBold">Capture & Extract</ThemedText>}
-          </Pressable>
-          <Pressable onPress={() => router.back()}>
-            <ThemedText type="small">Cancel</ThemedText>
-          </Pressable>
+          <Button label="Capture & Extract" loading={isBusy} onPress={() => void captureAndProcess()} />
+          <Button label="Cancel" variant="secondary" onPress={() => router.back()} />
         </SafeAreaView>
       </ThemedView>
     );
@@ -372,34 +337,34 @@ export default function AdminScannerScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.reviewContent}>
-        <ThemedText type="title">Review & Save</ThemedText>
+        <ThemedText type="subtitle">Review & Save</ThemedText>
 
         {localPhotoUri ? <Image source={{ uri: localPhotoUri }} style={styles.preview} contentFit="cover" /> : null}
 
         <GoldRateCard isOwner={profile?.role === 'owner'} />
 
-        <FormField label="Serial Number" value={form.serial_number} onChangeText={(v) => updateForm('serial_number', v)} />
-        <FormField label="Customer Name" value={form.customer_name} onChangeText={(v) => updateForm('customer_name', v)} />
-        <FormField
+        <Field label="Serial Number" value={form.serial_number} onChangeText={(v) => updateForm('serial_number', v)} />
+        <Field label="Customer Name" value={form.customer_name} onChangeText={(v) => updateForm('customer_name', v)} />
+        <Field
           label="Phone Number"
           value={form.phone_number}
           onChangeText={(v) => updateForm('phone_number', v)}
           keyboardType="phone-pad"
         />
-        <FormField label="Address" value={form.address} onChangeText={(v) => updateForm('address', v)} />
-        <FormField
+        <Field label="Address" value={form.address} onChangeText={(v) => updateForm('address', v)} />
+        <Field
           label="Loan Amount (₹)"
           value={form.loan_amount_rupees}
           onChangeText={(v) => updateForm('loan_amount_rupees', v)}
           keyboardType="numeric"
         />
-        <FormField
+        <Field
           label="Interest Rate (% per 30 days)"
           value={form.interest_percent_monthly}
           onChangeText={(v) => updateForm('interest_percent_monthly', v)}
           keyboardType="numeric"
         />
-        <FormField
+        <Field
           label="Disbursed on (YYYY-MM-DD)"
           value={form.disbursed_on}
           onChangeText={(v) => updateForm('disbursed_on', v)}
@@ -416,11 +381,7 @@ export default function AdminScannerScreen() {
             onRemove={() => dispatchItems({ type: 'remove', key: item.key })}
           />
         ))}
-        <Pressable
-          style={[styles.secondaryBtn, { borderColor: colors.backgroundSelected }]}
-          onPress={() => dispatchItems({ type: 'add' })}>
-          <ThemedText type="smallBold">Add another item</ThemedText>
-        </Pressable>
+        <Button label="Add another item" variant="secondary" onPress={() => dispatchItems({ type: 'add' })} />
 
         <ThemedText type="smallBold">Customer Digital Signature</ThemedText>
         <View style={styles.signatureBox}>
@@ -436,12 +397,7 @@ export default function AdminScannerScreen() {
           />
         </View>
 
-        <Pressable
-          style={[styles.primaryBtn, { backgroundColor: colors.backgroundSelected }]}
-          onPress={() => void handleSave()}
-          disabled={isBusy}>
-          {isBusy ? <ActivityIndicator /> : <ThemedText type="smallBold">Save Girvi Loan</ThemedText>}
-        </Pressable>
+        <Button label="Save Girvi Loan" loading={isBusy} onPress={() => void handleSave()} />
       </ScrollView>
     </ThemedView>
   );
@@ -461,26 +417,16 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     alignItems: 'center',
   },
-  overlayTitle: { color: '#fff', textShadowColor: '#000', textShadowRadius: 6 },
   reviewContent: { padding: Spacing.four, gap: Spacing.three },
-  preview: { width: '100%', height: 200, borderRadius: 12 },
-  field: { gap: Spacing.one },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
-  itemCard: { borderRadius: 12, padding: Spacing.three, gap: Spacing.two },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  preview: { width: '100%', height: 200, borderRadius: Radii.md },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
-  chip: { borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
-  signatureBox: { height: 220, borderRadius: 12, overflow: 'hidden' },
-  signatureCanvas: { flex: 1 },
-  primaryBtn: {
-    borderRadius: 12,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  secondaryBtn: {
-    borderRadius: 12,
+  chip: {
+    minHeight: MinTouchTarget,
+    borderRadius: Radii.pill,
     borderWidth: 1,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    justifyContent: 'center',
   },
+  signatureBox: { height: 220, borderRadius: Radii.md, overflow: 'hidden' },
+  signatureCanvas: { flex: 1 },
 });
