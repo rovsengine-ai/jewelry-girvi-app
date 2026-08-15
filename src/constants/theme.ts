@@ -1,17 +1,17 @@
 /**
  * Design tokens. Palette hex lives only here.
  *
- * `Colors` is the live set: create-expo-app greys plus status/link hex lifted
- * from existing screens. It is not a brand pick.
+ * `Colors` is the live set (Warm paper). Hex lives only in this file.
  *
- * `PaletteDirections` are the three complete proposals. Swap one into `Colors`
- * after the owner chooses. Do not edit screens to hard-code a favourite.
+ * `PaletteDirections` stay as the three complete proposals for reference.
+ * Do not edit screens to hard-code a favourite.
  *
  * Type: system fonts only (Devanagari on print later). No custom display face.
  */
 
 import '@/global.css';
 
+import { isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 export type Palette = {
@@ -22,7 +22,11 @@ export type Palette = {
   textSecondary: string;
   surface: string;
   elevated: string;
+  /** Recessed page behind iOS-style grouped lists. Darker than `background`. */
+  surfaceSunken: string;
   border: string;
+  /** Hairline for flat list rows. Lighter than `border` so it is not a box. */
+  divider: string;
   primary: string;
   onPrimary: string;
   statusActive: string;
@@ -34,10 +38,27 @@ export type Palette = {
   warning: string;
   danger: string;
   onDanger: string;
+  /** Low-alpha primary wash for selected chips and wells. */
+  tintPrimary: string;
+  tintDanger: string;
+  tintWarning: string;
+  tintSuccess: string;
+  /** Extra washes so redeemed/closed pills stay distinct from success/danger. */
+  tintRedeemed: string;
+  tintClosed: string;
+  onTintDanger: string;
+  onTintWarning: string;
+  onTintSuccess: string;
+  onTintRedeemed: string;
+  onTintClosed: string;
   overlay: string;
   overlayShadow: string;
   link: string;
   shadow: string;
+  glassTint: string;
+  glassTintStrong: string;
+  glassBorder: string;
+  glassHighlight: string;
 };
 
 export type PaletteDirectionId = 'warmPaper' | 'coolLedger' | 'shopfrontContrast';
@@ -51,24 +72,112 @@ export type PaletteDirection = {
   dark: Palette;
 };
 
+function hexToRgba(hex: string, alpha: number): string {
+  const digits = hex.replace('#', '');
+  const r = Number.parseInt(digits.slice(0, 2), 16);
+  const g = Number.parseInt(digits.slice(2, 4), 16);
+  const b = Number.parseInt(digits.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/**
+ * Glass chrome, derived from each direction's surface / elevated / border.
+ * Do not introduce a new hue.
+ *
+ * glassTint 0.72 — tint under iOS blur / liquid glass so chrome stays
+ *   coloured without hiding content behind it.
+ * glassTintStrong 0.94 — Android default and reduce-transparency: almost
+ *   opaque so type stays readable without blur.
+ * glassBorder 0.60 — 1px hairline from palette.border.
+ * glassHighlight 0.45 — inner top edge from palette.elevated.
+ */
+function glassFrom(
+  surface: string,
+  elevated: string,
+  border: string,
+): Pick<Palette, 'glassTint' | 'glassTintStrong' | 'glassBorder' | 'glassHighlight'> {
+  return {
+    glassTint: hexToRgba(surface, 0.72),
+    glassTintStrong: hexToRgba(surface, 0.94),
+    glassBorder: hexToRgba(border, 0.6),
+    glassHighlight: hexToRgba(elevated, 0.45),
+  };
+}
+
+/**
+ * Ink washes for hairlines and tonal pills. Alpha is the only variable;
+ * hues come from the palette so cream stays cream and slate stays slate.
+ *
+ * divider 0.10 light / 0.18 dark — lighter than `border`, WhatsApp-style.
+ * tintPrimary 0.12 light / 0.22 dark — selected chip fill, not a button.
+ * status tints 0.16 light / 0.24 dark — pill chrome without full-strength fills.
+ * warning 0.18 light / 0.28 dark — yellow-brown needs more alpha on cream.
+ */
+function inkWashes(
+  hues: {
+    text: string;
+    primary: string;
+    danger: string;
+    warning: string;
+    success: string;
+    statusRedeemed: string;
+    statusClosed: string;
+    dark: boolean;
+  },
+): Pick<
+  Palette,
+  | 'divider'
+  | 'tintPrimary'
+  | 'tintDanger'
+  | 'tintWarning'
+  | 'tintSuccess'
+  | 'tintRedeemed'
+  | 'tintClosed'
+  | 'onTintDanger'
+  | 'onTintWarning'
+  | 'onTintSuccess'
+  | 'onTintRedeemed'
+  | 'onTintClosed'
+> {
+  const dividerAlpha = hues.dark ? 0.18 : 0.1;
+  const primaryAlpha = hues.dark ? 0.22 : 0.12;
+  const statusAlpha = hues.dark ? 0.24 : 0.16;
+  const warningAlpha = hues.dark ? 0.28 : 0.18;
+  return {
+    divider: hexToRgba(hues.text, dividerAlpha),
+    tintPrimary: hexToRgba(hues.primary, primaryAlpha),
+    tintDanger: hexToRgba(hues.danger, statusAlpha),
+    tintWarning: hexToRgba(hues.warning, warningAlpha),
+    tintSuccess: hexToRgba(hues.success, statusAlpha),
+    tintRedeemed: hexToRgba(hues.statusRedeemed, statusAlpha),
+    tintClosed: hexToRgba(hues.statusClosed, statusAlpha),
+    onTintDanger: hues.danger,
+    onTintWarning: hues.warning,
+    onTintSuccess: hues.success,
+    onTintRedeemed: hues.statusRedeemed,
+    onTintClosed: hues.statusClosed,
+  };
+}
+
 const warmPaper: PaletteDirection = {
   id: 'warmPaper',
   label: 'Warm paper',
   summary:
     'Cream ledger, ink-brown type, maroon seal. Shop feels like a passbook; customer feels like a stamp, not an app.',
   contrast:
-    'Light body ~12:1 (#1F1B16 on #F4EFE6). Not pure black on white. Target WCAG AA 4.5:1 body, 3:1 large.',
+    'Light body ~12.8:1 (#1F1B16 on #E8DCC8). Elevated #FFFBF3 vs page #E8DCC8 is a real paper lift, not a 3% cream-on-cream delta. Target WCAG AA 4.5:1 body, 3:1 large / pills.',
   light: {
     text: '#1F1B16',
-    background: '#F4EFE6',
-    backgroundElement: '#EBE4D6',
-    backgroundSelected: '#DDD4C4',
+    background: '#E8DCC8',
+    backgroundElement: '#DDD0BA',
+    backgroundSelected: '#D0C3AB',
     textSecondary: '#5C5348',
-    surface: '#F4EFE6',
+    surface: '#E8DCC8',
     elevated: '#FFFBF3',
+    surfaceSunken: '#D4C6AE',
     border: '#D4CBBA',
     primary: '#6B2E2E',
-    onPrimary: '#F4EFE6',
+    onPrimary: '#FFFBF3',
     statusActive: '#2F6B3A',
     statusRedeemed: '#4A5C6B',
     statusClosed: '#6B6560',
@@ -78,35 +187,58 @@ const warmPaper: PaletteDirection = {
     warning: '#8A5A12',
     danger: '#8B2E2E',
     onDanger: '#FFFBF3',
-    overlay: '#F4EFE6',
+    overlay: '#E8DCC8',
     overlayShadow: '#1F1B16',
     link: '#6B2E2E',
     shadow: '#1F1B16',
+    ...inkWashes({
+      text: '#1F1B16',
+      primary: '#6B2E2E',
+      danger: '#8B2E2E',
+      warning: '#8A5A12',
+      success: '#2F6B3A',
+      statusRedeemed: '#4A5C6B',
+      statusClosed: '#6B6560',
+      dark: false,
+    }),
+    ...glassFrom('#E8DCC8', '#FFFBF3', '#D4CBBA'),
   },
   dark: {
     text: '#F0E6D8',
-    background: '#1A1714',
-    backgroundElement: '#2A241E',
+    background: '#141210',
+    backgroundElement: '#221E1A',
     backgroundSelected: '#3A322A',
     textSecondary: '#B7A898',
-    surface: '#1A1714',
-    elevated: '#2A241E',
+    surface: '#141210',
+    elevated: '#322B24',
+    surfaceSunken: '#0B0908',
     border: '#4A4036',
     primary: '#C98989',
-    onPrimary: '#1A1714',
+    onPrimary: '#141210',
     statusActive: '#7CB389',
     statusRedeemed: '#8AA0B3',
     statusClosed: '#A89F96',
     statusDefaulted: '#E08A8A',
-    onStatus: '#1A1714',
+    onStatus: '#141210',
     success: '#7CB389',
     warning: '#E0B36A',
     danger: '#E08A8A',
-    onDanger: '#1A1714',
+    onDanger: '#141210',
     overlay: '#F0E6D8',
     overlayShadow: '#0D0B09',
     link: '#C98989',
     shadow: '#0D0B09',
+    ...inkWashes({
+      text: '#F0E6D8',
+      primary: '#C98989',
+      danger: '#E08A8A',
+      warning: '#E0B36A',
+      success: '#7CB389',
+      statusRedeemed: '#8AA0B3',
+      statusClosed: '#A89F96',
+      dark: true,
+    }),
+    ...glassFrom('#141210', '#322B24', '#4A4036'),
   },
 };
 
@@ -116,15 +248,16 @@ const coolLedger: PaletteDirection = {
   summary:
     'Slate passbook. Institutional, not playful. Dense shop list stays cool-grey; customer receipt reads like a bank slip.',
   contrast:
-    'Light body ~12:1 (#1A2332 on #F3F5F8). Primary #1E4A73 on cream-slate meets AA for large type on buttons with onPrimary.',
+    'Light body ~12:1 (#1A2332 on #E4E9F0). Elevated #FFFFFF vs page #E4E9F0 is a paper lift without a border. Target WCAG AA 4.5:1 body, 3:1 large / pills.',
   light: {
     text: '#1A2332',
-    background: '#F3F5F8',
-    backgroundElement: '#E6EAF0',
-    backgroundSelected: '#D5DCE6',
+    background: '#E4E9F0',
+    backgroundElement: '#D8DEE8',
+    backgroundSelected: '#C9D2DE',
     textSecondary: '#5B6778',
-    surface: '#F3F5F8',
+    surface: '#E4E9F0',
     elevated: '#FFFFFF',
+    surfaceSunken: '#D5DCE6',
     border: '#C5CDD8',
     primary: '#1E4A73',
     onPrimary: '#F3F5F8',
@@ -137,35 +270,58 @@ const coolLedger: PaletteDirection = {
     warning: '#8A5A00',
     danger: '#A12622',
     onDanger: '#FFFFFF',
-    overlay: '#F3F5F8',
+    overlay: '#E4E9F0',
     overlayShadow: '#1A2332',
     link: '#1E4A73',
     shadow: '#1A2332',
+    ...inkWashes({
+      text: '#1A2332',
+      primary: '#1E4A73',
+      danger: '#A12622',
+      warning: '#8A5A00',
+      success: '#1B6B45',
+      statusRedeemed: '#3D5A73',
+      statusClosed: '#5C6773',
+      dark: false,
+    }),
+    ...glassFrom('#E4E9F0', '#FFFFFF', '#C5CDD8'),
   },
   dark: {
     text: '#E8EDF4',
-    background: '#12161C',
+    background: '#0E1218',
     backgroundElement: '#1C232C',
     backgroundSelected: '#2A3340',
     textSecondary: '#9AA7B8',
-    surface: '#12161C',
-    elevated: '#1C232C',
+    surface: '#0E1218',
+    elevated: '#222A35',
+    surfaceSunken: '#0A0D11',
     border: '#3A4554',
     primary: '#8BB4D9',
-    onPrimary: '#12161C',
+    onPrimary: '#0E1218',
     statusActive: '#7DCCA3',
     statusRedeemed: '#9BB4C9',
     statusClosed: '#A8B0B8',
     statusDefaulted: '#E08B88',
-    onStatus: '#12161C',
+    onStatus: '#0E1218',
     success: '#7DCCA3',
     warning: '#E0C07A',
     danger: '#E08B88',
-    onDanger: '#12161C',
+    onDanger: '#0E1218',
     overlay: '#E8EDF4',
     overlayShadow: '#07090C',
     link: '#8BB4D9',
     shadow: '#07090C',
+    ...inkWashes({
+      text: '#E8EDF4',
+      primary: '#8BB4D9',
+      danger: '#E08B88',
+      warning: '#E0C07A',
+      success: '#7DCCA3',
+      statusRedeemed: '#9BB4C9',
+      statusClosed: '#A8B0B8',
+      dark: true,
+    }),
+    ...glassFrom('#0E1218', '#222A35', '#3A4554'),
   },
 };
 
@@ -175,15 +331,16 @@ const shopfrontContrast: PaletteDirection = {
   summary:
     'Built for sun through a glass shopfront. Off-white / charcoal, not #000 on #fff. Thick status colours. Same product, louder edges.',
   contrast:
-    'Light body ~13:1 (#171717 on #EEEDE8). Buttons use #0D3B2E / #F4F4F0. Status hues stay distinct at a glance in glare.',
+    'Light body ~13:1 (#171717 on #E2E1DB). Elevated #F7F6F1 vs page #E2E1DB is a paper lift without a border. Target WCAG AA 4.5:1 body, 3:1 large / pills.',
   light: {
     text: '#171717',
-    background: '#EEEDE8',
-    backgroundElement: '#E2E1DB',
-    backgroundSelected: '#D2D1CB',
+    background: '#E2E1DB',
+    backgroundElement: '#D6D5CF',
+    backgroundSelected: '#C8C7C1',
     textSecondary: '#4A4A46',
-    surface: '#EEEDE8',
+    surface: '#E2E1DB',
     elevated: '#F7F6F1',
+    surfaceSunken: '#D4D3CD',
     border: '#B8B7B1',
     primary: '#0D3B2E',
     onPrimary: '#F7F6F1',
@@ -200,31 +357,54 @@ const shopfrontContrast: PaletteDirection = {
     overlayShadow: '#171717',
     link: '#0D3B2E',
     shadow: '#171717',
+    ...inkWashes({
+      text: '#171717',
+      primary: '#0D3B2E',
+      danger: '#9B1B1B',
+      warning: '#7A4A00',
+      success: '#0F6B38',
+      statusRedeemed: '#1F4E79',
+      statusClosed: '#4A4A46',
+      dark: false,
+    }),
+    ...glassFrom('#E2E1DB', '#F7F6F1', '#B8B7B1'),
   },
   dark: {
     text: '#F2F1EC',
-    background: '#101010',
+    background: '#0C0C0C',
     backgroundElement: '#1C1C1C',
     backgroundSelected: '#2A2A2A',
     textSecondary: '#B4B4AE',
-    surface: '#101010',
-    elevated: '#1C1C1C',
+    surface: '#0C0C0C',
+    elevated: '#222222',
+    surfaceSunken: '#080808',
     border: '#3A3A3A',
     primary: '#8FCBB3',
-    onPrimary: '#101010',
+    onPrimary: '#0C0C0C',
     statusActive: '#6DDB9A',
     statusRedeemed: '#8EB6E0',
     statusClosed: '#C4C4BE',
     statusDefaulted: '#F08A8A',
-    onStatus: '#101010',
+    onStatus: '#0C0C0C',
     success: '#6DDB9A',
     warning: '#E8C36A',
     danger: '#F08A8A',
-    onDanger: '#101010',
+    onDanger: '#0C0C0C',
     overlay: '#F2F1EC',
     overlayShadow: '#000000',
     link: '#8FCBB3',
     shadow: '#000000',
+    ...inkWashes({
+      text: '#F2F1EC',
+      primary: '#8FCBB3',
+      danger: '#F08A8A',
+      warning: '#E8C36A',
+      success: '#6DDB9A',
+      statusRedeemed: '#8EB6E0',
+      statusClosed: '#C4C4BE',
+      dark: true,
+    }),
+    ...glassFrom('#0C0C0C', '#222222', '#3A3A3A'),
   },
 };
 
@@ -235,61 +415,12 @@ export const PaletteDirections: Record<PaletteDirectionId, PaletteDirection> = {
 };
 
 /**
- * Live tokens until a PaletteDirections id is chosen. Existing 5 keys are
- * unchanged so current screens do not shift. New keys are lifts of hex already
- * in the repo (customer badge, ThemedText link).
+ * Live tokens: Warm paper. The three PaletteDirections stay below for
+ * reference; screens must keep reading Colors, never a direction id.
  */
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    surface: '#ffffff',
-    elevated: '#F0F0F3',
-    border: '#E0E1E6',
-    primary: '#212225',
-    onPrimary: '#ffffff',
-    statusActive: '#1B7F3A',
-    statusRedeemed: '#6B7280',
-    statusClosed: '#6B7280',
-    statusDefaulted: '#B42318',
-    onStatus: '#ffffff',
-    success: '#1B7F3A',
-    warning: '#60646C',
-    danger: '#B42318',
-    onDanger: '#ffffff',
-    overlay: '#ffffff',
-    overlayShadow: '#000000',
-    link: '#3c87f7',
-    shadow: '#000000',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    surface: '#000000',
-    elevated: '#212225',
-    border: '#2E3135',
-    primary: '#E0E1E6',
-    onPrimary: '#000000',
-    statusActive: '#1B7F3A',
-    statusRedeemed: '#6B7280',
-    statusClosed: '#6B7280',
-    statusDefaulted: '#B42318',
-    onStatus: '#ffffff',
-    success: '#1B7F3A',
-    warning: '#B0B4BA',
-    danger: '#B42318',
-    onDanger: '#ffffff',
-    overlay: '#ffffff',
-    overlayShadow: '#000000',
-    link: '#3c87f7',
-    shadow: '#000000',
-  },
+  light: PaletteDirections.warmPaper.light,
+  dark: PaletteDirections.warmPaper.dark,
 } as const satisfies { light: Palette; dark: Palette };
 
 export type ThemeColor = keyof Palette;
@@ -330,13 +461,37 @@ export const Spacing = {
   six: 64,
 } as const;
 
+/**
+ * What each size is FOR — pick by job, not by eye.
+ * Existing keys stay so screens that already use them do not break.
+ */
 export const TypeScale = {
+  /** Fine print, legal asides, compact badge labels. Not a section header. */
   caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  /** Default paragraph and form helper copy. */
   body: { fontSize: 16, lineHeight: 24, fontWeight: '500' },
+  /** Emphasis inside a body stack (running totals). */
   bodyBold: { fontSize: 16, lineHeight: 24, fontWeight: '700' },
+  /** Screen titles in chrome. Not ThemedText type="title" (that stays display-sized). */
   title: { fontSize: 22, lineHeight: 28, fontWeight: '600' },
+  /** Rare hero words and large empty-state titles. */
   display: { fontSize: 32, lineHeight: 40, fontWeight: '600' },
+  /** Inline money in rows. Pair with tabular-nums. */
   money: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  /** Section labels above grouped lists. Uppercase Latin; Devanagari is unchanged. */
+  overline: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  /** Metadata, timestamps, serial · item. */
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  /** Primary row title (customer name). */
+  bodyLarge: { fontSize: 17, lineHeight: 22, fontWeight: '500' },
+  /** Hero figure on detail screens. Pair with tabular-nums. */
+  moneyLarge: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
 } as const satisfies Record<string, TextStyle>;
 
 export const Radii = {
@@ -344,6 +499,29 @@ export const Radii = {
   md: 12,
   pill: 999,
 } as const;
+
+/** Layout sizes. Screens must not invent 48 / 56 / 72. */
+export const Sizes = {
+  avatar: 48,
+  listRowMinHeight: 72,
+  fab: 56,
+  leadingIcon: 22,
+  hairline: 1,
+} as const;
+
+/**
+ * Chrome sizes and blur. `supportsNativeGlass` is the runtime Liquid Glass
+ * check from expo-glass-effect (iOS 26+ API + compiled-in availability).
+ * https://docs.expo.dev/versions/v57.0.0/sdk/glass-effect/
+ */
+export const Glass = {
+  blurIntensity: Platform.select({ ios: 40, android: 24, default: 24 }) ?? 24,
+  tabBarHeight: Platform.select({ ios: 50, android: 56, default: 56 }) ?? 56,
+  headerHeight: 56,
+  get supportsNativeGlass(): boolean {
+    return isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
+  },
+};
 
 export const MinTouchTarget = 44;
 
@@ -356,6 +534,15 @@ export const Elevation = {
       shadowOffset: { width: 0, height: 2 },
     },
     android: { elevation: 2 },
+    default: {},
+  }) as ViewStyle,
+  fab: Platform.select<ViewStyle>({
+    ios: {
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+    },
+    android: { elevation: 6 },
     default: {},
   }) as ViewStyle,
 };

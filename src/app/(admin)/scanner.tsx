@@ -1,7 +1,6 @@
 import { useCallback, useReducer, useRef, useState, type ComponentRef } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -17,14 +16,16 @@ import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
-import { GoldRateCard } from '@/components/gold-rate-card';
+import { PressableScale } from '@/components/pressable-scale';
 import { Row } from '@/components/row';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Radii, Spacing, TypeScale } from '@/constants/theme';
+import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayInKolkata } from '@/lib/money';
-import { useAuth } from '@/providers/auth-provider';
+import { ADMIN_LOANS_HREF } from '@/lib/shop-tab-access';
+import { useLanguage } from '@/providers/language-provider';
 import {
   emptyScannerItem,
   scannerItemsReducer,
@@ -40,13 +41,13 @@ import {
 import { extractReceiptData } from '@/services/ocrService';
 import type { LoanFormData } from '@/types/database';
 
-const GOLD_PURITY_OPTIONS: Array<{ label: string; value: number | null }> = [
-  { label: 'Not assessed', value: null },
-  { label: '24K (999)', value: 24 },
-  { label: '22K (916)', value: 22 },
-  { label: '18K (75% / 750)', value: 18 },
-  { label: '14K (585)', value: 14 },
-  { label: '10K (417)', value: 10 },
+const GOLD_PURITY_OPTIONS: Array<{ labelKey: string; value: number | null }> = [
+  { labelKey: 'items.purity.notAssessed', value: null },
+  { labelKey: 'items.purity.k24', value: 24 },
+  { labelKey: 'items.purity.k22', value: 22 },
+  { labelKey: 'items.purity.k18', value: 18 },
+  { labelKey: 'items.purity.k14', value: 14 },
+  { labelKey: 'items.purity.k10', value: 10 },
 ];
 
 const emptyForm: LoanFormData = {
@@ -70,7 +71,7 @@ function ChoiceChip({
 }) {
   const colors = useTheme();
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       style={[
         styles.chip,
@@ -80,7 +81,7 @@ function ChoiceChip({
         },
       ]}>
       <ThemedText type="small">{label}</ThemedText>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -97,19 +98,20 @@ function PledgeItemCard({
   onPatch: (patch: Partial<Omit<ScannerItemDraft, 'key'>>) => void;
   onRemove: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <Card>
       <Row>
-        <ThemedText type="smallBold">Item {index + 1}</ThemedText>
-        {canRemove ? <Button label="Remove" variant="secondary" onPress={onRemove} /> : null}
+        <ThemedText type="smallBold">{t('items.rowTitle', { index: index + 1 })}</ThemedText>
+        {canRemove ? <Button label={t('common.remove')} variant="secondary" onPress={onRemove} /> : null}
       </Row>
 
-      <ThemedText type="small">Metal (required)</ThemedText>
+      <ThemedText type="small">{t('items.metalRequired')}</ThemedText>
       <View style={styles.chipRow}>
         {(['gold', 'silver'] as const).map((metal: PledgeMetal) => (
           <ChoiceChip
             key={metal}
-            label={metal === 'gold' ? 'Gold' : 'Silver'}
+            label={metal === 'gold' ? t('items.gold') : t('items.silver')}
             selected={item.metal === metal}
             onPress={() => onPatch({ metal })}
           />
@@ -117,29 +119,29 @@ function PledgeItemCard({
       </View>
 
       <Field
-        label="Ornament type"
+        label={t('items.ornamentType')}
         value={item.ornament_type}
         onChangeText={(ornament_type) => onPatch({ ornament_type })}
       />
       <Field
-        label="Description"
+        label={t('items.description')}
         value={item.description}
         onChangeText={(description) => onPatch({ description })}
       />
       <Field
-        label="Gross weight (grams)"
+        label={t('items.grossWeight')}
         value={item.gross_grams}
         onChangeText={(gross_grams) => onPatch({ gross_grams })}
         keyboardType="numeric"
       />
       <Field
-        label="Stone deduction (grams)"
+        label={t('items.stoneDeduction')}
         value={item.stone_grams}
         onChangeText={(stone_grams) => onPatch({ stone_grams })}
         keyboardType="numeric"
       />
       <Field
-        label="Net weight (grams)"
+        label={t('items.netWeight')}
         value={item.net_grams}
         onChangeText={(net_grams) => onPatch({ net_grams })}
         keyboardType="numeric"
@@ -147,7 +149,7 @@ function PledgeItemCard({
           (() => {
             try {
               return gramsInputToMg(item.net_grams) > gramsInputToMg(item.gross_grams)
-                ? 'Net weight cannot exceed gross weight.'
+                ? t('items.netExceedsGross')
                 : null;
             } catch {
               return null;
@@ -156,7 +158,7 @@ function PledgeItemCard({
         }
       />
       <Field
-        label="Quantity"
+        label={t('items.quantity')}
         value={item.quantity}
         onChangeText={(quantity) => onPatch({ quantity })}
         keyboardType="numeric"
@@ -164,12 +166,12 @@ function PledgeItemCard({
 
       {item.metal === 'gold' ? (
         <>
-          <ThemedText type="small">Purity (optional — do not assume 22K)</ThemedText>
+          <ThemedText type="small">{t('items.purityOptionalHint')}</ThemedText>
           <View style={styles.chipRow}>
             {GOLD_PURITY_OPTIONS.map((option) => (
               <ChoiceChip
-                key={option.label}
-                label={option.label}
+                key={option.labelKey}
+                label={t(option.labelKey)}
                 selected={item.purity_karat === option.value}
                 onPress={() => onPatch({ purity_karat: option.value })}
               />
@@ -177,20 +179,17 @@ function PledgeItemCard({
           </View>
         </>
       ) : item.metal === 'silver' ? (
-        <ThemedText type="small">
-          Silver is weight-only. No purity and no valuation.
-        </ThemedText>
+        <ThemedText type="small">{t('items.silverWeightOnly')}</ThemedText>
       ) : (
-        <ThemedText type="small">Choose gold or silver before saving. Nothing is pre-selected.</ThemedText>
+        <ThemedText type="small">{t('items.chooseMetalFirst')}</ThemedText>
       )}
     </Card>
   );
 }
 
 export default function AdminScannerScreen() {
-  const colors = useTheme();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { t } = useLanguage();
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -219,7 +218,7 @@ export default function AdminScannerScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (!photo?.uri) {
-        throw new Error('Camera did not return an image.');
+        throw new Error(t('loans.scanner.cameraNoImage'));
       }
 
       setLocalPhotoUri(photo.uri);
@@ -240,7 +239,7 @@ export default function AdminScannerScreen() {
       });
       setStep('review');
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : t('errors.unknown'));
     } finally {
       setIsBusy(false);
     }
@@ -260,14 +259,14 @@ export default function AdminScannerScreen() {
       });
       setPhotoGap(null);
       setSavedLoanId(error.loanId);
-      setFormNotice('Item photos attached.');
+      setFormNotice(t('loans.scanner.photosAttached'));
     } catch (retryError) {
       if (retryError instanceof LoanPhotosIncompleteError) {
         setPhotoGap(retryError);
         setSavedLoanId(retryError.loanId);
         setFormError(retryError.message);
       } else {
-        setFormError(retryError instanceof Error ? retryError.message : 'Unknown error');
+        setFormError(retryError instanceof Error ? retryError.message : t('errors.unknown'));
       }
     } finally {
       setIsBusy(false);
@@ -276,7 +275,7 @@ export default function AdminScannerScreen() {
 
   const handleSave = async () => {
     if (!localPhotoUri) {
-      setFormError('Capture a receipt image before saving.');
+      setFormError(t('loans.scanner.captureBeforeSave'));
       return;
     }
 
@@ -287,7 +286,7 @@ export default function AdminScannerScreen() {
       const loanId = await createLoanWithCustomer(form, items, localPhotoUri, signatureDataUrl);
       setSavedLoanId(loanId);
       setPhotoGap(null);
-      setFormNotice('Girvi loan created successfully.');
+      setFormNotice(t('loans.scanner.createdSuccess'));
     } catch (error) {
       if (error instanceof LoanPhotosIncompleteError) {
         setPhotoGap(error);
@@ -295,7 +294,7 @@ export default function AdminScannerScreen() {
         setFormError(error.message);
         return;
       }
-      setFormError(error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : t('errors.unknown'));
     } finally {
       setIsBusy(false);
     }
@@ -303,21 +302,27 @@ export default function AdminScannerScreen() {
 
   if (!permission) {
     return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+      <ThemedView style={styles.container}>
+        <ScreenHeader title={t('loans.scanner.cameraTitle')} />
+        <View style={styles.centered}>
+          <ActivityIndicator />
+        </View>
       </ThemedView>
     );
   }
 
   if (!permission.granted) {
     return (
-      <ThemedView style={styles.centered}>
-        <EmptyState
-          title="Camera needed"
-          body="Camera permission is required to scan receipts."
-          actionLabel="Grant permission"
-          onAction={() => void requestPermission()}
-        />
+      <ThemedView style={styles.container}>
+        <ScreenHeader title={t('loans.scanner.cameraTitle')} />
+        <View style={styles.centered}>
+          <EmptyState
+            title={t('loans.scanner.cameraNeededTitle')}
+            body={t('loans.scanner.cameraNeededBody')}
+            actionLabel={t('common.grantPermission')}
+            onAction={() => void requestPermission()}
+          />
+        </View>
       </ThemedView>
     );
   }
@@ -325,18 +330,16 @@ export default function AdminScannerScreen() {
   if (step === 'camera') {
     return (
       <ThemedView style={styles.container}>
+        <ScreenHeader title={t('loans.scanner.cameraTitle')} />
         <CameraView ref={cameraRef} style={styles.camera} facing="back" />
-        <SafeAreaView style={styles.cameraOverlay}>
-          <ThemedText
-            style={[
-              TypeScale.display,
-              { color: colors.overlay, textShadowColor: colors.overlayShadow, textShadowRadius: 6 },
-            ]}>
-            Scan Girvi Receipt
-          </ThemedText>
+        <SafeAreaView edges={['bottom']} style={styles.cameraOverlay}>
           <FormNotice error={formError} />
-          <Button label="Capture & Extract" loading={isBusy} onPress={() => void captureAndProcess()} />
-          <Button label="Cancel" variant="secondary" onPress={() => router.back()} />
+          <Button
+            label={t('loans.scanner.captureExtract')}
+            loading={isBusy}
+            onPress={() => void captureAndProcess()}
+          />
+          <Button label={t('common.cancel')} variant="secondary" onPress={() => router.back()} />
         </SafeAreaView>
       </ThemedView>
     );
@@ -344,41 +347,50 @@ export default function AdminScannerScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <ScreenHeader title={t('loans.scanner.reviewTitle')} />
       <ScrollView contentContainerStyle={styles.reviewContent}>
-        <ThemedText type="subtitle">Review & Save</ThemedText>
-
         {localPhotoUri ? <Image source={{ uri: localPhotoUri }} style={styles.preview} contentFit="cover" /> : null}
 
-        <GoldRateCard isOwner={profile?.role === 'owner'} />
-
-        <Field label="Serial Number" value={form.serial_number} onChangeText={(v) => updateForm('serial_number', v)} />
-        <Field label="Customer Name" value={form.customer_name} onChangeText={(v) => updateForm('customer_name', v)} />
         <Field
-          label="Phone Number"
+          label={t('loans.scanner.serialNumber')}
+          value={form.serial_number}
+          onChangeText={(v) => updateForm('serial_number', v)}
+        />
+        <Field
+          label={t('loans.scanner.customerName')}
+          value={form.customer_name}
+          onChangeText={(v) => updateForm('customer_name', v)}
+        />
+        <Field
+          label={t('loans.scanner.phoneNumber')}
           value={form.phone_number}
           onChangeText={(v) => updateForm('phone_number', v)}
           keyboardType="phone-pad"
         />
-        <Field label="Address" value={form.address} onChangeText={(v) => updateForm('address', v)} />
         <Field
-          label="Loan Amount (₹)"
+          label={t('loans.scanner.address')}
+          value={form.address}
+          onChangeText={(v) => updateForm('address', v)}
+        />
+        <Field
+          label={t('loans.scanner.loanAmount')}
           value={form.loan_amount_rupees}
           onChangeText={(v) => updateForm('loan_amount_rupees', v)}
           keyboardType="numeric"
         />
         <Field
-          label="Interest Rate (% per 30 days)"
+          label={t('loans.scanner.interestRate')}
           value={form.interest_percent_monthly}
           onChangeText={(v) => updateForm('interest_percent_monthly', v)}
           keyboardType="numeric"
         />
         <Field
-          label="Disbursed on (YYYY-MM-DD)"
+          label={t('loans.scanner.disbursedOn')}
           value={form.disbursed_on}
           onChangeText={(v) => updateForm('disbursed_on', v)}
         />
 
-        <ThemedText type="smallBold">Pledged items</ThemedText>
+        <ThemedText type="smallBold">{t('loans.scanner.pledgedItems')}</ThemedText>
         {items.map((item, index) => (
           <PledgeItemCard
             key={item.key}
@@ -389,27 +401,35 @@ export default function AdminScannerScreen() {
             onRemove={() => dispatchItems({ type: 'remove', key: item.key })}
           />
         ))}
-        <Button label="Add another item" variant="secondary" onPress={() => dispatchItems({ type: 'add' })} />
+        <Button
+          label={t('loans.scanner.addAnotherItem')}
+          variant="secondary"
+          onPress={() => dispatchItems({ type: 'add' })}
+        />
 
-        <ThemedText type="smallBold">Customer Digital Signature</ThemedText>
+        <ThemedText type="smallBold">{t('loans.scanner.signatureTitle')}</ThemedText>
         <View style={styles.signatureBox}>
           <SignatureCanvas
             ref={signatureRef}
             onOK={(sig) => setSignatureDataUrl(sig)}
             onEmpty={() => setSignatureDataUrl(null)}
-            descriptionText="Sign above"
-            clearText="Clear"
-            confirmText="Save"
+            descriptionText={t('loans.scanner.signAbove')}
+            clearText={t('common.clear')}
+            confirmText={t('common.save')}
             webStyle={`.m-signature-pad { box-shadow: none; border: none; }`}
             style={styles.signatureCanvas}
           />
         </View>
 
-        <Button label="Save Girvi Loan" loading={isBusy} onPress={() => void handleSave()} />
+        <Button
+          label={t('loans.scanner.saveGirviLoan')}
+          loading={isBusy}
+          onPress={() => void handleSave()}
+        />
         <FormNotice error={formError} notice={formNotice} />
         {photoGap ? (
           <Button
-            label="Retry photos"
+            label={t('loans.scanner.retryPhotos')}
             variant="secondary"
             loading={isBusy}
             onPress={() => void retryPhotos(photoGap)}
@@ -418,13 +438,13 @@ export default function AdminScannerScreen() {
         {savedLoanId ? (
           <>
             <Button
-              label="View loan"
+              label={t('loans.scanner.viewLoan')}
               onPress={() => router.replace(`/(admin)/loan/${savedLoanId}`)}
             />
             <Button
-              label="Dashboard"
+              label={t('loans.scanner.goToLoans')}
               variant="secondary"
-              onPress={() => router.replace('/(admin)/dashboard')}
+              onPress={() => router.replace(ADMIN_LOANS_HREF)}
             />
           </>
         ) : null}

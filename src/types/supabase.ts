@@ -128,6 +128,14 @@ export interface Database {
           closure_balance_paise: number | null;
           digital_signature_url: string | null;
           release_signature_url: string | null;
+          defaulted_on: string | null;
+          defaulted_by: string | null;
+          default_balance_paise: number | null;
+          default_reason: string | null;
+          archived_at: string | null;
+          archived_by: string | null;
+          archive_reason: string | null;
+          archive_balance_paise: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -155,6 +163,14 @@ export interface Database {
           closure_balance_paise?: number | null;
           digital_signature_url?: string | null;
           release_signature_url?: string | null;
+          defaulted_on?: string | null;
+          defaulted_by?: string | null;
+          default_balance_paise?: number | null;
+          default_reason?: string | null;
+          archived_at?: string | null;
+          archived_by?: string | null;
+          archive_reason?: string | null;
+          archive_balance_paise?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -181,6 +197,14 @@ export interface Database {
           closure_balance_paise?: number | null;
           digital_signature_url?: string | null;
           release_signature_url?: string | null;
+          defaulted_on?: string | null;
+          defaulted_by?: string | null;
+          default_balance_paise?: number | null;
+          default_reason?: string | null;
+          archived_at?: string | null;
+          archived_by?: string | null;
+          archive_reason?: string | null;
+          archive_balance_paise?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -188,6 +212,13 @@ export interface Database {
           {
             foreignKeyName: 'loans_customer_id_fkey';
             columns: ['customer_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'loans_archived_by_fkey';
+            columns: ['archived_by'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
@@ -618,6 +649,60 @@ export interface Database {
           already_redeemed: boolean;
         }[];
       };
+      default_loan: {
+        Args: {
+          p_loan_id: string;
+          p_defaulted_on: string;
+          p_reason: string;
+        };
+        Returns: {
+          loan_id: string;
+          status: LoanStatus;
+          defaulted_on: string;
+          defaulted_by: string;
+          default_balance_paise: number;
+          already_defaulted: boolean;
+        }[];
+      };
+      update_shop_defaults: {
+        Args: {
+          p_rate_bps: number;
+          p_partial_period_mode: PartialPeriodMode;
+          p_round_up_threshold_days: number;
+          p_simple_period_days: number;
+          p_compound_every_days: number;
+          p_grace_days: number;
+        };
+        Returns: {
+          id: number;
+          interest_model: InterestModel;
+          rate_bps: number;
+          merchant_rate_bps: number;
+          simple_period_days: number;
+          compound_every_days: number;
+          grace_days: number;
+          partial_period_mode: PartialPeriodMode;
+          round_up_threshold_days: number;
+          updated_at: string;
+        };
+      };
+      edit_loan_terms: {
+        Args: {
+          p_loan_id: string;
+          p_rate_bps: number;
+          p_interest_model: InterestModel;
+          p_simple_period_days: number;
+          p_compound_every_days: number;
+          p_grace_days: number;
+          p_partial_period_mode: PartialPeriodMode;
+          p_round_up_threshold_days: number;
+          p_reason: string;
+        };
+        Returns: {
+          loan_id: string;
+          change_count: number;
+        }[];
+      };
       renew_loan: {
         Args: {
           p_loan_id: string;
@@ -633,6 +718,27 @@ export interface Database {
           interest_paid_paise: number;
           new_maturity_on: string;
           already_renewed: boolean;
+        }[];
+      };
+      archive_loan: {
+        Args: {
+          p_loan_id: string;
+          p_reason: string;
+        };
+        Returns: {
+          loan_id: string;
+          archived_at: string;
+          archived_by: string;
+          archive_reason: string;
+          archive_balance_paise: number;
+          already_archived: boolean;
+        }[];
+      };
+      unarchive_loan: {
+        Args: { p_loan_id: string };
+        Returns: {
+          loan_id: string;
+          unarchived: boolean;
         }[];
       };
     };

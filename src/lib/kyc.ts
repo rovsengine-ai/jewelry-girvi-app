@@ -1,3 +1,4 @@
+import { translate, type AppLanguage } from '@/i18n';
 import type { IdDocumentType } from '@/types/database';
 
 const LAST4_RE = /^[0-9A-Za-z]{4}$/;
@@ -49,9 +50,9 @@ export function assertKycPhotoAllowed(
   }
 }
 
-export function kycStatusLabel(verifiedOn: string | null): string {
+export function kycStatusLabel(verifiedOn: string | null, language?: AppLanguage): string {
   if (verifiedOn) {
-    return `Verified ${verifiedOn}`;
+    return translate('kyc.verified', { date: verifiedOn }, language);
   }
-  return 'Not verified';
+  return translate('kyc.notVerified', undefined, language);
 }

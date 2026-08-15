@@ -254,9 +254,12 @@ otp_expiry = 3600
 # subject = "Your password has been changed"
 # content_path = "./templates/password_changed_notification.html"
 
+# LOCAL ONLY — never copy this [auth.sms] / [auth.sms.test_otp] block to the
+# hosted project. There is no SMS provider here; these numbers exist only in
+# the local CLI database so the app can sign in without a real phone.
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
-enable_signup = false
+enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
 # Template for sending OTP to users
@@ -265,8 +268,14 @@ template = "Your code is {{ .Code }}"
 max_frequency = "5s"
 
 # Use pre-defined map of phone number to OTP for testing.
-# [auth.sms.test_otp]
-# 4152127777 = "123456"
+[auth.sms.test_otp]
+9000000001 = "123456"   # owner
+9000000002 = "123456"   # staff
+9000000003 = "123456"   # retail customer
+# GoTrue looks up E.164 without '+'. The app sends +919000000001, so both forms.
+"919000000001" = "123456"
+"919000000002" = "123456"
+"919000000003" = "123456"
 
 # Configure logged in session timeouts.
 # [auth.sessions]
@@ -292,6 +301,14 @@ account_sid = ""
 message_service_sid = ""
 # DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+
+# LOCAL ONLY — older GoTrue/CLI builds disable phone login unless a provider
+# flag is on, even when [auth.sms.test_otp] is set. Dummy Textlocal fields
+# satisfy the CLI schema; OTP never leaves the machine. Do not copy to hosted.
+[auth.sms.textlocal]
+enabled = true
+sender = "GirviShop"
+api_key = "local-test-unused"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]
@@ -403,9 +420,6 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
-
-[functions.refresh-gold-rate]
-verify_jwt = true
 
 # pg-delta is the schema diff engine for db diff / db pull / db remote commit.
 # Set enabled = false to fall back to the legacy migra engine.

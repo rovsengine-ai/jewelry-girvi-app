@@ -1,16 +1,14 @@
+import { translate, type AppLanguage } from '@/i18n';
 import { asPaise, formatPaiseAsInr } from '@/lib/money';
 import type { NoticeType, OverdueLoan } from '@/types/database';
 
-export function noticeTypeLabel(type: NoticeType): string {
+export function noticeTypeLabel(type: NoticeType, language?: AppLanguage): string {
   switch (type) {
     case 'due_soon':
-      return 'Due soon';
     case 'overdue':
-      return 'Overdue';
     case 'renewal_offer':
-      return 'Renewal offer';
     case 'forfeiture_warning':
-      return 'Forfeiture warning';
+      return translate(`notices.type.${type}`, undefined, language);
     default: {
       const _exhaustive: never = type;
       return _exhaustive;

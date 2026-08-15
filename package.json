@@ -3,18 +3,20 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@expo/ui": "~57.0.10",
     "@supabase/supabase-js": "^2.112.3",
     "expo": "~57.0.12",
+    "expo-blur": "~57.0.2",
     "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.10",
     "expo-device": "~57.0.1",
     "expo-file-system": "~57.0.2",
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.1",
+    "expo-haptics": "~57.0.1",
     "expo-image": "~57.0.2",
     "expo-image-picker": "~57.0.9",
     "expo-linking": "~57.0.5",
+    "expo-localization": "~57.0.1",
     "expo-notifications": "~57.0.11",
     "expo-print": "~57.0.1",
     "expo-router": "~57.0.12",
@@ -25,6 +27,7 @@
     "expo-symbols": "~57.0.2",
     "expo-system-ui": "~57.0.2",
     "expo-web-browser": "~57.0.2",
+    "i18n-js": "^4.5.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
@@ -49,12 +52,17 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "e2e:maestro": "maestro test e2e",
+    "e2e:maestro:owner": "maestro test e2e/owner-payment-redeem-print.yaml",
+    "e2e:maestro:staff": "maestro test e2e/staff-owner-actions-absent.yaml",
+    "e2e:maestro:customer": "maestro test e2e/customer-list-language.yaml",
+    "e2e:maestro:archive": "maestro test e2e/owner-archive-hides-from-customer.yaml"
   },
   "jest": {
     "preset": "jest-expo",
@@ -64,7 +72,12 @@
     "moduleNameMapper": {
       "\\.(css|sass|scss)$": "<rootDir>/__mocks__/style-mock.js",
       "^@/assets/(.*)$": "<rootDir>/assets/$1",
-      "^@/(.*)$": "<rootDir>/src/$1"
+      "^@/(.*)$": "<rootDir>/src/$1",
+      "^react-native-worklets$": "<rootDir>/jest/worklets-mock.js",
+      "^react-native-reanimated$": "<rootDir>/jest/reanimated-mock.js",
+      "^expo-haptics$": "<rootDir>/jest/expo-haptics-mock.js",
+      "^expo-localization$": "<rootDir>/jest/expo-localization-mock.js",
+      "^expo-symbols$": "<rootDir>/jest/expo-symbols-mock.js"
     }
   },
   "private": true

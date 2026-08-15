@@ -1,3 +1,5 @@
+import { translate, type AppLanguage } from '@/i18n';
+
 /** Karat → millesimal. 22K is 916, not 22/24. 18K is 750 (75%). */
 
 export const GOLD_MILLESIMAL_BANDS = [999, 916, 750, 585, 417] as const;
@@ -17,12 +19,14 @@ export function karatToMillesimal(karat: number | null): GoldMillesimal | null {
   return KARAT_TO_MILLESIMAL[karat] ?? null;
 }
 
-export function goldPurityLabel(karat: number | null): string {
-  if (karat == null) return 'Not assessed / आकलित नहीं';
+export function goldPurityLabel(karat: number | null, language?: AppLanguage): string {
+  if (karat == null) return translate('items.purity.notAssessed', undefined, language);
   const millesimal = karatToMillesimal(karat);
-  if (millesimal == null) return `${karat}K`;
-  if (karat === 18) return '18K (75% / 750)';
-  return `${karat}K (${millesimal})`;
+  if (millesimal == null) {
+    return translate('items.purity.karatOnly', { karat }, language);
+  }
+  if (karat === 18) return translate('items.purity.k18', undefined, language);
+  return translate('items.purity.karatMillesimal', { karat, millesimal }, language);
 }
 
 export interface GoldRatePick {

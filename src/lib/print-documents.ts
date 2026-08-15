@@ -1,9 +1,8 @@
+import { translate, type AppLanguage } from '@/i18n';
 import { goldPurityLabel } from '@/lib/gold-purity';
 import { asBps, asPaise, formatBpsAsPercent, formatPaiseAsInr } from '@/lib/money';
 import { loanStatusLabel } from '@/lib/redemption';
 import type { InterestModel, LoanItem, LoanStatus } from '@/types/database';
-
-const LETTERHEAD = 'Girvi Shop';
 
 /** A4 at 72 PPI, from Expo Print defaults documented as US Letter otherwise. */
 export const PRINT_A4 = { width: 595.28, height: 841.89 };
@@ -16,7 +15,7 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Integer mg → display grams without a float. */
+/** Integer mg → display grams without a float. Latin digits in both languages. */
 export function formatMgAsGrams(mg: number): string {
   const abs = Math.abs(mg);
   const grams = Math.trunc(abs / 1000);
@@ -25,16 +24,16 @@ export function formatMgAsGrams(mg: number): string {
   return `${sign}${grams}.${String(rem).padStart(3, '0')} g (${mg} mg)`;
 }
 
-function purityLabel(purityKarat: number | null): string {
-  return goldPurityLabel(purityKarat);
+function tx(language: AppLanguage, key: string, options?: Record<string, string | number>): string {
+  return translate(key, options, language);
 }
 
-function interestModelLabel(model: InterestModel): string {
+function interestModelLabel(model: InterestModel, language: AppLanguage): string {
   switch (model) {
     case 'retail':
-      return 'Retail / खुदरा';
+      return tx(language, 'print.interestRetail');
     case 'merchant':
-      return 'Merchant / व्यापारी';
+      return tx(language, 'print.interestMerchant');
     default: {
       const _exhaustive: never = model;
       return _exhaustive;
@@ -42,20 +41,16 @@ function interestModelLabel(model: InterestModel): string {
   }
 }
 
-const DISCLAIMER = `
+function disclaimerHtml(language: AppLanguage): string {
+  return `
 <p class="disclaimer">
-  This sheet lists terms stored on this girvi ticket. It is not legal advice and is not a
-  stamped instrument. Have a lawyer review it before you rely on it as an agreement.
-  <br />
-  यह पत्रक इस गिरवी टिकट पर संग्रहीत शर्तें दर्शाता है। यह कानूनी सलाह नहीं है और मुद्रांकित दस्तावेज़ नहीं है।
-  समझौते के रूप में उपयोग से पहले वकील से जाँच करवाएँ।
+  ${escapeHtml(tx(language, 'print.disclaimerLegal'))}
 </p>
 <p class="disclaimer">
-  Shop practice recorded in the app: interest-only renewal may be offered after the simple
-  period; forfeiture / auction is considered only after six months, with a renewal warning.
-  No other sale, penalty, or compounding rule is added here.
+  ${escapeHtml(tx(language, 'print.disclaimerPractice'))}
 </p>
 `;
+}
 
 const DOC_CSS = `
   @page { margin: 18mm; }
@@ -76,6 +71,7 @@ const DOC_CSS = `
 `;
 
 export interface PledgePrintInput {
+  language: AppLanguage;
   serialNumber: string;
   customerName: string | null;
   phoneNumber: string | null;
@@ -93,9 +89,11 @@ export interface PledgePrintInput {
 }
 
 export function buildPledgeAgreementHtml(input: PledgePrintInput): string {
+  const lang = input.language;
+  const dash = tx(lang, 'common.emDash');
   const itemRows =
     input.items.length === 0
-      ? '<tr><td colspan="5">No pledged-item rows on this ticket.</td></tr>'
+      ? `<tr><td colspan="5">${escapeHtml(tx(lang, 'print.noItems'))}</td></tr>`
       : input.items
           .map(
             (item) => `
@@ -104,7 +102,7 @@ export function buildPledgeAgreementHtml(input: PledgePrintInput): string {
                 <td>${item.quantity}</td>
                 <td>${escapeHtml(formatMgAsGrams(item.gross_weight_mg))}</td>
                 <td>${escapeHtml(formatMgAsGrams(item.net_weight_mg))}</td>
-                <td>${escapeHtml(purityLabel(item.purity_karat))}</td>
+                <td>${escapeHtml(goldPurityLabel(item.purity_karat, lang))}</td>
               </tr>`,
           )
           .join('');
@@ -116,36 +114,37 @@ export function buildPledgeAgreementHtml(input: PledgePrintInput): string {
     <style>${DOC_CSS}</style>
   </head>
   <body>
-    <h1>${escapeHtml(LETTERHEAD)}</h1>
-    <p class="sub">Pledge record / गिरवी अभिलेख · ${escapeHtml(input.serialNumber)}</p>
-    <p class="meta">Customer / ग्राहक: ${escapeHtml(input.customerName ?? '—')}</p>
-    <p class="meta">Phone / फ़ोन: ${escapeHtml(input.phoneNumber ?? '—')}</p>
-    <p class="meta">Address / पता: ${escapeHtml(input.address ?? '—')}</p>
-    <p class="meta">Disbursed / वितरित: ${escapeHtml(input.disbursedOn)}</p>
-    <p class="meta">Current due date / वर्तमान देय तिथि: ${escapeHtml(input.dueOn ?? '—')}</p>
-    <p class="meta">Principal / मूलधन: ${escapeHtml(formatPaiseAsInr(asPaise(input.principalPaise)))}</p>
-    <p class="meta">Rate / दर: ${escapeHtml(formatBpsAsPercent(asBps(input.rateBps)))}% per 30 days</p>
-    <p class="meta">Model / मॉडल: ${escapeHtml(interestModelLabel(input.interestModel))}</p>
-    <p class="meta">Simple period / साधारण अवधि: ${input.simplePeriodDays} days</p>
-    <h2>Pledged items / गिरवी वस्तुएँ</h2>
+    <h1>${escapeHtml(tx(lang, 'print.letterhead'))}</h1>
+    <p class="sub">${escapeHtml(tx(lang, 'print.pledgeSubtitle', { serial: input.serialNumber }))}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.customer'))} ${escapeHtml(input.customerName ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.phone'))} ${escapeHtml(input.phoneNumber ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.address'))} ${escapeHtml(input.address ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.disbursed'))} ${escapeHtml(input.disbursedOn)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.dueDate'))} ${escapeHtml(input.dueOn ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.principal'))} ${escapeHtml(formatPaiseAsInr(asPaise(input.principalPaise)))}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.rate'))} ${escapeHtml(formatBpsAsPercent(asBps(input.rateBps)))}${escapeHtml(tx(lang, 'print.rateSuffix'))}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.model'))} ${escapeHtml(interestModelLabel(input.interestModel, lang))}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.simplePeriod'))} ${input.simplePeriodDays} ${escapeHtml(tx(lang, 'print.simplePeriodSuffix'))}</p>
+    <h2>${escapeHtml(tx(lang, 'print.pledgedItems'))}</h2>
     <table>
       <thead>
         <tr>
-          <th>Ornament</th>
-          <th>Qty</th>
-          <th>Gross</th>
-          <th>Net</th>
-          <th>Purity</th>
+          <th>${escapeHtml(tx(lang, 'print.ornament'))}</th>
+          <th>${escapeHtml(tx(lang, 'print.qty'))}</th>
+          <th>${escapeHtml(tx(lang, 'print.gross'))}</th>
+          <th>${escapeHtml(tx(lang, 'print.net'))}</th>
+          <th>${escapeHtml(tx(lang, 'print.purity'))}</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>
     </table>
-    ${DISCLAIMER}
+    ${disclaimerHtml(lang)}
   </body>
 </html>`;
 }
 
 export interface RedemptionPrintInput {
+  language: AppLanguage;
   serialNumber: string;
   customerName: string | null;
   phoneNumber: string | null;
@@ -158,9 +157,11 @@ export interface RedemptionPrintInput {
 }
 
 export function buildRedemptionReceiptHtml(input: RedemptionPrintInput): string {
+  const lang = input.language;
+  const dash = tx(lang, 'common.emDash');
   const itemRows =
     input.items.length === 0
-      ? '<tr><td colspan="2">No pledged-item rows on this ticket.</td></tr>'
+      ? `<tr><td colspan="2">${escapeHtml(tx(lang, 'print.noItems'))}</td></tr>`
       : input.items
           .map(
             (item) => `
@@ -178,28 +179,27 @@ export function buildRedemptionReceiptHtml(input: RedemptionPrintInput): string 
     <style>${DOC_CSS}</style>
   </head>
   <body>
-    <h1>${escapeHtml(LETTERHEAD)}</h1>
-    <p class="sub">Redemption receipt / मोचन रसीद · ${escapeHtml(input.serialNumber)}</p>
-    <p class="meta">Status: ${escapeHtml(loanStatusLabel(input.status))}</p>
-    <p class="meta">Customer / ग्राहक: ${escapeHtml(input.customerName ?? '—')}</p>
-    <p class="meta">Phone / फ़ोन: ${escapeHtml(input.phoneNumber ?? '—')}</p>
-    <p class="meta">Redeemed on / मोचन तिथि: ${escapeHtml(input.redeemedOn)}</p>
-    <p class="meta">Released to / प्राप्तकर्ता: ${escapeHtml(input.releasedToName ?? '—')}</p>
-    <p class="meta">Amount collected (snapshot) / वसूल राशि:
+    <h1>${escapeHtml(tx(lang, 'print.letterhead'))}</h1>
+    <p class="sub">${escapeHtml(tx(lang, 'print.redemptionSubtitle', { serial: input.serialNumber }))}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.status'))} ${escapeHtml(loanStatusLabel(input.status, lang))}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.customer'))} ${escapeHtml(input.customerName ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.phone'))} ${escapeHtml(input.phoneNumber ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.redeemedOn'))} ${escapeHtml(input.redeemedOn)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.releasedTo'))} ${escapeHtml(input.releasedToName ?? dash)}</p>
+    <p class="meta">${escapeHtml(tx(lang, 'print.amountCollected'))}
       ${escapeHtml(formatPaiseAsInr(asPaise(input.closureBalancePaise)))}</p>
-    <p class="meta">Note / टिप्पणी: ${escapeHtml(input.releaseNote ?? '—')}</p>
-    <h2>Items released / लौटाई वस्तुएँ</h2>
+    <p class="meta">${escapeHtml(tx(lang, 'print.note'))} ${escapeHtml(input.releaseNote ?? dash)}</p>
+    <h2>${escapeHtml(tx(lang, 'print.releasedItems'))}</h2>
     <table>
       <thead>
-        <tr><th>Ornament</th><th>Qty</th></tr>
+        <tr><th>${escapeHtml(tx(lang, 'print.ornament'))}</th><th>${escapeHtml(tx(lang, 'print.qty'))}</th></tr>
       </thead>
       <tbody>${itemRows}</tbody>
     </table>
     <p class="disclaimer">
-      Collected amount is the frozen closure_balance_paise written at redemption. A later
-      rate edit does not change this figure.
+      ${escapeHtml(tx(lang, 'print.disclaimerClosure'))}
     </p>
-    ${DISCLAIMER}
+    ${disclaimerHtml(lang)}
   </body>
 </html>`;
 }

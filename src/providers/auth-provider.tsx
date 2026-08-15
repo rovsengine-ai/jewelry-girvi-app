@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Href } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
+import { ADMIN_LOANS_HREF, CUSTOMER_LOANS_HREF } from '@/lib/shop-tab-access';
 import { clearLoanReminderNotifications } from '@/services/loanReminderNotifications';
 import type { Profile, UserRole } from '@/types/database';
 
@@ -90,9 +92,9 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
-export function routeForRole(role: UserRole | undefined): '/(admin)/dashboard' | '/(customer)/dashboard' {
+export function routeForRole(role: UserRole | undefined): Href {
   if (role === 'owner' || role === 'staff') {
-    return '/(admin)/dashboard';
+    return ADMIN_LOANS_HREF;
   }
-  return '/(customer)/dashboard';
+  return CUSTOMER_LOANS_HREF;
 }

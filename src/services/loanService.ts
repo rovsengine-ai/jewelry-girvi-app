@@ -7,16 +7,22 @@ import { convertScannerItem, type ScannerItemDraft } from '@/lib/scanner-items';
 import { supabase } from '@/lib/supabase';
 import type { Json } from '@/types/supabase';
 import type {
+  ArchivedLoan,
+  ArchiveLoanResult,
+  DefaultLoanResult,
+  EditLoanTermsResult,
   InterestModel,
   LoanBalances,
   LoanFormData,
   LoanItem,
   LoanNotice,
   OverdueLoan,
+  PartialPeriodMode,
   RateYield,
   RedeemLoanResult,
   RenewLoanResult,
   ShopDefaults,
+  UnarchiveLoanResult,
 } from '@/types/database';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -174,19 +180,15 @@ export async function createWalkInCustomer(
 }
 
 export async function findCustomerIdByPhone(phoneNumber: string): Promise<string | null> {
-  const normalized = toE164India(phoneNumber);
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('phone_number', normalized)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('find_profile_by_phone', {
+    p_phone: phoneNumber,
+  });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return data?.id ?? null;
+  return data ?? null;
 }
 
 async function loadShopDefaults(): Promise<ShopDefaults> {
@@ -195,6 +197,11 @@ async function loadShopDefaults(): Promise<ShopDefaults> {
     throw new Error(error?.message ?? 'shop_defaults row missing');
   }
   return data as ShopDefaults;
+}
+
+/** Single place screens read shop defaults. Do not query id = 1 from a route. */
+export async function fetchShopDefaults(): Promise<ShopDefaults> {
+  return loadShopDefaults();
 }
 
 /**
@@ -493,6 +500,231 @@ export async function redeemLoan(input: {
   };
 }
 
+/**
+ * Owner-only forfeiture. Idempotent: a second call returns the original
+ * snapshot. Overdue-ness and the six-month rule are decided in SQL.
+ */
+export async function defaultLoan(input: {
+  loanId: string;
+  defaultedOn: string;
+  reason: string;
+}): Promise<DefaultLoanResult> {
+  const { data, error } = await supabase.rpc('default_loan', {
+    p_loan_id: input.loanId,
+    p_defaulted_on: input.defaultedOn,
+    p_reason: input.reason,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('default_loan returned no row');
+  }
+
+  return {
+    loan_id: row.loan_id,
+    status: row.status,
+    defaulted_on: row.defaulted_on,
+    defaulted_by: row.defaulted_by,
+    default_balance_paise: asPaise(row.default_balance_paise),
+    already_defaulted: row.already_defaulted,
+  };
+}
+
+/**
+ * Owner-only hide. Idempotent: a second call returns the original snapshot
+ * and writes nothing. Never DELETE.
+ */
+export async function archiveLoan(input: {
+  loanId: string;
+  reason: string;
+}): Promise<ArchiveLoanResult> {
+  const { data, error } = await supabase.rpc('archive_loan', {
+    p_loan_id: input.loanId,
+    p_reason: input.reason,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('archive_loan returned no row');
+  }
+
+  return {
+    loan_id: row.loan_id,
+    archived_at: row.archived_at,
+    archived_by: row.archived_by,
+    archive_reason: row.archive_reason,
+    archive_balance_paise: asPaise(row.archive_balance_paise),
+    already_archived: row.already_archived,
+  };
+}
+
+/**
+ * Owner-only restore. Clears the four archive columns and writes an audit row.
+ */
+export async function unarchiveLoan(loanId: string): Promise<UnarchiveLoanResult> {
+  const { data, error } = await supabase.rpc('unarchive_loan', {
+    p_loan_id: loanId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('unarchive_loan returned no row');
+  }
+
+  return {
+    loan_id: row.loan_id,
+    unarchived: row.unarchived,
+  };
+}
+
+type ArchivedLoanQueryRow = {
+  id: string;
+  serial_number: string;
+  archived_at: string | null;
+  archived_by: string | null;
+  archive_reason: string | null;
+  archive_balance_paise: number | null;
+  customer: { full_name: string | null } | { full_name: string | null }[] | null;
+  archiver: { full_name: string | null } | { full_name: string | null }[] | null;
+};
+
+function nestedName(
+  value: { full_name: string | null } | { full_name: string | null }[] | null,
+): string | null {
+  if (Array.isArray(value)) {
+    return value[0]?.full_name ?? null;
+  }
+  return value?.full_name ?? null;
+}
+
+/**
+ * Owner-only list. RLS hides archived rows from staff and customers; this
+ * `.not('archived_at')` is UX so the Archive screen is not the live book.
+ */
+export async function fetchArchivedLoans(): Promise<ArchivedLoan[]> {
+  const { data, error } = await supabase
+    .from('loans')
+    .select(
+      `
+      id,
+      serial_number,
+      archived_at,
+      archived_by,
+      archive_reason,
+      archive_balance_paise,
+      customer:customer_id ( full_name ),
+      archiver:archived_by ( full_name )
+    `,
+    )
+    .not('archived_at', 'is', null)
+    .order('archived_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as ArchivedLoanQueryRow[];
+  return rows.flatMap((row) => {
+    if (
+      row.archived_at == null ||
+      row.archived_by == null ||
+      row.archive_reason == null ||
+      row.archive_balance_paise == null
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: row.id,
+        serial_number: row.serial_number,
+        archived_at: row.archived_at,
+        archived_by: row.archived_by,
+        archive_reason: row.archive_reason,
+        archive_balance_paise: asPaise(row.archive_balance_paise),
+        customer_name: nestedName(row.customer),
+        archived_by_name: nestedName(row.archiver),
+      },
+    ];
+  });
+}
+
+export async function updateShopDefaults(input: {
+  rateBps: number;
+  partialPeriodMode: PartialPeriodMode;
+  roundUpThresholdDays: number;
+  simplePeriodDays: number;
+  compoundEveryDays: number;
+  graceDays: number;
+}): Promise<ShopDefaults> {
+  const { data, error } = await supabase.rpc('update_shop_defaults', {
+    p_rate_bps: input.rateBps,
+    p_partial_period_mode: input.partialPeriodMode,
+    p_round_up_threshold_days: input.roundUpThresholdDays,
+    p_simple_period_days: input.simplePeriodDays,
+    p_compound_every_days: input.compoundEveryDays,
+    p_grace_days: input.graceDays,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    throw new Error('update_shop_defaults returned no row');
+  }
+
+  return data as ShopDefaults;
+}
+
+export async function editLoanTerms(input: {
+  loanId: string;
+  rateBps: number;
+  interestModel: InterestModel;
+  simplePeriodDays: number;
+  compoundEveryDays: number;
+  graceDays: number;
+  partialPeriodMode: PartialPeriodMode;
+  roundUpThresholdDays: number;
+  reason: string;
+}): Promise<EditLoanTermsResult> {
+  const { data, error } = await supabase.rpc('edit_loan_terms', {
+    p_loan_id: input.loanId,
+    p_rate_bps: input.rateBps,
+    p_interest_model: input.interestModel,
+    p_simple_period_days: input.simplePeriodDays,
+    p_compound_every_days: input.compoundEveryDays,
+    p_grace_days: input.graceDays,
+    p_partial_period_mode: input.partialPeriodMode,
+    p_round_up_threshold_days: input.roundUpThresholdDays,
+    p_reason: input.reason,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('edit_loan_terms returned no row');
+  }
+
+  return {
+    loan_id: row.loan_id,
+    change_count: Number(row.change_count),
+  };
+}
+
 export async function renewLoan(input: {
   loanId: string;
   renewedOn: string;
@@ -601,10 +833,9 @@ export async function fetchLoanNotices(limit = 50): Promise<LoanNotice[]> {
 }
 
 export async function fetchCustomerLoanReminders(asOf?: string): Promise<LoanReminderSlot[]> {
-  const { data, error } = await supabase.rpc(
-    'customer_loan_reminder_schedule',
-    asOf ? { p_as_of: asOf } : {},
-  );
+  const { data, error } = await supabase.rpc('customer_loan_reminder_schedule', {
+    p_as_of: asOf ?? todayInKolkata(),
+  });
 
   if (error) {
     throw new Error(error.message);

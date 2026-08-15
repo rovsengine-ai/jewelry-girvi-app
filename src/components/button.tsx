@@ -1,5 +1,6 @@
-import { ActivityIndicator, Pressable, StyleSheet, type PressableProps } from 'react-native';
+import { ActivityIndicator, StyleSheet, type PressableProps } from 'react-native';
 
+import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,7 +30,7 @@ export function Button({
     variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.onDanger : colors.text;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
@@ -47,7 +48,7 @@ export function Button({
           {label}
         </ThemedText>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 

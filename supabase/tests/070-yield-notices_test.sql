@@ -48,6 +48,26 @@ insert into public.loans (
 
 select tests.authenticate_as('yld_owner');
 
+-- Local CLI seed loans are also active @ 300 bps. Archive them so this
+-- suite's yield math stays about T070-* fixtures only (transaction rollback).
+do $isolate$
+declare
+  rid uuid;
+begin
+  for rid in
+    select id
+    from public.loans
+    where serial_number in ('SEED-ACTIVE', 'SEED-OVERDUE')
+  loop
+    perform a.loan_id
+    from public.archive_loan(
+      rid,
+      'isolate T070 yield fixtures from local seed'
+    ) a;
+  end loop;
+end
+$isolate$;
+
 -- Active 300 bps: two yield loans + two notice loans = 4 × 30,000 paise.
 -- Active 150 bps: one yield loan = 30,000 paise. Redeemed 400 bps is excluded.
 select results_eq(

@@ -20,4 +20,14 @@ describe('<FormNotice />', () => {
     const { toJSON } = await render(<FormNotice />);
     expect(toJSON()).toBeNull();
   });
+
+  test('keeps a standing info line even when an error is shown', async () => {
+    const { getByTestId } = await render(
+      <FormNotice info="Changing shop defaults affects NEW loans only." error="Could not save." />,
+    );
+    expect(getByTestId('screen-info').props.children).toBe(
+      'Changing shop defaults affects NEW loans only.',
+    );
+    expect(getByTestId('screen-error').props.children).toBe('Could not save.');
+  });
 });

@@ -15,9 +15,10 @@ import { formatPaiseAsInr, type Paise } from '@/lib/money';
 
 export type MoneyTextProps = Omit<ThemedTextProps, 'children'> & {
   paise: Paise;
+  size?: 'default' | 'large';
 };
 
-export function MoneyText({ paise, style, ...rest }: MoneyTextProps) {
+export function MoneyText({ paise, size = 'default', style, ...rest }: MoneyTextProps) {
   return (
     <ThemedText
       accessibilityRole="text"
@@ -25,7 +26,11 @@ export function MoneyText({ paise, style, ...rest }: MoneyTextProps) {
       minimumFontScale={0.5}
       numberOfLines={1}
       ellipsizeMode="clip"
-      style={[styles.money, { fontVariant: ['tabular-nums', 'lining-nums'] }, style]}
+      style={[
+        size === 'large' ? styles.moneyLarge : styles.money,
+        { fontVariant: ['tabular-nums', 'lining-nums'] },
+        style,
+      ]}
       {...rest}>
       {formatPaiseAsInr(paise)}
     </ThemedText>
@@ -35,6 +40,11 @@ export function MoneyText({ paise, style, ...rest }: MoneyTextProps) {
 const styles = StyleSheet.create({
   money: {
     ...TypeScale.money,
+    fontFamily: Fonts.sans,
+    flexShrink: 1,
+  },
+  moneyLarge: {
+    ...TypeScale.moneyLarge,
     fontFamily: Fonts.sans,
     flexShrink: 1,
   },

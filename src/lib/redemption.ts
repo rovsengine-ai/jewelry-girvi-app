@@ -1,3 +1,4 @@
+import { translate, type AppLanguage } from '@/i18n';
 import type { LoanStatus, UserRole } from '@/types/database';
 
 export type RedeemGate =
@@ -6,16 +7,13 @@ export type RedeemGate =
   | { kind: 'not_active'; status: LoanStatus }
   | { kind: 'ready' };
 
-export function loanStatusLabel(status: LoanStatus): string {
+export function loanStatusLabel(status: LoanStatus, language?: AppLanguage): string {
   switch (status) {
     case 'active':
-      return 'Active';
     case 'redeemed':
-      return 'Redeemed';
     case 'closed':
-      return 'Closed';
     case 'defaulted':
-      return 'Defaulted';
+      return translate(`loans.status.${status}`, undefined, language);
     default: {
       const _exhaustive: never = status;
       return _exhaustive;
@@ -54,12 +52,12 @@ export function canSubmitRedemption(input: {
   releasedToName: string;
   itemIds: string[];
   checkedIds: Iterable<string>;
-}): { ok: true } | { ok: false; reason: string } {
+}): { ok: true } | { ok: false; reason: 'redeem.validation.nameRequired' | 'redeem.validation.allItemsRequired' } {
   if (input.releasedToName.trim() === '') {
-    return { ok: false, reason: 'Enter the name of the person collecting the goods.' };
+    return { ok: false, reason: 'redeem.validation.nameRequired' };
   }
   if (!allItemsReleased(input.itemIds, input.checkedIds)) {
-    return { ok: false, reason: 'Tick every pledged item before releasing.' };
+    return { ok: false, reason: 'redeem.validation.allItemsRequired' };
   }
   return { ok: true };
 }

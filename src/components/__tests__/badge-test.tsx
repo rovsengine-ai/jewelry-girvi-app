@@ -13,12 +13,12 @@ describe('<Badge />', () => {
     getByText(status.charAt(0).toUpperCase() + status.slice(1));
     const token =
       status === 'active'
-        ? Colors.light.statusActive
+        ? Colors.light.tintSuccess
         : status === 'redeemed'
-          ? Colors.light.statusRedeemed
+          ? Colors.light.tintRedeemed
           : status === 'closed'
-            ? Colors.light.statusClosed
-            : Colors.light.statusDefaulted;
+            ? Colors.light.tintClosed
+            : Colors.light.tintDanger;
     expect(flatStyle(getByTestId('badge'))).toMatchObject({
       backgroundColor: token,
     });

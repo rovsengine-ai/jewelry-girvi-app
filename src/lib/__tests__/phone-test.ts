@@ -1,4 +1,4 @@
-import { toE164India } from '@/lib/phone';
+import { telHref, toE164India } from '@/lib/phone';
 
 describe('toE164India', () => {
   test('prefixes a bare 10-digit Indian mobile', () => {
@@ -80,5 +80,27 @@ describe('toE164India', () => {
       expect(toE164India(sixteen)).toBe(`+${sixteen}`);
       expect(`+${sixteen}`).not.toMatch(/^[+]?[0-9]{7,15}$/);
     });
+  });
+
+  test('lockstep with SQL normalize_phone_e164 (see supabase/tests/150-phone-normalize_test.sql)', () => {
+    expect(toE164India('9876543210')).toBe('+919876543210');
+    expect(toE164India('09876543210')).toBe('+09876543210');
+    expect(toE164India('+919876543210')).toBe('+919876543210');
+    expect(toE164India('919876543210')).toBe('+919876543210');
+    expect(toE164India('+91 98765-43210')).toBe('+919876543210');
+  });
+});
+
+describe('telHref', () => {
+  test('builds a dialer URL from a stored Indian mobile', () => {
+    expect(telHref('+919876543210')).toBe('tel:+919876543210');
+    expect(telHref('9876543210')).toBe('tel:+919876543210');
+  });
+
+  test('returns null when there is no number to dial', () => {
+    expect(telHref(null)).toBeNull();
+    expect(telHref(undefined)).toBeNull();
+    expect(telHref('')).toBeNull();
+    expect(telHref('   ')).toBeNull();
   });
 });

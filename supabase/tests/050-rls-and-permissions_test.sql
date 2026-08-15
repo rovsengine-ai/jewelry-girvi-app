@@ -3,7 +3,7 @@
 -- docs/RULES.md and the storage path-namespacing rules from migration
 -- 20260813200000.
 begin;
-select plan(43);
+select plan(45);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures (created as the superuser test role, which bypasses RLS).
@@ -215,17 +215,21 @@ select throws_ok(
   'staff cannot edit round_up_threshold_days'
 );
 
--- Note the shape of this one: loans_owner_delete restricts DELETE by USING, so
--- a staff DELETE matches zero rows and RETURNS QUIETLY rather than raising.
--- The row surviving is the guarantee; the silence is a UI trap worth knowing.
-delete from public.loans where id = 'c0000000-0000-4000-8000-000000000003';
+-- Hard delete is gone: the trigger raises and points at archive_loan.
+-- loans_delete_blocked USING (true) exists so RLS does not swallow the
+-- statement before the trigger runs.
+select throws_ok(
+  $$ delete from public.loans where id = 'c0000000-0000-4000-8000-000000000003' $$,
+  'loans cannot be deleted; call archive_loan instead',
+  'a staff DELETE raises and points at archive_loan'
+);
 select isnt_empty(
   $$ select id from public.loans where id = 'c0000000-0000-4000-8000-000000000003' $$,
-  'a staff DELETE removes nothing (silently filtered by RLS, not an error)'
+  'a staff DELETE leaves the row in place'
 );
 
 -- ---------------------------------------------------------------------------
--- 15-16. Owner may re-price and delete.
+-- 15-16. Owner may re-price. Owner cannot hard-delete; archive_loan instead.
 -- ---------------------------------------------------------------------------
 select tests.authenticate_as('rls_owner');
 
@@ -236,10 +240,14 @@ select lives_ok(
   'owner CAN edit a loan''s frozen terms'
 );
 
-delete from public.loans where id = 'd0000000-0000-4000-8000-000000000004';
-select is_empty(
+select throws_ok(
+  $$ delete from public.loans where id = 'd0000000-0000-4000-8000-000000000004' $$,
+  'loans cannot be deleted; call archive_loan instead',
+  'owner cannot hard-delete a loan'
+);
+select isnt_empty(
   $$ select id from public.loans where id = 'd0000000-0000-4000-8000-000000000004' $$,
-  'owner CAN delete a loan'
+  'owner DELETE leaves the row in place'
 );
 
 -- The audit snapshot is not optional. loans_redeemed_audit_chk exists so that a

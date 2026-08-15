@@ -102,6 +102,14 @@ export interface Loan {
   closure_balance_paise: number | null;
   digital_signature_url: string | null;
   release_signature_url: string | null;
+  defaulted_on: string | null;
+  defaulted_by: string | null;
+  default_balance_paise: number | null;
+  default_reason: string | null;
+  archived_at: string | null;
+  archived_by: string | null;
+  archive_reason: string | null;
+  archive_balance_paise: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -122,6 +130,45 @@ export interface RenewLoanResult {
   interest_paid_paise: number;
   new_maturity_on: string;
   already_renewed: boolean;
+}
+
+export interface DefaultLoanResult {
+  loan_id: string;
+  status: LoanStatus;
+  defaulted_on: string;
+  defaulted_by: string;
+  default_balance_paise: number;
+  already_defaulted: boolean;
+}
+
+export interface EditLoanTermsResult {
+  loan_id: string;
+  change_count: number;
+}
+
+export interface ArchiveLoanResult {
+  loan_id: string;
+  archived_at: string;
+  archived_by: string;
+  archive_reason: string;
+  archive_balance_paise: number;
+  already_archived: boolean;
+}
+
+export interface UnarchiveLoanResult {
+  loan_id: string;
+  unarchived: boolean;
+}
+
+export interface ArchivedLoan {
+  id: string;
+  serial_number: string;
+  archived_at: string;
+  archived_by: string;
+  archive_reason: string;
+  archive_balance_paise: number;
+  customer_name: string | null;
+  archived_by_name: string | null;
 }
 
 export interface LoanWithCustomer extends Loan {

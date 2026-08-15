@@ -19,3 +19,13 @@ export function toE164India(phone: string): string {
 
   return phone.startsWith('+') ? `+${digits}` : `+${digits}`;
 }
+
+/** Dialer URL for a stored shop phone. Null when the number cannot be parsed. */
+export function telHref(phone: string | null | undefined): string | null {
+  if (phone == null || phone.trim() === '') return null;
+  try {
+    return `tel:${toE164India(phone)}`;
+  } catch {
+    return null;
+  }
+}

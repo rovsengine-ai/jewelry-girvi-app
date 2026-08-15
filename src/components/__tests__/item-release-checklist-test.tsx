@@ -4,6 +4,10 @@ import { ItemReleaseChecklist } from '@/components/item-release-checklist';
 import { canSubmitRedemption } from '@/lib/redemption';
 import type { LoanItem } from '@/types/database';
 
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn(async () => undefined),
+}));
+
 const ITEMS: LoanItem[] = [
   {
     id: 'item-chain',

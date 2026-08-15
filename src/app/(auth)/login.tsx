@@ -1,23 +1,24 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
-import { ThemedText } from '@/components/themed-text';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing, TypeScale } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { toE164India } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 import { routeForRole, useAuth } from '@/providers/auth-provider';
+import { useLanguage } from '@/providers/language-provider';
 import type { Profile, UserRole } from '@/types/database';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
+  const { t } = useLanguage();
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -33,11 +34,11 @@ export default function LoginScreen() {
     try {
       normalized = toE164India(phone.trim());
     } catch {
-      setFormError('Enter a valid 10-digit mobile number.');
+      setFormError(t('auth.invalidMobile'));
       return;
     }
     if (normalized.length < 13) {
-      setFormError('Enter a valid 10-digit mobile number.');
+      setFormError(t('auth.invalidMobile'));
       return;
     }
 
@@ -51,7 +52,7 @@ export default function LoginScreen() {
     }
 
     setStep('otp');
-    setFormNotice(`Verification code sent to ${normalized}`);
+    setFormNotice(t('auth.otpSent', { phone: normalized }));
   };
 
   const handleVerifyOtp = async () => {
@@ -61,11 +62,11 @@ export default function LoginScreen() {
     try {
       normalized = toE164India(phone.trim());
     } catch {
-      setFormError('Enter a valid 10-digit mobile number.');
+      setFormError(t('auth.invalidMobile'));
       return;
     }
     if (otp.trim().length < 4) {
-      setFormError('Enter the verification code from SMS.');
+      setFormError(t('auth.enterVerificationCode'));
       return;
     }
 
@@ -83,7 +84,7 @@ export default function LoginScreen() {
     }
 
     if (!data.user) {
-      setFormError('No user session returned.');
+      setFormError(t('auth.noUserSession'));
       return;
     }
 
@@ -106,48 +107,47 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.content}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.form}>
-          <ThemedText style={TypeScale.display}>Girvi Shop Login</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            Sign in with your mobile number to view receipts or manage loans.
-          </ThemedText>
-
+      <ScreenHeader title={t('auth.title')} subtitle={t('auth.subtitle')} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.form}>
+        <View style={styles.content}>
           <Card>
             <Field
-              label="Mobile number"
+              label={t('auth.mobileNumber')}
               value={phone}
               onChangeText={setPhone}
-              placeholder="10-digit mobile number"
+              placeholder={t('auth.mobilePlaceholder')}
               keyboardType="phone-pad"
               editable={step === 'phone' && !isSubmitting}
+              testID="login-phone"
             />
 
             {step === 'otp' ? (
               <Field
-                label="Verification code"
+                label={t('auth.verificationCode')}
                 value={otp}
                 onChangeText={setOtp}
-                placeholder="Enter OTP"
+                placeholder={t('auth.otpPlaceholder')}
                 keyboardType="number-pad"
                 maxLength={6}
                 editable={!isSubmitting}
+                testID="login-otp"
               />
             ) : null}
 
             <FormNotice error={formError} notice={formNotice} />
 
             <Button
-              label={step === 'phone' ? 'Send OTP' : 'Verify & Sign In'}
+              testID={step === 'phone' ? 'login-send-otp' : 'login-verify'}
+              label={step === 'phone' ? t('auth.sendOtp') : t('auth.verifyAndSignIn')}
               loading={isSubmitting}
               onPress={() => void (step === 'phone' ? handleSendOtp() : handleVerifyOtp())}
             />
 
             {step === 'otp' ? (
               <Button
-                label="Change phone number"
+                label={t('auth.changePhoneNumber')}
                 variant="secondary"
                 disabled={isSubmitting}
                 onPress={() => {
@@ -158,14 +158,14 @@ export default function LoginScreen() {
               />
             ) : null}
           </Card>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+        </View>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: Spacing.four },
-  form: { gap: Spacing.three },
+  content: { flex: 1, justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
+  form: { flex: 1 },
 });

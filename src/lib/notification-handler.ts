@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+
+import { setNotificationHandler } from '@/lib/local-notifications';
 
 /**
  * Required for a scheduled/local notification to appear while the app is
@@ -8,7 +9,7 @@ import * as Notifications from 'expo-notifications';
  * https://docs.expo.dev/versions/v57.0.0/sdk/notifications/
  */
 if (Platform.OS === 'ios' || Platform.OS === 'android') {
-  Notifications.setNotificationHandler({
+  setNotificationHandler({
     handleNotification: async () => ({
       shouldPlaySound: false,
       shouldSetBadge: false,

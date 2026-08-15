@@ -1,10 +1,23 @@
 import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { Fonts, ThemeColor, TypeScale } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?:
+    | 'default'
+    | 'title'
+    | 'small'
+    | 'smallBold'
+    | 'subtitle'
+    | 'link'
+    | 'linkPrimary'
+    | 'code'
+    | 'overline'
+    | 'label'
+    | 'bodyLarge'
+    | 'moneyLarge'
+    | 'caption';
   themeColor?: ThemeColor;
 };
 
@@ -24,6 +37,11 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'linkPrimary' && { color: theme.link },
         type === 'code' && styles.code,
+        type === 'overline' && styles.overline,
+        type === 'label' && styles.label,
+        type === 'bodyLarge' && styles.bodyLarge,
+        type === 'moneyLarge' && styles.moneyLarge,
+        type === 'caption' && styles.caption,
         style,
       ]}
       {...rest}
@@ -70,4 +88,9 @@ const styles = StyleSheet.create({
     fontWeight: Platform.select({ android: 700 }) ?? 500,
     fontSize: 12,
   },
+  overline: TypeScale.overline,
+  label: TypeScale.label,
+  bodyLarge: TypeScale.bodyLarge,
+  moneyLarge: TypeScale.moneyLarge,
+  caption: TypeScale.caption,
 });

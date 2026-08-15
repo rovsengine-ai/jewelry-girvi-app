@@ -8,26 +8,27 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { KycCaptureForm } from '@/components/kyc-capture-form';
-import { ThemedText } from '@/components/themed-text';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useLanguage } from '@/providers/language-provider';
 import { fetchCustomerKyc, type CustomerKyc } from '@/services/kycService';
 
 export default function KycCaptureScreen() {
   const { customerId } = useLocalSearchParams<{ customerId: string }>();
   const router = useRouter();
+  const { t } = useLanguage();
   const [customer, setCustomer] = useState<CustomerKyc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!customerId) {
-      setError('Missing customer id.');
+      setError(t('kyc.missingCustomerId'));
       setIsLoading(false);
       return;
     }
@@ -37,34 +38,34 @@ export default function KycCaptureScreen() {
         setCustomer(await fetchCustomerKyc(customerId));
         setError(null);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Could not load KYC.');
+        setError(loadError instanceof Error ? loadError.message : t('kyc.loadErrorBody'));
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [customerId]);
+  }, [customerId, t]);
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-        <ThemedText type="subtitle">KYC</ThemedText>
+      <ScreenHeader title={t('kyc.title')} />
+      <ThemedView style={styles.body}>
+        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         {isLoading ? (
           <ActivityIndicator />
         ) : error || !customer ? (
-          <EmptyState title="Could not load KYC" body={error ?? 'Customer not found.'} />
+          <EmptyState title={t('kyc.loadErrorTitle')} body={error ?? t('kyc.customerNotFound')} />
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
             <KycCaptureForm customer={customer} />
           </ScrollView>
         )}
-      </SafeAreaView>
+      </ThemedView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
+  body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   content: { paddingBottom: Spacing.five, gap: Spacing.two },
 });

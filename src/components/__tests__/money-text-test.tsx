@@ -20,6 +20,13 @@ describe('<MoneyText />', () => {
     expect(flatStyle(node).fontVariant).toEqual(['tabular-nums', 'lining-nums']);
   });
 
+  test('large size keeps tabular lining figures', async () => {
+    const { getByText } = await render(<MoneyText paise={LONGEST_MONEY_PAISE} size="large" />);
+    const node = getByText(formatPaiseAsInr(LONGEST_MONEY_PAISE));
+    expect(flatStyle(node).fontVariant).toEqual(['tabular-nums', 'lining-nums']);
+    expect(flatStyle(node).fontSize).toBe(28);
+  });
+
   test('proves the longest realistic Indian figure', async () => {
     expect(formatPaiseAsInr(LONGEST_MONEY_PAISE)).toBe('₹99,99,99,999.99');
     const { getByText } = await render(<MoneyText paise={LONGEST_MONEY_PAISE} />);

@@ -1,3 +1,5 @@
+import { translate } from '@/i18n';
+
 export type ReminderKind = 'due_soon' | 'due_today' | 'overdue';
 
 export interface LoanReminderSlot {
@@ -20,18 +22,18 @@ export function reminderCopy(
   switch (kind) {
     case 'due_soon':
       return {
-        title: 'Girvi payment reminder',
-        body: `${serialNumber} is due in 15 days. Open the app for your receipt.`,
+        title: translate('notices.reminder.dueSoonTitle'),
+        body: translate('notices.reminder.dueSoonBody', { serial: serialNumber }),
       };
     case 'due_today':
       return {
-        title: 'Girvi payment due today',
-        body: `${serialNumber} is due today. Visit the shop to pay or renew.`,
+        title: translate('notices.reminder.dueTodayTitle'),
+        body: translate('notices.reminder.dueTodayBody', { serial: serialNumber }),
       };
     case 'overdue':
       return {
-        title: 'Girvi payment overdue',
-        body: `${serialNumber} is past due. Contact the shop to pay or renew.`,
+        title: translate('notices.reminder.overdueTitle'),
+        body: translate('notices.reminder.overdueBody', { serial: serialNumber }),
       };
     default: {
       const _exhaustive: never = kind;

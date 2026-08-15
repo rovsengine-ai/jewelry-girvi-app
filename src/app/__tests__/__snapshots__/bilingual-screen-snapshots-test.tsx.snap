@@ -1,0 +1,59 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`bilingual screen snapshots admin alerts: admin-alerts-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin alerts: admin-alerts-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin archive: admin-archive-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin archive: admin-archive-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin insights: admin-insights-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin insights: admin-insights-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin loans: admin-loans-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin loans: admin-loans-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin scanner: admin-scanner-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin scanner: admin-scanner-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin settings: admin-settings-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin settings: admin-settings-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots auth login: login-en 1`] = `
+[
+  "Girvi Shop Login",
+  "Sign in with your mobile number to view receipts or manage loans.",
+  "EN",
+  "हिं",
+  "Mobile number",
+  "Send OTP",
+]
+`;
+
+exports[`bilingual screen snapshots auth login: login-hi 1`] = `
+[
+  "गिरवी दुकान लॉगिन",
+  "रसीदें देखने या गिरवी चलाने के लिए मोबाइल नंबर से साइन इन करें।",
+  "EN",
+  "हिं",
+  "मोबाइल नंबर",
+  "OTP भेजें",
+]
+`;
+
+exports[`bilingual screen snapshots customer alerts: customer-alerts-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots customer alerts: customer-alerts-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots customer loans: customer-loans-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots customer loans: customer-loans-hi 1`] = `[]`;
+
+exports[`bilingual screen snapshots customer settings: customer-settings-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots customer settings: customer-settings-hi 1`] = `[]`;

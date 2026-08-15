@@ -1,14 +1,21 @@
 import {
+  archiveLoan,
   createLoanWithCustomer,
   createWalkInCustomer,
+  defaultLoan,
+  editLoanTerms,
+  fetchArchivedLoans,
   fetchCustomerLoanReminders,
   fetchOverdueLoans,
   fetchRateYield,
+  findCustomerIdByPhone,
   generateLoanNotices,
   LoanPhotosIncompleteError,
   redeemLoan,
   renewLoan,
   resolveReceiptDisplayUrl,
+  unarchiveLoan,
+  updateShopDefaults,
   uploadImageToStorage,
 } from '@/services/loanService';
 import type { ScannerItemDraft } from '@/lib/scanner-items';
@@ -362,9 +369,11 @@ describe('createLoanWithCustomer', () => {
       chain.eq.mockReturnValue(chain);
       return chain;
     });
-    rpc.mockResolvedValue({
-      data: [{ loan_id: 'loan-uuid', item_ids: ['item-a'] }],
-      error: null,
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'find_profile_by_phone') {
+        return { data: CUSTOMER, error: null };
+      }
+      return { data: [{ loan_id: 'loan-uuid', item_ids: ['item-a'] }], error: null };
     });
   });
 
@@ -408,13 +417,18 @@ describe('createLoanWithCustomer', () => {
         null,
       ),
     ).rejects.toThrow('Choose gold or silver for every pledged item.');
-    expect(rpc).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalledWith('create_loan', expect.anything());
   });
 
   test('surfaces the RPC error rather than leaving a loan without items', async () => {
-    rpc.mockResolvedValue({
-      data: null,
-      error: { message: 'items_required: create_loan needs at least one pledged item' },
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'find_profile_by_phone') {
+        return { data: CUSTOMER, error: null };
+      }
+      return {
+        data: null,
+        error: { message: 'items_required: create_loan needs at least one pledged item' },
+      };
     });
     await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).rejects.toThrow(
       'items_required: create_loan needs at least one pledged item',
@@ -423,9 +437,11 @@ describe('createLoanWithCustomer', () => {
 
   test('attaches photo N to item N using ids returned by create_loan', async () => {
     const itemIds = ['item-a', 'item-b', 'item-c'];
-    rpc.mockResolvedValue({
-      data: [{ loan_id: 'loan-uuid', item_ids: itemIds }],
-      error: null,
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'find_profile_by_phone') {
+        return { data: CUSTOMER, error: null };
+      }
+      return { data: [{ loan_id: 'loan-uuid', item_ids: itemIds }], error: null };
     });
     const photographed: ScannerItemDraft[] = [
       { ...items[0]!, key: 'i1', ornament_type: 'Chain', localPhotoUri: 'file:///tmp/chain.jpg' },
@@ -445,9 +461,11 @@ describe('createLoanWithCustomer', () => {
 
   test('a mid-loop upload failure reports that the loan exists, not a generic save failure', async () => {
     const itemIds = ['item-a', 'item-b', 'item-c'];
-    rpc.mockResolvedValue({
-      data: [{ loan_id: 'loan-uuid', item_ids: itemIds }],
-      error: null,
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'find_profile_by_phone') {
+        return { data: CUSTOMER, error: null };
+      }
+      return { data: [{ loan_id: 'loan-uuid', item_ids: itemIds }], error: null };
     });
     let uploadCount = 0;
     upload.mockImplementation(async () => {
@@ -479,7 +497,7 @@ describe('createLoanWithCustomer', () => {
     expect(incomplete.nextIndex).toBe(1);
     expect(incomplete.message).toMatch(/Loan T-1 was created/);
     expect(incomplete.message).toMatch(/retry attaching photos/);
-    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith('create_loan', expect.objectContaining({ p_serial_number: 'T-1' }));
     expect(photoInserts).toHaveLength(1);
     expect(photoInserts[0]?.loan_item_id).toBe('item-a');
   });
@@ -539,6 +557,227 @@ describe('redeemLoan', () => {
         finalPaymentPaise: 0,
       }),
     ).rejects.toThrow('owner_only: only the owner may redeem a loan');
+  });
+});
+
+describe('findCustomerIdByPhone', () => {
+  test('calls find_profile_by_phone with the typed number so SQL normalises', async () => {
+    rpc.mockResolvedValue({ data: 'cust-1', error: null });
+    await expect(findCustomerIdByPhone('98765 43210')).resolves.toBe('cust-1');
+    expect(rpc).toHaveBeenCalledWith('find_profile_by_phone', { p_phone: '98765 43210' });
+  });
+
+  test('returns null when no profile matches', async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+    await expect(findCustomerIdByPhone('9876543210')).resolves.toBeNull();
+  });
+});
+
+describe('defaultLoan', () => {
+  test('calls the RPC and returns the audit snapshot', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          loan_id: 'loan-1',
+          status: 'defaulted',
+          defaulted_on: '2024-07-01',
+          defaulted_by: CUSTOMER,
+          default_balance_paise: 1180000,
+          already_defaulted: false,
+        },
+      ],
+      error: null,
+    });
+
+    await expect(
+      defaultLoan({
+        loanId: 'loan-1',
+        defaultedOn: '2024-07-01',
+        reason: 'Unreachable after six months',
+      }),
+    ).resolves.toMatchObject({
+      default_balance_paise: 1180000,
+      already_defaulted: false,
+    });
+
+    expect(rpc).toHaveBeenCalledWith('default_loan', {
+      p_loan_id: 'loan-1',
+      p_defaulted_on: '2024-07-01',
+      p_reason: 'Unreachable after six months',
+    });
+  });
+
+  test('surfaces owner_only so the screen can show a calm message', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'owner_only: only the owner may default a loan' },
+    });
+    await expect(
+      defaultLoan({
+        loanId: 'loan-1',
+        defaultedOn: '2024-07-01',
+        reason: 'x',
+      }),
+    ).rejects.toThrow('owner_only: only the owner may default a loan');
+  });
+});
+
+describe('archiveLoan', () => {
+  test('calls the RPC and returns the frozen snapshot', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          loan_id: 'loan-1',
+          archived_at: '2026-08-15T06:30:00+00:00',
+          archived_by: CUSTOMER,
+          archive_reason: 'Duplicate ticket',
+          archive_balance_paise: 1180000,
+          already_archived: false,
+        },
+      ],
+      error: null,
+    });
+
+    await expect(
+      archiveLoan({ loanId: 'loan-1', reason: 'Duplicate ticket' }),
+    ).resolves.toMatchObject({
+      archive_balance_paise: 1180000,
+      already_archived: false,
+    });
+
+    expect(rpc).toHaveBeenCalledWith('archive_loan', {
+      p_loan_id: 'loan-1',
+      p_reason: 'Duplicate ticket',
+    });
+  });
+
+  test('surfaces owner_only so the screen can show a calm message', async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'owner_only: only the owner may archive a loan' },
+    });
+    await expect(archiveLoan({ loanId: 'loan-1', reason: 'x' })).rejects.toThrow(
+      'owner_only: only the owner may archive a loan',
+    );
+  });
+});
+
+describe('unarchiveLoan', () => {
+  test('calls the RPC', async () => {
+    rpc.mockResolvedValue({
+      data: [{ loan_id: 'loan-1', unarchived: true }],
+      error: null,
+    });
+    await expect(unarchiveLoan('loan-1')).resolves.toEqual({
+      loan_id: 'loan-1',
+      unarchived: true,
+    });
+    expect(rpc).toHaveBeenCalledWith('unarchive_loan', { p_loan_id: 'loan-1' });
+  });
+});
+
+describe('fetchArchivedLoans', () => {
+  test('lists archived rows; nested names and integer paise', async () => {
+    const { supabase } = jest.requireMock('@/lib/supabase') as {
+      supabase: { from: jest.Mock };
+    };
+    const result = {
+      data: [
+        {
+          id: 'loan-1',
+          serial_number: 'G-1',
+          archived_at: '2026-08-15T06:30:00+00:00',
+          archived_by: CUSTOMER,
+          archive_reason: 'Duplicate ticket',
+          archive_balance_paise: 1180000,
+          customer: { full_name: 'Asha Patil' },
+          archiver: { full_name: 'Owner' },
+        },
+      ],
+      error: null,
+    };
+    const chain = {
+      select: jest.fn(),
+      not: jest.fn(),
+      order: jest.fn(),
+      then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.not.mockReturnValue(chain);
+    chain.order.mockReturnValue(chain);
+    supabase.from.mockReturnValue(chain);
+
+    await expect(fetchArchivedLoans()).resolves.toEqual([
+      {
+        id: 'loan-1',
+        serial_number: 'G-1',
+        archived_at: '2026-08-15T06:30:00+00:00',
+        archived_by: CUSTOMER,
+        archive_reason: 'Duplicate ticket',
+        archive_balance_paise: 1180000,
+        customer_name: 'Asha Patil',
+        archived_by_name: 'Owner',
+      },
+    ]);
+    expect(supabase.from).toHaveBeenCalledWith('loans');
+    expect(chain.not).toHaveBeenCalledWith('archived_at', 'is', null);
+  });
+});
+
+describe('updateShopDefaults', () => {
+  test('calls the RPC without a client-side id = 1 filter', async () => {
+    rpc.mockResolvedValue({
+      data: {
+        id: 1,
+        rate_bps: 400,
+        partial_period_mode: 'pro_rata',
+        round_up_threshold_days: 20,
+        simple_period_days: 180,
+        compound_every_days: 30,
+        grace_days: 0,
+      },
+      error: null,
+    });
+    await expect(
+      updateShopDefaults({
+        rateBps: 400,
+        partialPeriodMode: 'pro_rata',
+        roundUpThresholdDays: 20,
+        simplePeriodDays: 180,
+        compoundEveryDays: 30,
+        graceDays: 0,
+      }),
+    ).resolves.toMatchObject({ rate_bps: 400 });
+    expect(rpc).toHaveBeenCalledWith('update_shop_defaults', {
+      p_rate_bps: 400,
+      p_partial_period_mode: 'pro_rata',
+      p_round_up_threshold_days: 20,
+      p_simple_period_days: 180,
+      p_compound_every_days: 30,
+      p_grace_days: 0,
+    });
+  });
+});
+
+describe('editLoanTerms', () => {
+  test('calls the RPC with parsed terms and a reason', async () => {
+    rpc.mockResolvedValue({
+      data: [{ loan_id: 'loan-1', change_count: 1 }],
+      error: null,
+    });
+    await expect(
+      editLoanTerms({
+        loanId: 'loan-1',
+        rateBps: 400,
+        interestModel: 'retail',
+        simplePeriodDays: 180,
+        compoundEveryDays: 30,
+        graceDays: 0,
+        partialPeriodMode: 'min_month_then_pro_rata',
+        roundUpThresholdDays: 24,
+        reason: 'Customer asked for 4 percent',
+      }),
+    ).resolves.toEqual({ loan_id: 'loan-1', change_count: 1 });
   });
 });
 
@@ -666,6 +905,14 @@ describe('fetchCustomerLoanReminders', () => {
       expect.objectContaining({ reminder_kind: 'due_soon', serial_number: 'T080-A' }),
     ]);
     expect(rpc).toHaveBeenCalledWith('customer_loan_reminder_schedule', { p_as_of: '2024-06-01' });
+  });
+
+  test('always sends p_as_of so PostgREST does not look for a zero-arg overload', async () => {
+    rpc.mockResolvedValue({ data: [], error: null });
+    await fetchCustomerLoanReminders();
+    expect(rpc).toHaveBeenCalledWith('customer_loan_reminder_schedule', {
+      p_as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
   });
 });
 

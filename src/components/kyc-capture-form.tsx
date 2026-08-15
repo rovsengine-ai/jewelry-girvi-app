@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { PressableScale } from '@/components/pressable-scale';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +15,7 @@ import {
 } from '@/lib/kyc';
 import { todayInKolkata } from '@/lib/money';
 import { pickStillImage } from '@/lib/pick-image';
+import { useLanguage } from '@/providers/language-provider';
 import {
   saveKycCapture,
   uploadKycImage,
@@ -31,15 +33,13 @@ import type { IdDocumentType } from '@/types/database';
  * Aadhaar disables the control so the operator never hits profiles_no_aadhaar_image_chk.
  */
 
-const AADHAAR_PHOTO_REASON =
-  'Aadhaar photos cannot be stored. An unmasked card image is the full number, and this shop has no UIDAI masking pipeline.';
-
 type Props = {
   customer: CustomerKyc;
 };
 
 export function KycCaptureForm({ customer }: Props) {
   const colors = useTheme();
+  const { t, language } = useLanguage();
   const [documentType, setDocumentType] = useState<IdDocumentType | null>(customer.id_document_type);
   const [last4, setLast4] = useState(customer.id_document_last4 ?? '');
   const [last4Error, setLast4Error] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export function KycCaptureForm({ customer }: Props) {
   const onLast4Change = (next: string) => {
     const accepted = acceptLast4Draft(next);
     if (!accepted.ok) {
-      setLast4Error(accepted.error);
+      setLast4Error(t('kyc.last4TooLong'));
       return;
     }
     setLast4Error(null);
@@ -101,9 +101,9 @@ export function KycCaptureForm({ customer }: Props) {
       });
       setStoredPath(path);
       setLocalPhotoUri(null);
-      setFormNotice('KYC saved.');
+      setFormNotice(t('kyc.saved'));
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : t('errors.unknown'));
     } finally {
       setIsSaving(false);
     }
@@ -116,9 +116,9 @@ export function KycCaptureForm({ customer }: Props) {
     try {
       await verifyKyc(customer.id);
       setVerifiedOn(todayInKolkata());
-      setFormNotice('KYC marked verified.');
+      setFormNotice(t('kyc.markedVerified'));
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : t('errors.unknown'));
     } finally {
       setIsVerifying(false);
     }
@@ -126,16 +126,16 @@ export function KycCaptureForm({ customer }: Props) {
 
   return (
     <View style={styles.form}>
-      <ThemedText type="smallBold">{customer.full_name ?? 'Customer'}</ThemedText>
+      <ThemedText type="smallBold">{customer.full_name ?? t('common.customer')}</ThemedText>
       <ThemedText type="small" testID="kyc-status">
-        {kycStatusLabel(verifiedOn)}
+        {kycStatusLabel(verifiedOn, language)}
       </ThemedText>
       <FormNotice error={formError} notice={formNotice} />
 
-      <ThemedText type="smallBold">ID document</ThemedText>
+      <ThemedText type="smallBold">{t('kyc.idDocument')}</ThemedText>
       <View style={styles.chipRow}>
         {ID_DOCUMENT_TYPE_OPTIONS.map((option) => (
-          <Pressable
+          <PressableScale
             key={option.value}
             testID={`kyc-type-${option.value}`}
             accessibilityRole="button"
@@ -148,49 +148,49 @@ export function KycCaptureForm({ customer }: Props) {
                 borderColor: colors.border,
               },
             ]}>
-            <ThemedText type="small">{option.label}</ThemedText>
-          </Pressable>
+            <ThemedText type="small">{t(`kyc.idType.${option.value}`)}</ThemedText>
+          </PressableScale>
         ))}
       </View>
 
       <Field
         testID="kyc-last4"
-        label="Last 4 of ID"
+        label={t('kyc.last4')}
         value={last4}
         onChangeText={onLast4Change}
         autoCapitalize="characters"
         autoCorrect={false}
-        placeholder="ABCD"
+        placeholder={t('kyc.last4Placeholder')}
         error={last4Error}
       />
       {!last4Error ? (
-        <ThemedText type="small">Four characters only. Do not enter the full number.</ThemedText>
+        <ThemedText type="small">{t('kyc.last4Hint')}</ThemedText>
       ) : null}
 
       <Field
         testID="kyc-dob"
-        label="Date of birth (YYYY-MM-DD)"
+        label={t('kyc.dob')}
         value={dateOfBirth}
         onChangeText={setDateOfBirth}
-        placeholder="1990-01-15"
+        placeholder={t('kyc.dobPlaceholder')}
       />
 
       <Field
         testID="kyc-guardian"
-        label="Guardian name (optional)"
+        label={t('kyc.guardian')}
         value={guardianName}
         onChangeText={setGuardianName}
       />
 
       {photoLocked ? (
         <ThemedText type="small" testID="kyc-aadhaar-photo-reason">
-          {AADHAAR_PHOTO_REASON}
+          {t('kyc.aadhaarPhotoReason')}
         </ThemedText>
       ) : null}
       <View style={styles.photoRow}>
         <Button
           testID="kyc-photo-camera"
-          label="Photograph ID"
+          label={t('kyc.photographId')}
           variant="secondary"
           disabled={photoLocked}
           onPress={() => void pickPhoto('camera')}
@@ -198,7 +198,7 @@ export function KycCaptureForm({ customer }: Props) {
         />
         <Button
           testID="kyc-photo-library"
-          label="Choose photo"
+          label={t('kyc.choosePhoto')}
           variant="secondary"
           disabled={photoLocked}
           onPress={() => void pickPhoto('library')}
@@ -207,15 +207,15 @@ export function KycCaptureForm({ customer }: Props) {
       </View>
       {localPhotoUri && !photoLocked ? (
         <ThemedText type="small" testID="kyc-photo-pending">
-          Photo ready to upload on save
+          {t('kyc.photoPending')}
         </ThemedText>
       ) : null}
 
-      <Button testID="kyc-save" label="Save KYC" loading={isSaving} onPress={() => void handleSave()} />
+      <Button testID="kyc-save" label={t('kyc.save')} loading={isSaving} onPress={() => void handleSave()} />
 
       <Button
         testID="kyc-verify"
-        label="Mark verified"
+        label={t('kyc.markVerified')}
         variant="secondary"
         loading={isVerifying}
         onPress={() => void handleVerify()}

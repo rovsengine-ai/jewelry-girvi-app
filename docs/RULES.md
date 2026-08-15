@@ -78,11 +78,20 @@
   keep this value rather than being relabelled `redeemed`, because we do not
   know when or by whom they were settled and will not invent it.
 - `defaulted` = forfeiture ran its course; goods were not redeemed.
+- Archive is not a status. `archive_loan` sets `archived_at` / `archived_by` /
+  `archive_reason` / `archive_balance_paise` together (CHECK: all NULL or all
+  NOT NULL). Staff and customers cannot see an archived loan or its child
+  rows; the owner can, and `unarchive_loan` restores them. Client DELETE
+  always raises. Archived loans are excluded from `loans_overdue_as_of`,
+  `generate_loan_notices`, `shop_rate_yield`, and
+  `customer_loan_reminder_schedule`.
 - Only an OWNER may move a loan to `redeemed`, `closed` or `defaulted`, and only
   an owner may write the redemption fields. Enforced by `redeem_loan` (row lock
   + status check inside a transaction) and the mutation trigger, not the UI.
   A second call on an already-redeemed loan returns the original snapshot and
-  inserts nothing.
+  inserts nothing. `default_loan` is the only writer of `defaulted` (row lock,
+  overdue via `loans_overdue_as_of`, six months after `disbursed_on`, immutable
+  `default_balance_paise`). A second call returns the original snapshot.
 - Interest-only renewal after the simple period is `renew_loan`: it records the
   accrued interest as a payment, writes `loan_renewals`, and the overdue
   function then uses `new_maturity_on`. Idempotent on `(loan_id, renewed_on)`.
@@ -112,11 +121,10 @@
   karat factor.
 - Wastage: none. LTV: none. Principal is whatever staff types; assessed value
   is not a cap.
-- `gold_rates` quotes are NEVER IBJA. Feed is GoldAPI (`GOLDAPI_API_KEY`) or
-  metals.dev (`METALS_DEV_API_KEY` + `GOLD_RATE_PROVIDER=metals_dev`), stored
-  by the `refresh-gold-rate` Edge Function. Owner override is `source=manual`.
-  Keys live in Supabase secrets. Never `EXPO_PUBLIC_*`. Every UI figure is
-  labelled “not IBJA”.
+- `gold_rates` quotes are NEVER IBJA. There is no live vendor feed in the app.
+  Quotes are `source=manual` (seed or `set_manual_gold_rate`). Every UI figure
+  for a frozen valuation is labelled “not IBJA”. A missing quote never blocks
+  the counter.
 - Item photos live in the private `receipts` bucket at
   `{customer_id}/items/...`, reachable only through a signed URL.
 ## KYC
@@ -166,12 +174,12 @@
 |---|---|---|
 | Create loan | yes | yes |
 | Record payment | yes | yes |
-| View all loans | yes | yes |
+| View all loans | yes (including archived) | yes (not archived) |
 | Close / redeem loan | yes | no|
 | Renew loan (interest only) | yes | no |
 | Edit a loan's terms | yes | no |
 | Edit shop defaults | yes | no |
-| Delete a loan | yes | no |
+| Archive / unarchive a loan | yes | no |
 | View analytics / totals | yes | no |
 | Generate in-app notices | yes | yes |
 | Export overdue call list | yes | yes |

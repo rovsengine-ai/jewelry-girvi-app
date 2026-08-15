@@ -6,7 +6,6 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import SignatureCanvas from 'react-native-signature-canvas';
 
 import { Button } from '@/components/button';
@@ -17,6 +16,7 @@ import { FormNotice } from '@/components/form-notice';
 import { ItemReleaseChecklist } from '@/components/item-release-checklist';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Spacing } from '@/constants/theme';
@@ -27,9 +27,10 @@ import {
   rupeesInputToPaise,
   todayInKolkata,
 } from '@/lib/money';
-import { canSubmitRedemption, parseOwnerOnlyError, redeemGate } from '@/lib/redemption';
+import { canSubmitRedemption, loanStatusLabel, parseOwnerOnlyError, redeemGate } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+import { useLanguage } from '@/providers/language-provider';
 import {
   fetchLoanBalances,
   fetchLoanItems,
@@ -42,6 +43,7 @@ export default function RedeemLoanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { profile } = useAuth();
+  const { t, language } = useLanguage();
   const signatureRef = useRef<ComponentRef<typeof SignatureCanvas> | null>(null);
 
   const [loan, setLoan] = useState<LoanWithCustomer | null>(null);
@@ -60,6 +62,9 @@ export default function RedeemLoanScreen() {
 
   const gate = redeemGate(profile?.role, loan?.status);
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
+  const headerTitle = loan
+    ? t('redeem.title', { serial: loan.serial_number })
+    : t('loans.detail.redeem');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -104,12 +109,12 @@ export default function RedeemLoanScreen() {
       try {
         await load();
       } catch (error) {
-        setLoadError(error instanceof Error ? error.message : 'Failed to load loan');
+        setLoadError(error instanceof Error ? error.message : t('errors.failedLoadLoan'));
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [load]);
+  }, [load, t]);
 
   const toggleItem = (itemId: string) => {
     setCheckedIds((prev) => {
@@ -133,7 +138,7 @@ export default function RedeemLoanScreen() {
       checkedIds,
     });
     if (!submit.ok) {
-      setFormError(submit.reason);
+      setFormError(t(submit.reason));
       return;
     }
 
@@ -143,7 +148,7 @@ export default function RedeemLoanScreen() {
       try {
         finalPaymentPaise = rupeesInputToPaise(trimmed);
       } catch (error) {
-        setFormError(error instanceof Error ? error.message : 'Unknown error');
+        setFormError(error instanceof Error ? error.message : t('errors.unknown'));
         return;
       }
     }
@@ -166,12 +171,15 @@ export default function RedeemLoanScreen() {
       });
 
       setDoneNotice(
-        `Collected ${formatPaiseAsInr(asPaise(result.closure_balance_paise))} on ${result.redeemed_on}.`,
+        t('redeem.successBody', {
+          amount: formatPaiseAsInr(asPaise(result.closure_balance_paise)),
+          date: result.redeemed_on,
+        }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : t('errors.unknown');
       if (parseOwnerOnlyError(message)) {
-        setFormError('Only the shop owner can redeem a loan.');
+        setFormError(t('redeem.ownerOnlyError'));
       } else {
         setFormError(message);
       }
@@ -191,10 +199,11 @@ export default function RedeemLoanScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <EmptyState title="Could not load loan" body={loadError} />
-        </SafeAreaView>
+        <ScreenHeader title={t('loans.detail.redeem')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <EmptyState title={t('loans.detail.loadErrorTitle')} body={loadError} />
+        </View>
       </ThemedView>
     );
   }
@@ -202,14 +211,15 @@ export default function RedeemLoanScreen() {
   if (doneNotice) {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader title={t('redeem.successTitle')} />
+        <View style={styles.body}>
           <EmptyState
-            title="Redeemed"
+            title={t('redeem.successTitle')}
             body={doneNotice}
-            actionLabel="Back to loan"
+            actionLabel={t('common.backToLoan')}
             onAction={() => router.replace(`/(admin)/loan/${id}`)}
           />
-        </SafeAreaView>
+        </View>
       </ThemedView>
     );
   }
@@ -217,14 +227,11 @@ export default function RedeemLoanScreen() {
   if (gate.kind === 'owner_only') {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <ThemedText type="subtitle">Owner only</ThemedText>
-          <EmptyState
-            title="Owner only"
-            body="Only the shop owner can redeem a loan and release pledged goods. Ask the owner to complete this at the counter."
-          />
-        </SafeAreaView>
+        <ScreenHeader title={t('redeem.ownerOnlyTitle')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <EmptyState title={t('redeem.ownerOnlyTitle')} body={t('redeem.ownerOnlyBody')} />
+        </View>
       </ThemedView>
     );
   }
@@ -232,10 +239,11 @@ export default function RedeemLoanScreen() {
   if (!loan || !balances) {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <EmptyState title="Loan not found" body="This girvi could not be found." />
-        </SafeAreaView>
+        <ScreenHeader title={t('loans.detail.redeem')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <EmptyState title={t('loans.detail.notFoundTitle')} body={t('loans.detail.notFoundBody')} />
+        </View>
       </ThemedView>
     );
   }
@@ -243,16 +251,19 @@ export default function RedeemLoanScreen() {
   if (gate.kind === 'already_redeemed') {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <ThemedText type="subtitle">Already redeemed</ThemedText>
+        <ScreenHeader title={t('redeem.alreadyTitle')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <ThemedText>
-            Released to {loan.released_to_name ?? '—'} on {loan.redeemed_on}.
+            {t('redeem.alreadyBody', {
+              name: loan.released_to_name ?? t('common.emDash'),
+              date: loan.redeemed_on ?? t('common.emDash'),
+            })}
           </ThemedText>
           {loan.closure_balance_paise != null ? (
             <MoneyText paise={asPaise(loan.closure_balance_paise)} />
           ) : null}
-        </SafeAreaView>
+        </View>
       </ThemedView>
     );
   }
@@ -260,98 +271,98 @@ export default function RedeemLoanScreen() {
   if (gate.kind === 'not_active') {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <ThemedText type="subtitle">Cannot redeem</ThemedText>
-          <ThemedText>This loan is {gate.status} and cannot be redeemed.</ThemedText>
-        </SafeAreaView>
+        <ScreenHeader title={t('redeem.cannotTitle')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <ThemedText>
+            {t('redeem.cannotBody', { status: loanStatusLabel(gate.status, language) })}
+          </ThemedText>
+        </View>
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <ThemedText type="subtitle">Redeem {loan.serial_number}</ThemedText>
-          <ThemedText type="small">{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
-          <FormNotice error={formError} />
+      <ScreenHeader title={headerTitle} />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+        <ThemedText type="small">{loan.profiles?.full_name ?? t('common.unknownCustomer')}</ThemedText>
+        <FormNotice error={formError} />
 
-          <Card>
-            <ThemedText type="smallBold">Balances today (server)</ThemedText>
-            <Row>
-              <ThemedText type="small">Principal</ThemedText>
-              <MoneyText paise={balances.outstandingPrincipalPaise} />
-            </Row>
-            <Row>
-              <ThemedText type="small">Accrued interest</ThemedText>
-              <MoneyText paise={balances.accruedInterestPaise} />
-            </Row>
-            <Row>
-              <ThemedText type="smallBold">Total due</ThemedText>
-              <MoneyText paise={balances.totalDuePaise} />
-            </Row>
-          </Card>
+        <Card>
+          <ThemedText type="smallBold">{t('redeem.balancesTitle')}</ThemedText>
+          <Row>
+            <ThemedText type="small">{t('redeem.principal')}</ThemedText>
+            <MoneyText paise={balances.outstandingPrincipalPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="small">{t('redeem.accruedInterest')}</ThemedText>
+            <MoneyText paise={balances.accruedInterestPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="smallBold">{t('redeem.totalDue')}</ThemedText>
+            <MoneyText paise={balances.totalDuePaise} />
+          </Row>
+        </Card>
 
-          <Card>
-            <ThemedText type="smallBold">Final payment</ThemedText>
-            <ThemedText type="small">Leave empty if the due amount is already cleared.</ThemedText>
-            <Field
-              label="Amount in ₹"
-              value={amountRupees}
-              onChangeText={setAmountRupees}
-              keyboardType="numeric"
-            />
-          </Card>
-
-          <Card>
-            <ThemedText type="smallBold">Release checklist</ThemedText>
-            <ThemedText type="small">
-              Tick every ornament before handing them back. There is no select-all.
-            </ThemedText>
-            <ItemReleaseChecklist items={items} checkedIds={checkedIds} onToggle={toggleItem} />
-          </Card>
-
-          <Card>
-            <ThemedText type="smallBold">Collected by</ThemedText>
-            <Field
-              label="Name of the person collecting"
-              value={releasedToName}
-              onChangeText={setReleasedToName}
-            />
-            <Field label="Optional note" value={releaseNote} onChangeText={setReleaseNote} />
-          </Card>
-
-          <Card>
-            <ThemedText type="smallBold">Second signature (optional)</ThemedText>
-            <View style={styles.signatureBox}>
-              <SignatureCanvas
-                ref={signatureRef}
-                onOK={(sig) => setSignatureDataUrl(sig)}
-                onEmpty={() => setSignatureDataUrl(null)}
-                autoClear={false}
-                webStyle={`.m-signature-pad { box-shadow: none; border: none; }`}
-                style={styles.signatureCanvas}
-              />
-            </View>
-          </Card>
-
-          <Button
-            testID="confirm-redeem"
-            label="Confirm redemption"
-            loading={isSaving}
-            onPress={() => void handleRedeem()}
+        <Card>
+          <ThemedText type="smallBold">{t('redeem.finalPaymentTitle')}</ThemedText>
+          <ThemedText type="small">{t('redeem.finalPaymentHint')}</ThemedText>
+          <Field
+            label={t('redeem.amountInRupees')}
+            value={amountRupees}
+            onChangeText={setAmountRupees}
+            keyboardType="numeric"
+            testID="redeem-amount"
           />
-        </ScrollView>
-      </SafeAreaView>
+        </Card>
+
+        <Card>
+          <ThemedText type="smallBold">{t('redeem.checklistTitle')}</ThemedText>
+          <ThemedText type="small">{t('redeem.checklistHint')}</ThemedText>
+          <ItemReleaseChecklist items={items} checkedIds={checkedIds} onToggle={toggleItem} />
+        </Card>
+
+        <Card>
+          <ThemedText type="smallBold">{t('redeem.collectedBy')}</ThemedText>
+          <Field
+            label={t('redeem.collectorName')}
+            value={releasedToName}
+            onChangeText={setReleasedToName}
+            testID="redeem-collector"
+          />
+          <Field label={t('redeem.optionalNote')} value={releaseNote} onChangeText={setReleaseNote} />
+        </Card>
+
+        <Card>
+          <ThemedText type="smallBold">{t('redeem.signatureTitle')}</ThemedText>
+          <View style={styles.signatureBox}>
+            <SignatureCanvas
+              ref={signatureRef}
+              onOK={(sig) => setSignatureDataUrl(sig)}
+              onEmpty={() => setSignatureDataUrl(null)}
+              autoClear={false}
+              webStyle={`.m-signature-pad { box-shadow: none; border: none; }`}
+              style={styles.signatureCanvas}
+            />
+          </View>
+        </Card>
+
+        <Button
+          testID="confirm-redeem"
+          label={t('redeem.confirm')}
+          loading={isSaving}
+          onPress={() => void handleRedeem()}
+        />
+      </ScrollView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
+  body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
   signatureBox: { height: 180, borderRadius: Radii.md, overflow: 'hidden' },

@@ -1,8 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useLanguage } from '@/providers/language-provider';
 import type { LoanItem } from '@/types/database';
 
 function formatMg(mg: number): string {
@@ -24,9 +26,10 @@ export function ItemReleaseChecklist({
   disabled?: boolean;
 }) {
   const colors = useTheme();
+  const { t } = useLanguage();
 
   if (items.length === 0) {
-    return <ThemedText type="small">No pledged items on this loan.</ThemedText>;
+    return <ThemedText type="small">{t('items.releaseEmpty')}</ThemedText>;
   }
 
   return (
@@ -34,11 +37,11 @@ export function ItemReleaseChecklist({
       {items.map((item) => {
         const checked = checkedIds.has(item.id);
         return (
-          <Pressable
+          <PressableScale
             key={item.id}
             accessibilityRole="checkbox"
             accessibilityState={{ checked, disabled }}
-            testID={`item-check-${item.id}`}
+            testID={`item-check-${item.position}`}
             disabled={disabled}
             onPress={() => onToggle(item.id)}
             style={[
@@ -61,11 +64,11 @@ export function ItemReleaseChecklist({
             <View style={styles.body}>
               <ThemedText type="smallBold">{item.ornament_type}</ThemedText>
               <ThemedText type="small">
-                {item.quantity} × {formatMg(item.net_weight_mg)}
+                {t('items.quantityWeight', { qty: item.quantity, weight: formatMg(item.net_weight_mg) })}
                 {item.description ? ` · ${item.description}` : ''}
               </ThemedText>
             </View>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </View>

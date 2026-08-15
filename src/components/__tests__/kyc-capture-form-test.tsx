@@ -5,6 +5,10 @@ import { pickStillImage } from '@/lib/pick-image';
 import { saveKycCapture, uploadKycImage, verifyKyc } from '@/services/kycService';
 import type { CustomerKyc } from '@/services/kycService';
 
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn(async () => undefined),
+}));
+
 jest.mock('@/lib/pick-image', () => ({
   pickStillImage: jest.fn(),
 }));

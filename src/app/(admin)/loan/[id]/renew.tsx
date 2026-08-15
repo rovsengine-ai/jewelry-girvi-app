@@ -3,9 +3,9 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
+  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -14,6 +14,7 @@ import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -26,6 +27,7 @@ import {
 } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+import { useLanguage } from '@/providers/language-provider';
 import { fetchLatestMaturityOn, fetchLoanBalances, renewLoan } from '@/services/loanService';
 import type { LoanBalances, LoanWithCustomer } from '@/types/database';
 
@@ -33,6 +35,7 @@ export default function RenewLoanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { profile } = useAuth();
+  const { t } = useLanguage();
 
   const [loan, setLoan] = useState<LoanWithCustomer | null>(null);
   const [balances, setBalances] = useState<LoanBalances | null>(null);
@@ -46,6 +49,9 @@ export default function RenewLoanScreen() {
 
   const asOf = todayInKolkata();
   const gate = redeemGate(profile?.role, loan?.status);
+  const headerTitle = loan
+    ? t('renew.title', { serial: loan.serial_number })
+    : t('loans.detail.renew');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -83,12 +89,12 @@ export default function RenewLoanScreen() {
       try {
         await load();
       } catch (error) {
-        setLoadError(error instanceof Error ? error.message : 'Failed to load loan');
+        setLoadError(error instanceof Error ? error.message : t('errors.failedLoadLoan'));
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [load]);
+  }, [load, t]);
 
   const handleRenew = async () => {
     if (!id || !loan || !balances) return;
@@ -105,12 +111,15 @@ export default function RenewLoanScreen() {
         note: note.trim() || null,
       });
       setDoneNotice(
-        `Interest ${formatPaiseAsInr(asPaise(result.interest_paid_paise))} · new due ${result.new_maturity_on}.`,
+        t('renew.successBody', {
+          amount: formatPaiseAsInr(asPaise(result.interest_paid_paise)),
+          date: result.new_maturity_on,
+        }),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = error instanceof Error ? error.message : t('errors.unknown');
       if (parseOwnerOnlyError(message)) {
-        setFormError('Only the shop owner can renew a loan.');
+        setFormError(t('renew.ownerOnlyError'));
       } else {
         setFormError(message);
       }
@@ -130,10 +139,11 @@ export default function RenewLoanScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <EmptyState title="Could not load loan" body={loadError} />
-        </SafeAreaView>
+        <ScreenHeader title={t('loans.detail.renew')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <EmptyState title={t('loans.detail.loadErrorTitle')} body={loadError} />
+        </View>
       </ThemedView>
     );
   }
@@ -141,14 +151,15 @@ export default function RenewLoanScreen() {
   if (doneNotice) {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        <ScreenHeader title={t('renew.successTitle')} />
+        <View style={styles.body}>
           <EmptyState
-            title="Renewed"
+            title={t('renew.successTitle')}
             body={doneNotice}
-            actionLabel="Back to loan"
+            actionLabel={t('common.backToLoan')}
             onAction={() => router.replace(`/(admin)/loan/${id}`)}
           />
-        </SafeAreaView>
+        </View>
       </ThemedView>
     );
   }
@@ -156,13 +167,11 @@ export default function RenewLoanScreen() {
   if (gate.kind === 'owner_only') {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <EmptyState
-            title="Owner only"
-            body="Only the shop owner can renew a loan after the simple period."
-          />
-        </SafeAreaView>
+        <ScreenHeader title={t('renew.ownerOnlyTitle')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <EmptyState title={t('renew.ownerOnlyTitle')} body={t('renew.ownerOnlyBody')} />
+        </View>
       </ThemedView>
     );
   }
@@ -170,10 +179,11 @@ export default function RenewLoanScreen() {
   if (!loan || !balances) {
     return (
       <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <EmptyState title="Loan not found" body="This girvi could not be found." />
-        </SafeAreaView>
+        <ScreenHeader title={t('loans.detail.renew')} />
+        <View style={styles.body}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <EmptyState title={t('loans.detail.notFoundTitle')} body={t('loans.detail.notFoundBody')} />
+        </View>
       </ThemedView>
     );
   }
@@ -187,52 +197,53 @@ export default function RenewLoanScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
-          <ThemedText type="subtitle">Renew {loan.serial_number}</ThemedText>
-          <ThemedText type="small">{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
-          <FormNotice error={formError} />
+      <ScreenHeader title={headerTitle} />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+        <ThemedText type="small">{loan.profiles?.full_name ?? t('common.unknownCustomer')}</ThemedText>
+        <FormNotice error={formError} />
 
-          <Card>
-            <ThemedText type="smallBold">Interest-only renewal</ThemedText>
-            <Row>
-              <ThemedText type="small">Accrued interest due</ThemedText>
-              <MoneyText paise={balances.accruedInterestPaise} />
-            </Row>
-            <Row>
-              <ThemedText type="small">Principal stays</ThemedText>
-              <MoneyText paise={balances.outstandingPrincipalPaise} />
-            </Row>
-            <ThemedText type="small">
-              New due date: {defaultNewMaturityOn(asOf, loan.simple_period_days)}
-            </ThemedText>
-            <Field label="Optional note" value={note} onChangeText={setNote} />
-          </Card>
+        <Card>
+          <ThemedText type="smallBold">{t('renew.interestOnly')}</ThemedText>
+          <Row>
+            <ThemedText type="small">{t('renew.accruedInterestDue')}</ThemedText>
+            <MoneyText paise={balances.accruedInterestPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="small">{t('renew.principalStays')}</ThemedText>
+            <MoneyText paise={balances.outstandingPrincipalPaise} />
+          </Row>
+          <ThemedText type="small">
+            {t('renew.newDueDate', { date: defaultNewMaturityOn(asOf, loan.simple_period_days) })}
+          </ThemedText>
+          <Field label={t('renew.optionalNote')} value={note} onChangeText={setNote} />
+        </Card>
 
-          {!eligible ? (
-            <ThemedText>
-              Renewal is only offered after the simple period (
-              {loan.simple_period_days} days from disbursal
-              {latestMaturityOn ? `, currently due ${latestMaturityOn}` : ''}).
-            </ThemedText>
-          ) : (
-            <Button
-              testID="confirm-renew"
-              label="Pay interest and renew"
-              loading={isSaving}
-              onPress={() => void handleRenew()}
-            />
-          )}
-        </ScrollView>
-      </SafeAreaView>
+        {!eligible ? (
+          <ThemedText>
+            {latestMaturityOn
+              ? t('renew.notEligibleWithDue', {
+                  days: loan.simple_period_days,
+                  date: latestMaturityOn,
+                })
+              : t('renew.notEligible', { days: loan.simple_period_days })}
+          </ThemedText>
+        ) : (
+          <Button
+            testID="confirm-renew"
+            label={t('renew.confirm')}
+            loading={isSaving}
+            onPress={() => void handleRenew()}
+          />
+        )}
+      </ScrollView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1 },
+  body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
 });

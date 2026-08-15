@@ -19,7 +19,9 @@ describe('goldPurityLabel', () => {
   test('names 18K as 75% / 750', () => {
     expect(goldPurityLabel(18)).toBe('18K (75% / 750)');
     expect(goldPurityLabel(22)).toBe('22K (916)');
-    expect(goldPurityLabel(null)).toContain('Not assessed');
+    expect(goldPurityLabel(null)).toBe('Not assessed');
+    expect(goldPurityLabel(null, 'en')).toBe('Not assessed');
+    expect(goldPurityLabel(null, 'hi')).toBe('आकलित नहीं');
   });
 });
 

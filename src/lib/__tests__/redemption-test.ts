@@ -61,14 +61,14 @@ describe('allItemsReleased / canSubmitRedemption', () => {
   test('blank collector name is refused even if every item is ticked', () => {
     expect(canSubmitRedemption({ releasedToName: '  ', itemIds: ids, checkedIds: ids })).toEqual({
       ok: false,
-      reason: 'Enter the name of the person collecting the goods.',
+      reason: 'redeem.validation.nameRequired',
     });
   });
 
   test('missing ticks are refused with a checklist message', () => {
     expect(canSubmitRedemption({ releasedToName: 'Asha', itemIds: ids, checkedIds: ['a'] })).toEqual({
       ok: false,
-      reason: 'Tick every pledged item before releasing.',
+      reason: 'redeem.validation.allItemsRequired',
     });
   });
 });

@@ -4,6 +4,10 @@ import { Button } from '@/components/button';
 import { Colors } from '@/constants/theme';
 import { flatStyle } from '@/test-utils/flat-style';
 
+jest.mock('expo-haptics', () => ({
+  selectionAsync: jest.fn(async () => undefined),
+}));
+
 describe('<Button />', () => {
   test('renders the label', async () => {
     const { getByText } = await render(<Button label="Save loan" />);

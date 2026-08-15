@@ -1,6 +1,16 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 
+import {
+  AndroidImportance,
+  cancelScheduledNotificationAsync,
+  getAllScheduledNotificationsAsync,
+  getPermissionsAsync,
+  requestPermissionsAsync,
+  scheduleNotificationAsync,
+  SchedulableTriggerInputTypes,
+  setNotificationChannelAsync,
+  type NotificationTriggerInput,
+} from '@/lib/local-notifications';
 import {
   LOAN_REMINDER_CHANNEL_ID,
   LOAN_REMINDER_ID_PREFIX,
@@ -20,27 +30,27 @@ export async function ensureLoanReminderPermissions(): Promise<boolean> {
   }
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(LOAN_REMINDER_CHANNEL_ID, {
+    await setNotificationChannelAsync(LOAN_REMINDER_CHANNEL_ID, {
       name: ANDROID_CHANNEL_NAME,
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: AndroidImportance.HIGH,
     });
   }
 
-  const existing = await Notifications.getPermissionsAsync();
+  const existing = await getPermissionsAsync();
   let status = existing.status;
   if (status !== 'granted') {
-    const requested = await Notifications.requestPermissionsAsync();
+    const requested = await requestPermissionsAsync();
     status = requested.status;
   }
   return status === 'granted';
 }
 
 async function cancelOurScheduledReminders(): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const scheduled = await getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
       .filter((item) => item.identifier.startsWith(LOAN_REMINDER_ID_PREFIX))
-      .map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier)),
+      .map((item) => cancelScheduledNotificationAsync(item.identifier)),
   );
 }
 
@@ -75,12 +85,12 @@ export async function syncLoanReminderNotifications(
   const toSchedule = remindersToSchedule(slots, nowMs);
   for (const slot of toSchedule) {
     const copy = reminderCopy(slot.reminder_kind, slot.serial_number);
-    const trigger: Notifications.NotificationTriggerInput = {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
+    const trigger: NotificationTriggerInput = {
+      type: SchedulableTriggerInputTypes.DATE,
       date: new Date(slot.fire_at),
       channelId: LOAN_REMINDER_CHANNEL_ID,
     };
-    await Notifications.scheduleNotificationAsync({
+    await scheduleNotificationAsync({
       identifier: reminderIdentifier(slot.reminder_kind, slot.loan_id),
       content: {
         title: copy.title,
