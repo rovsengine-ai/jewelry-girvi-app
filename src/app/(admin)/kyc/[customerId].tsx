@@ -6,10 +6,12 @@
  * Dynamic `[customerId]` matches the existing `(admin)/loan/[id]` file route.
  */
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/button';
+import { EmptyState } from '@/components/empty-state';
 import { KycCaptureForm } from '@/components/kyc-capture-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -45,14 +47,12 @@ export default function KycCaptureScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="smallBold">← Back</ThemedText>
-        </Pressable>
-        <ThemedText type="title">KYC</ThemedText>
+        <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+        <ThemedText type="subtitle">KYC</ThemedText>
         {isLoading ? (
           <ActivityIndicator />
         ) : error || !customer ? (
-          <ThemedText type="small">{error ?? 'Customer not found.'}</ThemedText>
+          <EmptyState title="Could not load KYC" body={error ?? 'Customer not found.'} />
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
             <KycCaptureForm customer={customer} />
@@ -65,7 +65,6 @@ export default function KycCaptureScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four },
-  back: { paddingVertical: Spacing.two },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   content: { paddingBottom: Spacing.five, gap: Spacing.two },
 });

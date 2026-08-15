@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/button';
+import { Field } from '@/components/field';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   acceptLast4Draft,
@@ -132,7 +134,8 @@ export function KycCaptureForm({ customer }: Props) {
               styles.chip,
               {
                 backgroundColor:
-                  documentType === option.value ? colors.backgroundSelected : colors.backgroundElement,
+                  documentType === option.value ? colors.backgroundSelected : colors.elevated,
+                borderColor: colors.border,
               },
             ]}>
             <ThemedText type="small">{option.label}</ThemedText>
@@ -140,42 +143,33 @@ export function KycCaptureForm({ customer }: Props) {
         ))}
       </View>
 
-      <ThemedText type="smallBold">Last 4 of ID</ThemedText>
-      <TextInput
+      <Field
         testID="kyc-last4"
+        label="Last 4 of ID"
         value={last4}
         onChangeText={onLast4Change}
         autoCapitalize="characters"
         autoCorrect={false}
         placeholder="ABCD"
-        placeholderTextColor={colors.textSecondary}
-        style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
+        error={last4Error}
       />
-      {last4Error ? (
-        <ThemedText type="small" testID="kyc-last4-error">
-          {last4Error}
-        </ThemedText>
-      ) : (
+      {!last4Error ? (
         <ThemedText type="small">Four characters only. Do not enter the full number.</ThemedText>
-      )}
+      ) : null}
 
-      <ThemedText type="smallBold">Date of birth (YYYY-MM-DD)</ThemedText>
-      <TextInput
+      <Field
         testID="kyc-dob"
+        label="Date of birth (YYYY-MM-DD)"
         value={dateOfBirth}
         onChangeText={setDateOfBirth}
         placeholder="1990-01-15"
-        placeholderTextColor={colors.textSecondary}
-        style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
       />
 
-      <ThemedText type="smallBold">Guardian name (optional)</ThemedText>
-      <TextInput
+      <Field
         testID="kyc-guardian"
+        label="Guardian name (optional)"
         value={guardianName}
         onChangeText={setGuardianName}
-        placeholderTextColor={colors.textSecondary}
-        style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
       />
 
       {photoLocked ? (
@@ -184,24 +178,22 @@ export function KycCaptureForm({ customer }: Props) {
         </ThemedText>
       ) : null}
       <View style={styles.photoRow}>
-        <Pressable
+        <Button
           testID="kyc-photo-camera"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: photoLocked }}
+          label="Photograph ID"
+          variant="secondary"
           disabled={photoLocked}
           onPress={() => void pickPhoto('camera')}
-          style={[styles.photoBtn, { backgroundColor: colors.backgroundSelected }]}>
-          <ThemedText type="smallBold">Photograph ID</ThemedText>
-        </Pressable>
-        <Pressable
+          style={styles.photoBtn}
+        />
+        <Button
           testID="kyc-photo-library"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: photoLocked }}
+          label="Choose photo"
+          variant="secondary"
           disabled={photoLocked}
           onPress={() => void pickPhoto('library')}
-          style={[styles.photoBtn, { backgroundColor: colors.backgroundSelected }]}>
-          <ThemedText type="smallBold">Choose photo</ThemedText>
-        </Pressable>
+          style={styles.photoBtn}
+        />
       </View>
       {localPhotoUri && !photoLocked ? (
         <ThemedText type="small" testID="kyc-photo-pending">
@@ -209,23 +201,15 @@ export function KycCaptureForm({ customer }: Props) {
         </ThemedText>
       ) : null}
 
-      <Pressable
-        testID="kyc-save"
-        accessibilityRole="button"
-        onPress={() => void handleSave()}
-        disabled={isSaving}
-        style={[styles.primaryBtn, { backgroundColor: colors.backgroundSelected }]}>
-        {isSaving ? <ActivityIndicator /> : <ThemedText type="smallBold">Save KYC</ThemedText>}
-      </Pressable>
+      <Button testID="kyc-save" label="Save KYC" loading={isSaving} onPress={() => void handleSave()} />
 
-      <Pressable
+      <Button
         testID="kyc-verify"
-        accessibilityRole="button"
+        label="Mark verified"
+        variant="secondary"
+        loading={isVerifying}
         onPress={() => void handleVerify()}
-        disabled={isVerifying}
-        style={[styles.primaryBtn, { backgroundColor: colors.backgroundElement }]}>
-        {isVerifying ? <ActivityIndicator /> : <ThemedText type="smallBold">Mark verified</ThemedText>}
-      </Pressable>
+      />
     </View>
   );
 }
@@ -233,9 +217,13 @@ export function KycCaptureForm({ customer }: Props) {
 const styles = StyleSheet.create({
   form: { gap: Spacing.two },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
-  chip: { borderRadius: 999, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  chip: {
+    minHeight: MinTouchTarget,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.three,
+    justifyContent: 'center',
+  },
   photoRow: { flexDirection: 'row', gap: Spacing.two },
-  photoBtn: { flex: 1, borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
-  primaryBtn: { borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
+  photoBtn: { flex: 1 },
 });
