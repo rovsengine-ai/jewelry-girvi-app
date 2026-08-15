@@ -3,7 +3,7 @@
 -- items in one transaction — the regression that made ORDER BY created_at
 -- a silent photo-mismatch.
 begin;
-select plan(5);
+select plan(6);
 
 select tests.create_supabase_user('pos_staff');
 select tests.create_supabase_user('pos_cust');
@@ -16,29 +16,33 @@ select tests.authenticate_as('pos_staff');
 -- ---------------------------------------------------------------------------
 -- 1. Positions 1,2,3 follow the jsonb array, not ornament_type or id.
 -- ---------------------------------------------------------------------------
+select lives_ok(
+  $$
+    select * from public.create_loan(
+      tests.get_supabase_uid('pos_cust'),
+      'T110-POS',
+      null,
+      1000000,
+      300,
+      DATE '2024-01-01',
+      'retail'::public.interest_model,
+      null,
+      '[
+        {"metal":"gold","ornament_type":"Chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1},
+        {"metal":"gold","ornament_type":"Bangle","gross_weight_mg":20000,"net_weight_mg":20000,"quantity":1},
+        {"metal":"gold","ornament_type":"Ring","gross_weight_mg":3000,"net_weight_mg":3000,"quantity":1}
+      ]'::jsonb
+    )
+  $$,
+  'staff can create a three-item loan'
+);
+
 select results_eq(
   $$
-    with created as (
-      select loan_id
-      from public.create_loan(
-        tests.get_supabase_uid('pos_cust'),
-        'T110-POS',
-        null,
-        1000000,
-        300,
-        DATE '2024-01-01',
-        'retail'::public.interest_model,
-        null,
-        '[
-          {"metal":"gold","ornament_type":"Chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1},
-          {"metal":"gold","ornament_type":"Bangle","gross_weight_mg":20000,"net_weight_mg":20000,"quantity":1},
-          {"metal":"gold","ornament_type":"Ring","gross_weight_mg":3000,"net_weight_mg":3000,"quantity":1}
-        ]'::jsonb
-      )
-    )
     select i.position, i.ornament_type
     from public.loan_items i
-    join created c on c.loan_id = i.loan_id
+    join public.loans l on l.id = i.loan_id
+    where l.serial_number = 'T110-POS'
     order by i.position
   $$,
   $$ values
@@ -51,36 +55,33 @@ select results_eq(
 
 -- ---------------------------------------------------------------------------
 -- 2. Returned item_ids match position order so the client never re-queries.
+-- Capture the RPC row first so both sides of results_eq read the same loan.
 -- ---------------------------------------------------------------------------
-select is(
-  (
-    with created as (
-      select loan_id, item_ids
-      from public.create_loan(
-        tests.get_supabase_uid('pos_cust'),
-        'T110-IDS',
-        null,
-        1000000,
-        300,
-        DATE '2024-01-01',
-        'retail'::public.interest_model,
-        null,
-        '[
-          {"metal":"gold","ornament_type":"Chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1},
-          {"metal":"gold","ornament_type":"Bangle","gross_weight_mg":20000,"net_weight_mg":20000,"quantity":1},
-          {"metal":"gold","ornament_type":"Ring","gross_weight_mg":3000,"net_weight_mg":3000,"quantity":1}
-        ]'::jsonb
-      )
-    )
-    select created.item_ids = ARRAY(
-      select i.id
-      from public.loan_items i
-      where i.loan_id = created.loan_id
-      order by i.position
-    )
-    from created
-  ),
-  true,
+create temp table t110_created as
+  select * from public.create_loan(
+    tests.get_supabase_uid('pos_cust'),
+    'T110-IDS',
+    null,
+    1000000,
+    300,
+    DATE '2024-01-01',
+    'retail'::public.interest_model,
+    null,
+    '[
+      {"metal":"gold","ornament_type":"Chain","gross_weight_mg":10000,"net_weight_mg":10000,"quantity":1},
+      {"metal":"gold","ornament_type":"Bangle","gross_weight_mg":20000,"net_weight_mg":20000,"quantity":1},
+      {"metal":"gold","ornament_type":"Ring","gross_weight_mg":3000,"net_weight_mg":3000,"quantity":1}
+    ]'::jsonb
+  );
+
+select results_eq(
+  $$ select unnest(item_ids) from t110_created $$,
+  $$
+    select i.id
+    from public.loan_items i
+    join t110_created c on c.loan_id = i.loan_id
+    order by i.position
+  $$,
   'create_loan returns item ids in input/position order'
 );
 

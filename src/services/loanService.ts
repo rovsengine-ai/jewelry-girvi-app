@@ -214,11 +214,9 @@ export class LoanPhotosIncompleteError extends Error {
   ) {
     super(
       `Loan ${serialNumber} was created but item photos are incomplete. The loan exists; retry attaching photos instead of saving again.`,
+      cause instanceof Error ? { cause } : undefined,
     );
     this.name = 'LoanPhotosIncompleteError';
-    if (cause instanceof Error) {
-      this.cause = cause;
-    }
   }
 }
 
