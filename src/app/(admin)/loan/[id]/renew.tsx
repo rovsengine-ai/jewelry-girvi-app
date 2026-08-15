@@ -2,20 +2,22 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
-  View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
+import { Field } from '@/components/field';
+import { MoneyText } from '@/components/money-text';
+import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { asPaise, formatPaiseAsInr, paiseToRupeesInput, todayInKolkata } from '@/lib/money';
+import { asPaise, formatPaiseAsInr, todayInKolkata } from '@/lib/money';
 import {
   defaultNewMaturityOn,
   isRenewalEligible,
@@ -30,7 +32,6 @@ import type { LoanBalances, LoanWithCustomer } from '@/types/database';
 export default function RenewLoanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const colors = useTheme();
   const { profile } = useAuth();
 
   const [loan, setLoan] = useState<LoanWithCustomer | null>(null);
@@ -127,11 +128,11 @@ export default function RenewLoanScreen() {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <Pressable onPress={() => router.back()} style={styles.back}>
-            <ThemedText type="smallBold">← Back</ThemedText>
-          </Pressable>
-          <ThemedText type="title">Owner only</ThemedText>
-          <ThemedText>Only the shop owner can renew a loan after the simple period.</ThemedText>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <EmptyState
+            title="Owner only"
+            body="Only the shop owner can renew a loan after the simple period."
+          />
         </SafeAreaView>
       </ThemedView>
     );
@@ -156,31 +157,25 @@ export default function RenewLoanScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Pressable onPress={() => router.back()} style={styles.back}>
-            <ThemedText type="smallBold">← Back</ThemedText>
-          </Pressable>
-          <ThemedText type="title">Renew {loan.serial_number}</ThemedText>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <ThemedText type="subtitle">Renew {loan.serial_number}</ThemedText>
           <ThemedText type="small">{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Interest-only renewal</ThemedText>
-            <ThemedText type="small">
-              Accrued interest due: {formatPaiseAsInr(balances.accruedInterestPaise)}
-            </ThemedText>
-            <ThemedText type="small">
-              Principal stays {formatPaiseAsInr(balances.outstandingPrincipalPaise)}
-            </ThemedText>
+            <Row>
+              <ThemedText type="small">Accrued interest due</ThemedText>
+              <MoneyText paise={balances.accruedInterestPaise} />
+            </Row>
+            <Row>
+              <ThemedText type="small">Principal stays</ThemedText>
+              <MoneyText paise={balances.outstandingPrincipalPaise} />
+            </Row>
             <ThemedText type="small">
               New due date: {defaultNewMaturityOn(asOf, loan.simple_period_days)}
             </ThemedText>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="Optional note"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
-            />
-          </View>
+            <Field label="Optional note" value={note} onChangeText={setNote} />
+          </Card>
 
           {!eligible ? (
             <ThemedText>
@@ -189,19 +184,12 @@ export default function RenewLoanScreen() {
               {latestMaturityOn ? `, currently due ${latestMaturityOn}` : ''}).
             </ThemedText>
           ) : (
-            <Pressable
+            <Button
               testID="confirm-renew"
-              style={[styles.saveBtn, { backgroundColor: colors.backgroundSelected }]}
+              label="Pay interest and renew"
+              loading={isSaving}
               onPress={() => void handleRenew()}
-              disabled={isSaving}>
-              {isSaving ? (
-                <ActivityIndicator />
-              ) : (
-                <ThemedText type="smallBold">
-                  Pay {paiseToRupeesInput(balances.accruedInterestPaise)} interest and renew
-                </ThemedText>
-              )}
-            </Pressable>
+            />
           )}
         </ScrollView>
       </SafeAreaView>
@@ -214,8 +202,4 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
-  back: { paddingVertical: Spacing.two },
-  card: { borderRadius: 14, padding: Spacing.three, gap: Spacing.two },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
-  saveBtn: { borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
 });
