@@ -277,6 +277,9 @@ export default function LoanDetailScreen() {
                 {item.metal ?? 'metal unknown'} · {item.ornament_type} ·{' '}
                 {mgToGramsInput(item.net_weight_mg)}g net
                 {item.purity_karat != null ? ` · ${item.purity_karat}K` : ' · purity not assessed'}
+                {item.valuation_paise != null
+                  ? ` · assessed ${formatPaiseAsInr(asPaise(item.valuation_paise))} (not IBJA)`
+                  : ''}
                 {item.quantity > 1 ? ` · ×${item.quantity}` : ''}
               </ThemedText>
             ))

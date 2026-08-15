@@ -16,9 +16,11 @@ import SignatureCanvas from 'react-native-signature-canvas';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { GoldRateCard } from '@/components/gold-rate-card';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayInKolkata } from '@/lib/money';
+import { useAuth } from '@/providers/auth-provider';
 import {
   emptyScannerItem,
   scannerItemsReducer,
@@ -36,11 +38,11 @@ import type { LoanFormData } from '@/types/database';
 
 const GOLD_PURITY_OPTIONS: Array<{ label: string; value: number | null }> = [
   { label: 'Not assessed', value: null },
-  { label: '24K', value: 24 },
-  { label: '22K', value: 22 },
-  { label: '18K', value: 18 },
-  { label: '14K', value: 14 },
-  { label: '10K', value: 10 },
+  { label: '24K (999)', value: 24 },
+  { label: '22K (916)', value: 22 },
+  { label: '18K (75% / 750)', value: 18 },
+  { label: '14K (585)', value: 14 },
+  { label: '10K (417)', value: 10 },
 ];
 
 const emptyForm: LoanFormData = {
@@ -201,7 +203,7 @@ function PledgeItemCard({
         </>
       ) : item.metal === 'silver' ? (
         <ThemedText type="small">
-          Silver purity is not stored as karat. Leave unassessed until a millesimal is decided.
+          Silver is weight-only. No purity and no valuation.
         </ThemedText>
       ) : (
         <ThemedText type="small">Choose gold or silver before saving. Nothing is pre-selected.</ThemedText>
@@ -213,6 +215,7 @@ function PledgeItemCard({
 export default function AdminScannerScreen() {
   const colors = useTheme();
   const router = useRouter();
+  const { profile } = useAuth();
 
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
@@ -373,10 +376,7 @@ export default function AdminScannerScreen() {
 
         {localPhotoUri ? <Image source={{ uri: localPhotoUri }} style={styles.preview} contentFit="cover" /> : null}
 
-        <View style={[styles.rateCard, { backgroundColor: colors.backgroundElement }]}>
-          <ThemedText type="smallBold">Live rate</ThemedText>
-          <ThemedText type="small">Rate unavailable</ThemedText>
-        </View>
+        <GoldRateCard isOwner={profile?.role === 'owner'} />
 
         <FormField label="Serial Number" value={form.serial_number} onChangeText={(v) => updateForm('serial_number', v)} />
         <FormField label="Customer Name" value={form.customer_name} onChangeText={(v) => updateForm('customer_name', v)} />
@@ -464,7 +464,6 @@ const styles = StyleSheet.create({
   overlayTitle: { color: '#fff', textShadowColor: '#000', textShadowRadius: 6 },
   reviewContent: { padding: Spacing.four, gap: Spacing.three },
   preview: { width: '100%', height: 200, borderRadius: 12 },
-  rateCard: { borderRadius: 12, padding: Spacing.three, gap: Spacing.one },
   field: { gap: Spacing.one },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   itemCard: { borderRadius: 12, padding: Spacing.three, gap: Spacing.two },

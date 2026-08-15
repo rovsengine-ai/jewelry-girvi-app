@@ -97,8 +97,26 @@
 - Weights are INTEGER MILLIGRAMS (`gross_weight_mg`, `net_weight_mg`), same
   discipline as paise and basis points. Never a decimal gram.
 - `purity_karat` NULL means NOT ASSESSED. Never assume 22: an invented purity
-  flows into valuation and misprices the pledge. Silver has no karat; leave it
-  NULL (do not invent a millesimal).
+  flows into valuation and misprices the pledge. Silver is weight-only: no
+  millesimal, no karat, no valuation.
+- Gold valuation is frozen onto `loan_items.valuation_paise` at insert, with
+  `gold_rate_id` pointing at the `gold_rates` row used. SQL only; half-up once.
+  Silver and unassessed gold stay NULL. A missing quote never blocks the
+  counter.
+- Karat maps to millesimal bands, not karat/24: 24K=999, 22K=916, 18K=750
+  (75%), 14K=585, 10K=417. Unmapped karat is not valued.
+- Formula when only a 999 quote exists:
+  `div_round_half_up(net_mg × millesimal × price_per_10g_999_paise, 10_000_000)`.
+  A matching-band row (manual 916, etc.) uses
+  `div_round_half_up(net_mg × price_per_10g_paise, 10_000)` with no extra
+  karat factor.
+- Wastage: none. LTV: none. Principal is whatever staff types; assessed value
+  is not a cap.
+- `gold_rates` quotes are NEVER IBJA. Feed is GoldAPI (`GOLDAPI_API_KEY`) or
+  metals.dev (`METALS_DEV_API_KEY` + `GOLD_RATE_PROVIDER=metals_dev`), stored
+  by the `refresh-gold-rate` Edge Function. Owner override is `source=manual`.
+  Keys live in Supabase secrets. Never `EXPO_PUBLIC_*`. Every UI figure is
+  labelled “not IBJA”.
 - Item photos live in the private `receipts` bucket at
   `{customer_id}/items/...`, reachable only through a signed URL.
 ## KYC

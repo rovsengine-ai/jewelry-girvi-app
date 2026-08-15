@@ -6,6 +6,7 @@ export type { PledgeMetal };
 /**
  * Counter draft of one pledged ornament. Grams stay as input strings until
  * save, where gramsInputToMg converts them. metal and purity_karat start unset.
+ * Silver never carries purity or valuation.
  */
 export interface ScannerItemDraft {
   key: string;

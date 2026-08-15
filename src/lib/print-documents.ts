@@ -1,3 +1,4 @@
+import { goldPurityLabel } from '@/lib/gold-purity';
 import { asBps, asPaise, formatBpsAsPercent, formatPaiseAsInr } from '@/lib/money';
 import { loanStatusLabel } from '@/lib/redemption';
 import type { InterestModel, LoanItem, LoanStatus } from '@/types/database';
@@ -25,8 +26,7 @@ export function formatMgAsGrams(mg: number): string {
 }
 
 function purityLabel(purityKarat: number | null): string {
-  if (purityKarat == null) return 'Not assessed / आकलित नहीं';
-  return `${purityKarat}K`;
+  return goldPurityLabel(purityKarat);
 }
 
 function interestModelLabel(model: InterestModel): string {

@@ -1,4 +1,5 @@
 import type {
+  GoldRateSource,
   IdDocumentType,
   InterestModel,
   LoanStatus,
@@ -238,6 +239,7 @@ export interface Database {
           stone_deduction_mg: number;
           quantity: number;
           valuation_paise: number | null;
+          gold_rate_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -253,6 +255,7 @@ export interface Database {
           stone_deduction_mg?: number;
           quantity?: number;
           valuation_paise?: number | null;
+          gold_rate_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -267,6 +270,7 @@ export interface Database {
           stone_deduction_mg?: number;
           quantity?: number;
           valuation_paise?: number | null;
+          gold_rate_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -275,6 +279,13 @@ export interface Database {
             columns: ['loan_id'];
             isOneToOne: false;
             referencedRelation: 'loans';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'loan_items_gold_rate_id_fkey';
+            columns: ['gold_rate_id'];
+            isOneToOne: false;
+            referencedRelation: 'gold_rates';
             referencedColumns: ['id'];
           },
         ];
@@ -436,6 +447,35 @@ export interface Database {
           },
         ];
       };
+      gold_rates: {
+        Row: {
+          id: string;
+          quoted_on: string;
+          purity_millesimal: number;
+          source: GoldRateSource;
+          price_per_10g_paise: number;
+          fetched_at: string;
+          created_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          quoted_on: string;
+          purity_millesimal: number;
+          source: GoldRateSource;
+          price_per_10g_paise: number;
+          fetched_at?: string;
+          created_by?: string | null;
+        };
+        Update: {
+          quoted_on?: string;
+          purity_millesimal?: number;
+          source?: GoldRateSource;
+          price_per_10g_paise?: number;
+          fetched_at?: string;
+          created_by?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -506,6 +546,41 @@ export interface Database {
           reminder_kind: string;
           fire_at: string;
         }[];
+      };
+      gold_karat_to_millesimal: {
+        Args: { p_karat: number };
+        Returns: number | null;
+      };
+      resolve_gold_rate: {
+        Args: { p_quoted_on: string; p_millesimal: number };
+        Returns: {
+          id: string;
+          quoted_on: string;
+          purity_millesimal: number;
+          source: GoldRateSource;
+          price_per_10g_paise: number;
+          fetched_at: string;
+          created_by: string | null;
+        }[];
+      };
+      assess_gold_item_valuation: {
+        Args: {
+          p_net_weight_mg: number;
+          p_purity_karat: number;
+          p_as_of: string;
+        };
+        Returns: {
+          valuation_paise: number;
+          gold_rate_id: string;
+        }[];
+      };
+      set_manual_gold_rate: {
+        Args: {
+          p_quoted_on: string;
+          p_millesimal: number;
+          p_price_per_10g_paise: number;
+        };
+        Returns: string;
       };
       create_loan: {
         Args: {

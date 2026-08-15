@@ -178,13 +178,14 @@ No iOS-only glass UI is rendered. Unused deps are listed, not removed.
 
 1. **Hosted production drift is unknown** — migrations and pgTAP describe local
    CLI state only. Remote apply / dashboard edits: **NOT VERIFIABLE FROM REPO**.
-2. **Live gold rate is a dead/demo path** — `goldRateService.ts` calls
-   `https://api.metals.live/v1/spot/gold` and uses `usdToInr = 83.5`. Not IBJA.
-   Valuation is not frozen in SQL.
-3. **Scanner still one item, no metal, float gram input** — milligram conversion
-   is `Math.round(Number(weight) * 1000)` until Stage 6.1 `gramsInputToMg`.
-4. **KYC UI is missing** — columns and the Aadhaar-photo CHECK exist; staff
-   cannot capture or mark verified from the app yet.
+2. **Gold feed keys must stay off the client** — `refresh-gold-rate` uses
+   `GOLDAPI_API_KEY` / `METALS_DEV_API_KEY` in Edge Function secrets. Confirm
+   no `EXPO_PUBLIC_GOLD*` is introduced. Quotes are labelled not IBJA; valuation
+   freezes in SQL at insert.
+3. **Scanner is multi-item** — metal, milligrams via `gramsInputToMg`, and
+   photos keyed by `create_loan` item ids. Silver is weight-only.
+4. **KYC capture exists** — last-4 only; Aadhaar photos are blocked. Verify
+   hosted `kyc` bucket + policies match the local migration.
 5. **OCR vendor key must stay off the client** — `.env.example` says so;
    confirm no `EXPO_PUBLIC_MOONSHOT_*` is introduced.
 6. **`enforce_loan_mutation_permissions` raises if `auth.uid()` is NULL** —
@@ -199,7 +200,7 @@ No iOS-only glass UI is rendered. Unused deps are listed, not removed.
 
 1. Has any hosted Supabase project applied this 12-file chain, or does
    production still differ?
-2. Will the shop subscribe to official IBJA rates, or use an indicative feed
-   plus owner override?
+2. ~~IBJA vs indicative feed?~~ Decided 2026-08-15: GoldAPI or metals.dev,
+   plus owner override labelled “not IBJA”. No IBJA subscription.
 3. Who mints the first `owner` row in production (SQL, invite metadata, phone
    allowlist), and is there more than one shop?
