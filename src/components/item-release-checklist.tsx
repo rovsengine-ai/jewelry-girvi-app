@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { LoanItem } from '@/types/database';
 
@@ -45,7 +45,7 @@ export function ItemReleaseChecklist({
               styles.row,
               {
                 backgroundColor: colors.background,
-                borderColor: checked ? colors.text : colors.backgroundSelected,
+                borderColor: checked ? colors.text : colors.border,
                 opacity: disabled ? 0.6 : 1,
               },
             ]}>
@@ -79,8 +79,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: Radii.sm,
     padding: Spacing.two,
+    minHeight: MinTouchTarget,
   },
   box: { width: 18, height: 18, borderWidth: 2, borderRadius: 4 },
   body: { flex: 1, gap: 2 },

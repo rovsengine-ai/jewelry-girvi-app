@@ -2,21 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } 
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SignatureCanvas from 'react-native-signature-canvas';
 
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
+import { Field } from '@/components/field';
 import { ItemReleaseChecklist } from '@/components/item-release-checklist';
+import { MoneyText } from '@/components/money-text';
+import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radii, Spacing } from '@/constants/theme';
 import {
   asPaise,
   formatPaiseAsInr,
@@ -38,7 +41,6 @@ import type { LoanBalances, LoanItem, LoanWithCustomer } from '@/types/database'
 export default function RedeemLoanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const colors = useTheme();
   const { profile } = useAuth();
   const signatureRef = useRef<ComponentRef<typeof SignatureCanvas> | null>(null);
 
@@ -187,14 +189,12 @@ export default function RedeemLoanScreen() {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <Pressable onPress={() => router.back()} style={styles.back}>
-            <ThemedText type="smallBold">← Back</ThemedText>
-          </Pressable>
-          <ThemedText type="title">Owner only</ThemedText>
-          <ThemedText>
-            Only the shop owner can redeem a loan and release pledged goods. Ask the owner to complete
-            this at the counter.
-          </ThemedText>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <ThemedText type="subtitle">Owner only</ThemedText>
+          <EmptyState
+            title="Owner only"
+            body="Only the shop owner can redeem a loan and release pledged goods. Ask the owner to complete this at the counter."
+          />
         </SafeAreaView>
       </ThemedView>
     );
@@ -212,17 +212,14 @@ export default function RedeemLoanScreen() {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <Pressable onPress={() => router.back()} style={styles.back}>
-            <ThemedText type="smallBold">← Back</ThemedText>
-          </Pressable>
-          <ThemedText type="title">Already redeemed</ThemedText>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <ThemedText type="subtitle">Already redeemed</ThemedText>
           <ThemedText>
-            Released to {loan.released_to_name ?? '—'} on {loan.redeemed_on}. Snapshot{' '}
-            {loan.closure_balance_paise != null
-              ? formatPaiseAsInr(asPaise(loan.closure_balance_paise))
-              : '—'}
-            .
+            Released to {loan.released_to_name ?? '—'} on {loan.redeemed_on}.
           </ThemedText>
+          {loan.closure_balance_paise != null ? (
+            <MoneyText paise={asPaise(loan.closure_balance_paise)} />
+          ) : null}
         </SafeAreaView>
       </ThemedView>
     );
@@ -232,10 +229,8 @@ export default function RedeemLoanScreen() {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <Pressable onPress={() => router.back()} style={styles.back}>
-            <ThemedText type="smallBold">← Back</ThemedText>
-          </Pressable>
-          <ThemedText type="title">Cannot redeem</ThemedText>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <ThemedText type="subtitle">Cannot redeem</ThemedText>
           <ThemedText>This loan is {gate.status} and cannot be redeemed.</ThemedText>
         </SafeAreaView>
       </ThemedView>
@@ -246,61 +241,56 @@ export default function RedeemLoanScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Pressable onPress={() => router.back()} style={styles.back}>
-            <ThemedText type="smallBold">← Back</ThemedText>
-          </Pressable>
-          <ThemedText type="title">Redeem {loan.serial_number}</ThemedText>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <ThemedText type="subtitle">Redeem {loan.serial_number}</ThemedText>
           <ThemedText type="small">{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Balances today (server)</ThemedText>
-            <ThemedText type="small">
-              Principal {formatPaiseAsInr(balances.outstandingPrincipalPaise)}
-            </ThemedText>
-            <ThemedText type="small">
-              Accrued interest {formatPaiseAsInr(balances.accruedInterestPaise)}
-            </ThemedText>
-            <ThemedText type="smallBold">Total due {formatPaiseAsInr(balances.totalDuePaise)}</ThemedText>
-          </View>
+            <Row>
+              <ThemedText type="small">Principal</ThemedText>
+              <MoneyText paise={balances.outstandingPrincipalPaise} />
+            </Row>
+            <Row>
+              <ThemedText type="small">Accrued interest</ThemedText>
+              <MoneyText paise={balances.accruedInterestPaise} />
+            </Row>
+            <Row>
+              <ThemedText type="smallBold">Total due</ThemedText>
+              <MoneyText paise={balances.totalDuePaise} />
+            </Row>
+          </Card>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Final payment</ThemedText>
             <ThemedText type="small">Leave empty if the due amount is already cleared.</ThemedText>
-            <TextInput
+            <Field
+              label="Amount in ₹"
               value={amountRupees}
               onChangeText={setAmountRupees}
-              placeholder="Amount in ₹"
               keyboardType="numeric"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
             />
-          </View>
+          </Card>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Release checklist</ThemedText>
-            <ThemedText type="small">Tick every ornament before handing them back.</ThemedText>
+            <ThemedText type="small">
+              Tick every ornament before handing them back. There is no select-all.
+            </ThemedText>
             <ItemReleaseChecklist items={items} checkedIds={checkedIds} onToggle={toggleItem} />
-          </View>
+          </Card>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Collected by</ThemedText>
-            <TextInput
+            <Field
+              label="Name of the person collecting"
               value={releasedToName}
               onChangeText={setReleasedToName}
-              placeholder="Name of the person collecting"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
             />
-            <TextInput
-              value={releaseNote}
-              onChangeText={setReleaseNote}
-              placeholder="Optional note"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
-            />
-          </View>
+            <Field label="Optional note" value={releaseNote} onChangeText={setReleaseNote} />
+          </Card>
 
-          <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Second signature (optional)</ThemedText>
             <View style={styles.signatureBox}>
               <SignatureCanvas
@@ -312,15 +302,14 @@ export default function RedeemLoanScreen() {
                 style={styles.signatureCanvas}
               />
             </View>
-          </View>
+          </Card>
 
-          <Pressable
+          <Button
             testID="confirm-redeem"
-            style={[styles.saveBtn, { backgroundColor: colors.backgroundSelected }]}
+            label="Confirm redemption"
+            loading={isSaving}
             onPress={() => void handleRedeem()}
-            disabled={isSaving}>
-            {isSaving ? <ActivityIndicator /> : <ThemedText type="smallBold">Confirm redemption</ThemedText>}
-          </Pressable>
+          />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -332,10 +321,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
-  back: { paddingVertical: Spacing.two },
-  card: { borderRadius: 14, padding: Spacing.three, gap: Spacing.two },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
-  signatureBox: { height: 180, borderRadius: 12, overflow: 'hidden' },
+  signatureBox: { height: 180, borderRadius: Radii.md, overflow: 'hidden' },
   signatureCanvas: { flex: 1 },
-  saveBtn: { borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
 });
