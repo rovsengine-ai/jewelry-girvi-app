@@ -3,31 +3,33 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Pressable,
   StyleSheet,
-  TextInput,
-  View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Badge } from '@/components/badge';
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
+import { Field } from '@/components/field';
+import { MoneyText } from '@/components/money-text';
+import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radii, Spacing } from '@/constants/theme';
 import {
   asBps,
   asPaise,
   formatBpsAsPercent,
-  formatPaiseAsInr,
   rupeesInputToPaise,
   todayInKolkata,
 } from '@/lib/money';
 import { mgToGramsInput } from '@/lib/weight';
 import { buildPledgeAgreementHtml, buildRedemptionReceiptHtml } from '@/lib/print-documents';
 import { kycStatusLabel } from '@/lib/kyc';
-import { isRenewalEligible, loanStatusLabel } from '@/lib/redemption';
+import { isRenewalEligible } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import {
@@ -43,7 +45,6 @@ import type { LoanBalances, LoanItem, LoanWithCustomer, Payment } from '@/types/
 export default function LoanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const colors = useTheme();
   const { profile } = useAuth();
   const isOwner = profile?.role === 'owner';
 
@@ -212,150 +213,153 @@ export default function LoanDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="smallBold">← Back</ThemedText>
-        </Pressable>
+        <Button label="← Back" variant="secondary" onPress={() => router.back()} />
 
-        <ThemedText type="title">{loan.serial_number}</ThemedText>
+        <ThemedText type="subtitle">{loan.serial_number}</ThemedText>
         <ThemedText>{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
         <ThemedText type="small">{loan.profiles?.phone_number ?? '—'}</ThemedText>
         <ThemedText type="small" testID="loan-kyc-status">
           KYC: {kycStatusLabel(loan.profiles?.kyc_verified_on ?? null)}
         </ThemedText>
-        <Pressable
+        <Button
           testID="open-kyc"
+          label="Capture / verify KYC"
+          variant="secondary"
           onPress={() => router.push(`/(admin)/kyc/${loan.customer_id}`)}
-          style={styles.back}>
-          <ThemedText type="smallBold">Capture / verify KYC</ThemedText>
-        </Pressable>
+        />
 
         {receiptDisplayUrl ? (
           <Image source={{ uri: receiptDisplayUrl }} style={styles.receipt} contentFit="cover" />
         ) : null}
 
-        <View style={[styles.summaryCard, { backgroundColor: colors.backgroundElement }]}>
-          <ThemedText type="smallBold">Loan Summary</ThemedText>
+        <Card>
+          <Row>
+            <ThemedText type="smallBold">Loan Summary</ThemedText>
+            <Badge status={loan.status} />
+          </Row>
           <ThemedText type="small">
             {loan.item_name} · {loan.weight_grams}g · {formatBpsAsPercent(asBps(loan.rate_bps))}% / 30d ·{' '}
             {loan.interest_model}
           </ThemedText>
           <ThemedText type="small">Disbursed: {loan.disbursed_on}</ThemedText>
           <ThemedText type="small">Due: {dueOn ?? '—'}</ThemedText>
-          <ThemedText type="small">
-            Original principal: {formatPaiseAsInr(asPaise(loan.principal_paise))}
-          </ThemedText>
-          <ThemedText type="small">
-            Interest paid: {formatPaiseAsInr(balances.interestPaidPaise)}
-          </ThemedText>
-          <ThemedText type="small">
-            Principal paid: {formatPaiseAsInr(balances.principalPaidPaise)}
-          </ThemedText>
-          <ThemedText type="smallBold">
-            Outstanding principal: {formatPaiseAsInr(balances.outstandingPrincipalPaise)}
-          </ThemedText>
-          <ThemedText type="smallBold">
-            Accrued interest due: {formatPaiseAsInr(balances.accruedInterestPaise)}
-          </ThemedText>
-          <ThemedText type="smallBold">Total due: {formatPaiseAsInr(balances.totalDuePaise)}</ThemedText>
-          <ThemedText type="small">Status: {loanStatusLabel(loan.status)}</ThemedText>
+          <Row>
+            <ThemedText type="small">Original principal</ThemedText>
+            <MoneyText paise={asPaise(loan.principal_paise)} />
+          </Row>
+          <Row>
+            <ThemedText type="small">Interest paid</ThemedText>
+            <MoneyText paise={balances.interestPaidPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="small">Principal paid</ThemedText>
+            <MoneyText paise={balances.principalPaidPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="smallBold">Outstanding principal</ThemedText>
+            <MoneyText paise={balances.outstandingPrincipalPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="smallBold">Accrued interest due</ThemedText>
+            <MoneyText paise={balances.accruedInterestPaise} />
+          </Row>
+          <Row>
+            <ThemedText type="smallBold">Total due</ThemedText>
+            <MoneyText paise={balances.totalDuePaise} />
+          </Row>
           {loan.status === 'redeemed' && loan.closure_balance_paise != null ? (
-            <ThemedText type="small">
-              Redeemed {loan.redeemed_on} · collected{' '}
-              {formatPaiseAsInr(asPaise(loan.closure_balance_paise))} · released to{' '}
-              {loan.released_to_name ?? '—'}
-            </ThemedText>
+            <Row>
+              <ThemedText type="small">
+                Redeemed {loan.redeemed_on} · released to {loan.released_to_name ?? '—'}
+              </ThemedText>
+              <MoneyText paise={asPaise(loan.closure_balance_paise)} />
+            </Row>
           ) : null}
-        </View>
+        </Card>
 
-        <View style={[styles.summaryCard, { backgroundColor: colors.backgroundElement }]}>
+        <Card>
           <ThemedText type="smallBold">Pledged items</ThemedText>
           {items.length === 0 ? (
-            <ThemedText type="small">No item rows on this loan.</ThemedText>
+            <EmptyState title="No items" body="No item rows on this loan." />
           ) : (
             items.map((item) => (
-              <ThemedText type="small" key={item.id}>
-                {item.metal ?? 'metal unknown'} · {item.ornament_type} ·{' '}
-                {mgToGramsInput(item.net_weight_mg)}g net
-                {item.purity_karat != null ? ` · ${item.purity_karat}K` : ' · purity not assessed'}
-                {item.valuation_paise != null
-                  ? ` · assessed ${formatPaiseAsInr(asPaise(item.valuation_paise))} (not IBJA)`
-                  : ''}
-                {item.quantity > 1 ? ` · ×${item.quantity}` : ''}
-              </ThemedText>
+              <Row key={item.id} style={styles.itemRow}>
+                <ThemedText type="small" style={styles.itemMeta}>
+                  {item.metal ?? 'metal unknown'} · {item.ornament_type} ·{' '}
+                  {mgToGramsInput(item.net_weight_mg)}g net
+                  {item.purity_karat != null ? ` · ${item.purity_karat}K` : ' · purity not assessed'}
+                  {item.quantity > 1 ? ` · ×${item.quantity}` : ''}
+                  {item.valuation_paise != null ? ' · assessed (not IBJA)' : ''}
+                </ThemedText>
+                {item.valuation_paise != null ? (
+                  <MoneyText paise={asPaise(item.valuation_paise)} />
+                ) : null}
+              </Row>
             ))
           )}
-        </View>
+        </Card>
 
         {loan.status === 'active' ? (
-          <View style={styles.actionRow}>
-            <Pressable
+          <Row>
+            <Button
               testID="open-redeem"
-              style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}
-              onPress={() => router.push(`/(admin)/loan/${id}/redeem`)}>
-              <ThemedText type="smallBold">Redeem</ThemedText>
-            </Pressable>
+              label="Redeem"
+              onPress={() => router.push(`/(admin)/loan/${id}/redeem`)}
+            />
             {showRenew ? (
-              <Pressable
+              <Button
                 testID="open-renew"
-                style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}
-                onPress={() => router.push(`/(admin)/loan/${id}/renew`)}>
-                <ThemedText type="smallBold">Renew</ThemedText>
-              </Pressable>
+                label="Renew"
+                variant="secondary"
+                onPress={() => router.push(`/(admin)/loan/${id}/renew`)}
+              />
             ) : null}
-          </View>
+          </Row>
         ) : null}
 
-        <View style={styles.actionRow}>
-          <Pressable
-            testID="print-pledge"
-            style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}
-            onPress={() => void printPledge()}>
-            <ThemedText type="smallBold">Print pledge</ThemedText>
-          </Pressable>
+        <Row>
+          <Button testID="print-pledge" label="Print pledge" variant="secondary" onPress={() => void printPledge()} />
           {loan.status === 'redeemed' ? (
-            <Pressable
+            <Button
               testID="print-redemption"
-              style={[styles.actionBtn, { backgroundColor: colors.backgroundSelected }]}
-              onPress={() => void printRedemption()}>
-              <ThemedText type="smallBold">Print receipt</ThemedText>
-            </Pressable>
+              label="Print receipt"
+              variant="secondary"
+              onPress={() => void printRedemption()}
+            />
           ) : null}
-        </View>
+        </Row>
 
         {loan.status === 'active' ? (
-          <View style={[styles.paymentForm, { backgroundColor: colors.backgroundElement }]}>
+          <Card>
             <ThemedText type="smallBold">Record Payment</ThemedText>
             <ThemedText type="small">Server allocates to accrued interest first, then principal.</ThemedText>
-            <TextInput
+            <Field
+              label="Amount in ₹"
               value={amountRupees}
               onChangeText={setAmountRupees}
-              placeholder="Amount in ₹"
               keyboardType="numeric"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
             />
-            <Pressable
-              style={[styles.saveBtn, { backgroundColor: colors.backgroundSelected }]}
+            <Button
+              label="Record Payment"
+              loading={isSaving}
               onPress={() => void handleLogPayment()}
-              disabled={isSaving}>
-              {isSaving ? <ActivityIndicator /> : <ThemedText type="smallBold">Record Payment</ThemedText>}
-            </Pressable>
-          </View>
+            />
+          </Card>
         ) : null}
 
-        <ThemedText type="smallBold" style={styles.historyTitle}>
-          Payment History
-        </ThemedText>
+        <ThemedText type="smallBold">Payment History</ThemedText>
         <FlatList
           data={payments}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.historyList}
-          ListEmptyComponent={<ThemedText type="small">No payments recorded yet.</ThemedText>}
+          ListEmptyComponent={<EmptyState title="No payments" body="No payments recorded yet." />}
           renderItem={({ item }) => (
-            <View style={[styles.historyRow, { backgroundColor: colors.backgroundElement }]}>
-              <ThemedText type="smallBold">{formatPaiseAsInr(asPaise(item.amount_paid_paise))}</ThemedText>
-              <ThemedText type="small">Paid on {item.paid_on}</ThemedText>
-            </View>
+            <Card>
+              <Row>
+                <ThemedText type="small">Paid on {item.paid_on}</ThemedText>
+                <MoneyText paise={asPaise(item.amount_paid_paise)} />
+              </Row>
+            </Card>
           )}
         />
       </SafeAreaView>
@@ -365,17 +369,10 @@ export default function LoanDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  back: { paddingVertical: Spacing.two },
-  receipt: { width: '100%', height: 180, borderRadius: 12, marginVertical: Spacing.two },
-  summaryCard: { borderRadius: 14, padding: Spacing.three, gap: Spacing.one, marginBottom: Spacing.three },
-  actionRow: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
-  actionBtn: { flex: 1, borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
-  paymentForm: { borderRadius: 14, padding: Spacing.three, gap: Spacing.two, marginBottom: Spacing.three },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
-  saveBtn: { borderRadius: 10, paddingVertical: Spacing.two, alignItems: 'center' },
-  historyTitle: { marginBottom: Spacing.two },
+  receipt: { width: '100%', height: 180, borderRadius: Radii.md, marginVertical: Spacing.two },
+  itemRow: { flexWrap: 'wrap' },
+  itemMeta: { flex: 1 },
   historyList: { gap: Spacing.two, paddingBottom: Spacing.five },
-  historyRow: { borderRadius: 10, padding: Spacing.two, gap: Spacing.one },
 });
