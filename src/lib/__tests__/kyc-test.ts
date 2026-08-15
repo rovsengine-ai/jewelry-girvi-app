@@ -1,4 +1,9 @@
-import { assertKycPhotoAllowed, kycStatusLabel, normalizeIdLast4 } from '@/lib/kyc';
+import {
+  acceptLast4Draft,
+  assertKycPhotoAllowed,
+  kycStatusLabel,
+  normalizeIdLast4,
+} from '@/lib/kyc';
 
 describe('normalizeIdLast4', () => {
   test('accepts four alphanumeric characters', () => {
@@ -6,10 +11,23 @@ describe('normalizeIdLast4', () => {
     expect(normalizeIdLast4(' 4321 ')).toBe('4321');
   });
 
-  test.each(['', '123', '12345', '12-4', 'ABCD1'])('rejects %p', (input) => {
+  test.each(['', '123', '12345', '12-4', 'ABCD1', '123456789012'])('rejects %p', (input) => {
     expect(() => normalizeIdLast4(input)).toThrow(
       'Store only the last 4 characters of the ID, not the full number.',
     );
+  });
+});
+
+describe('acceptLast4Draft', () => {
+  test('keeps a 4-character draft', () => {
+    expect(acceptLast4Draft('ab12')).toEqual({ ok: true, value: 'ab12' });
+  });
+
+  test('rejects a 12-digit number instead of slicing it', () => {
+    expect(acceptLast4Draft('123456789012')).toEqual({
+      ok: false,
+      error: 'Store only the last 4 characters of the ID, not the full number.',
+    });
   });
 });
 

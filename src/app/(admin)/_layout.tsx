@@ -33,6 +33,7 @@ export default function AdminLayout() {
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="scanner" />
       <Stack.Screen name="loan/[id]" />
+      <Stack.Screen name="kyc/[customerId]" />
     </Stack>
   );
 }

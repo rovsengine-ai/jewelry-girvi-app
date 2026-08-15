@@ -1,14 +1,37 @@
 import type { IdDocumentType } from '@/types/database';
 
 const LAST4_RE = /^[0-9A-Za-z]{4}$/;
+const LAST4_TOO_LONG_ERROR =
+  'Store only the last 4 characters of the ID, not the full number.';
+
+export const ID_DOCUMENT_TYPE_OPTIONS: Array<{ value: IdDocumentType; label: string }> = [
+  { value: 'aadhaar', label: 'Aadhaar' },
+  { value: 'pan', label: 'PAN' },
+  { value: 'voter_id', label: 'Voter ID' },
+  { value: 'driving_licence', label: 'Driving licence' },
+  { value: 'passport', label: 'Passport' },
+];
 
 /** Last 4 only. The CHECK on profiles.id_document_last4 is the same pattern. */
 export function normalizeIdLast4(input: string): string {
   const trimmed = input.trim().toUpperCase();
   if (!LAST4_RE.test(trimmed)) {
-    throw new Error('Store only the last 4 characters of the ID, not the full number.');
+    throw new Error(LAST4_TOO_LONG_ERROR);
   }
   return trimmed;
+}
+
+/**
+ * Draft last-4 for the capture field. Longer input is rejected outright —
+ * never sliced — so a pasted 12-digit Aadhaar never enters React state.
+ */
+export function acceptLast4Draft(
+  next: string,
+): { ok: true; value: string } | { ok: false; error: string } {
+  if (next.length > 4) {
+    return { ok: false, error: LAST4_TOO_LONG_ERROR };
+  }
+  return { ok: true, value: next };
 }
 
 /**

@@ -26,6 +26,7 @@ import {
 } from '@/lib/money';
 import { mgToGramsInput } from '@/lib/weight';
 import { buildPledgeAgreementHtml, buildRedemptionReceiptHtml } from '@/lib/print-documents';
+import { kycStatusLabel } from '@/lib/kyc';
 import { isRenewalEligible, loanStatusLabel } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -66,7 +67,15 @@ export default function LoanDetailScreen() {
           .select(
             `
             *,
-            profiles:customer_id ( full_name, phone_number, address, role )
+            profiles:customer_id (
+              full_name,
+              phone_number,
+              address,
+              role,
+              id_document_type,
+              kyc_verified_on,
+              guardian_name
+            )
           `,
           )
           .eq('id', id)
@@ -210,6 +219,15 @@ export default function LoanDetailScreen() {
         <ThemedText type="title">{loan.serial_number}</ThemedText>
         <ThemedText>{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
         <ThemedText type="small">{loan.profiles?.phone_number ?? '—'}</ThemedText>
+        <ThemedText type="small" testID="loan-kyc-status">
+          KYC: {kycStatusLabel(loan.profiles?.kyc_verified_on ?? null)}
+        </ThemedText>
+        <Pressable
+          testID="open-kyc"
+          onPress={() => router.push(`/(admin)/kyc/${loan.customer_id}`)}
+          style={styles.back}>
+          <ThemedText type="smallBold">Capture / verify KYC</ThemedText>
+        </Pressable>
 
         {receiptDisplayUrl ? (
           <Image source={{ uri: receiptDisplayUrl }} style={styles.receipt} contentFit="cover" />
