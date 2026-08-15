@@ -1,51 +1,34 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Badge } from '@/components/badge';
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
+import { FormNotice } from '@/components/form-notice';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { loanStatusLabel } from '@/lib/redemption';
+import { Radii, Spacing, TypeScale } from '@/constants/theme';
 import { noticeTypeLabel } from '@/lib/notices';
-import { formatPaiseAsInr } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { fetchLoanNotices, resolveReceiptDisplayUrl } from '@/services/loanService';
-import type { Loan, LoanNotice, LoanStatus } from '@/types/database';
+import type { Loan, LoanNotice } from '@/types/database';
 
 type CustomerLoanView = Pick<Loan, 'id' | 'receipt_image_url' | 'status'> & {
   displayUrl?: string | null;
 };
 
-function StatusBadge({ status }: { status: LoanStatus }) {
-  const backgroundColor =
-    status === 'active' ? '#1B7F3A' : status === 'defaulted' ? '#B42318' : '#6B7280';
-  return (
-    <View style={[styles.badge, { backgroundColor }]}>
-      <ThemedText type="smallBold" style={styles.badgeText}>
-        {loanStatusLabel(status)}
-      </ThemedText>
-    </View>
-  );
-}
-
 export default function CustomerDashboardScreen() {
-  const colors = useTheme();
   const { session, signOut } = useAuth();
 
   const [loans, setLoans] = useState<CustomerLoanView[]>([]);
   const [notices, setNotices] = useState<LoanNotice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadLoans = useCallback(async () => {
     if (!session?.user.id) return;
@@ -57,8 +40,7 @@ export default function CustomerDashboardScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn(error.message);
-      return;
+      throw new Error(error.message);
     }
 
     const rows = (data ?? []) as CustomerLoanView[];
@@ -72,22 +54,34 @@ export default function CustomerDashboardScreen() {
 
     try {
       setNotices(await fetchLoanNotices(20));
-    } catch (err) {
-      console.warn(err instanceof Error ? err.message : err);
+    } catch {
+      setNotices([]);
     }
   }, [session?.user.id]);
 
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
-    await loadLoans();
-    setIsRefreshing(false);
+    setLoadError(null);
+    try {
+      await loadLoans();
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Could not load receipts.');
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [loadLoans]);
 
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
-      await loadLoans();
-      setIsLoading(false);
+      setLoadError(null);
+      try {
+        await loadLoans();
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Could not load receipts.');
+      } finally {
+        setIsLoading(false);
+      }
     })();
   }, [loadLoans]);
 
@@ -95,34 +89,26 @@ export default function CustomerDashboardScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <ThemedText type="title">My Receipts</ThemedText>
-          <Pressable onPress={() => void signOut()} style={styles.signOut}>
-            <ThemedText type="smallBold">Sign out</ThemedText>
-          </Pressable>
+          <ThemedText style={TypeScale.display}>My Receipts</ThemedText>
+          <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
         </View>
 
-        <ThemedText style={styles.privacyNote}>
-          Only your own receipts, loan status, and due-date notices are shown here.
-          Payment reminders (15 days before due, due day, and overdue) use this phone's
-          notifications after you allow them.
+        <ThemedText type="small" themeColor="textSecondary">
+          Only your own receipts, loan status, and due-date notices are shown here. Payment
+          reminders (15 days before due, due day, and overdue) use this phone's notifications after
+          you allow them.
         </ThemedText>
 
+        <FormNotice error={loadError} />
+
         {notices.length > 0 ? (
-          <View style={styles.noticeBlock}>
-            {notices.map((notice) => {
-              const duePaise = notice.payload.total_due_paise;
-              const amount =
-                typeof duePaise === 'number' && Number.isInteger(duePaise)
-                  ? ` · ${formatPaiseAsInr(duePaise)}`
-                  : '';
-              return (
-                <ThemedText type="small" key={notice.id}>
-                  {noticeTypeLabel(notice.notice_type)} · {notice.scheduled_for}
-                  {amount}
-                </ThemedText>
-              );
-            })}
-          </View>
+          <Card>
+            {notices.map((notice) => (
+              <ThemedText type="small" key={notice.id}>
+                {noticeTypeLabel(notice.notice_type)} · {notice.scheduled_for}
+              </ThemedText>
+            ))}
+          </Card>
         ) : null}
 
         {isLoading ? (
@@ -131,13 +117,18 @@ export default function CustomerDashboardScreen() {
           <FlatList
             data={loans}
             keyExtractor={(item) => item.id}
-            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => void refresh()} />}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={() => void refresh()} />
+            }
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
-              <ThemedText style={styles.empty}>No girvi receipts linked to your account yet.</ThemedText>
+              <EmptyState
+                title="No receipts yet"
+                body="No girvi receipts linked to your account yet."
+              />
             }
             renderItem={({ item }) => (
-              <View style={[styles.card, { backgroundColor: colors.backgroundElement }]}>
+              <Card style={styles.card}>
                 {item.displayUrl ? (
                   <Image
                     source={{ uri: item.displayUrl }}
@@ -145,12 +136,14 @@ export default function CustomerDashboardScreen() {
                     contentFit="cover"
                   />
                 ) : (
-                  <View style={[styles.receiptPlaceholder, { backgroundColor: colors.backgroundSelected }]}>
+                  <View style={styles.receiptPlaceholder}>
                     <ThemedText type="small">No receipt image</ThemedText>
                   </View>
                 )}
-                <StatusBadge status={item.status} />
-              </View>
+                <View style={styles.badgeWrap}>
+                  <Badge status={item.status} />
+                </View>
+              </Card>
             )}
           />
         )}
@@ -161,33 +154,26 @@ export default function CustomerDashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.two,
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
-  signOut: { padding: Spacing.two },
-  privacyNote: { marginBottom: Spacing.three, opacity: 0.8 },
-  noticeBlock: { marginBottom: Spacing.three, gap: Spacing.one },
   loader: { marginTop: Spacing.five },
   listContent: { gap: Spacing.three, paddingBottom: Spacing.five },
-  empty: { textAlign: 'center', marginTop: Spacing.five },
-  card: { borderRadius: 14, overflow: 'hidden' },
-  receiptImage: { width: '100%', height: 220 },
+  card: { overflow: 'hidden', padding: 0 },
+  receiptImage: { width: '100%', height: 220, borderRadius: Radii.md },
   receiptPlaceholder: {
     height: 160,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badge: {
+  badgeWrap: {
     position: 'absolute',
     top: Spacing.two,
     right: Spacing.two,
-    borderRadius: 8,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
   },
-  badgeText: { color: '#fff' },
 });

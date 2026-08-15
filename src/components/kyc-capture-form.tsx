@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Field } from '@/components/field';
+import { FormNotice } from '@/components/form-notice';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,6 +50,8 @@ export function KycCaptureForm({ customer }: Props) {
   const [verifiedOn, setVerifiedOn] = useState<string | null>(customer.kyc_verified_on);
   const [isSaving, setIsSaving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
 
   const photoLocked = documentType === 'aadhaar';
 
@@ -81,6 +84,8 @@ export function KycCaptureForm({ customer }: Props) {
 
   const handleSave = async () => {
     setIsSaving(true);
+    setFormError(null);
+    setFormNotice(null);
     try {
       let path = documentType === 'aadhaar' ? null : storedPath;
       if (localPhotoUri && documentType !== 'aadhaar') {
@@ -96,8 +101,9 @@ export function KycCaptureForm({ customer }: Props) {
       });
       setStoredPath(path);
       setLocalPhotoUri(null);
+      setFormNotice('KYC saved.');
     } catch (error) {
-      Alert.alert('Could not save KYC', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSaving(false);
     }
@@ -105,11 +111,14 @@ export function KycCaptureForm({ customer }: Props) {
 
   const handleVerify = async () => {
     setIsVerifying(true);
+    setFormError(null);
+    setFormNotice(null);
     try {
       await verifyKyc(customer.id);
       setVerifiedOn(todayInKolkata());
+      setFormNotice('KYC marked verified.');
     } catch (error) {
-      Alert.alert('Could not verify KYC', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsVerifying(false);
     }
@@ -121,6 +130,7 @@ export function KycCaptureForm({ customer }: Props) {
       <ThemedText type="small" testID="kyc-status">
         {kycStatusLabel(verifiedOn)}
       </ThemedText>
+      <FormNotice error={formError} notice={formNotice} />
 
       <ThemedText type="smallBold">ID document</ThemedText>
       <View style={styles.chipRow}>

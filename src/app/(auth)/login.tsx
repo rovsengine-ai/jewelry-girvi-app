@@ -1,28 +1,21 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+import { Button } from '@/components/button';
+import { Card } from '@/components/card';
+import { Field } from '@/components/field';
+import { FormNotice } from '@/components/form-notice';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Spacing, TypeScale } from '@/constants/theme';
 import { toE164India } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 import { routeForRole, useAuth } from '@/providers/auth-provider';
 import type { Profile, UserRole } from '@/types/database';
 
 export default function LoginScreen() {
-  const colors = useTheme();
   const router = useRouter();
   const { refreshProfile } = useAuth();
 
@@ -30,17 +23,21 @@ export default function LoginScreen() {
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
 
   const handleSendOtp = async () => {
+    setFormError(null);
+    setFormNotice(null);
     let normalized: string;
     try {
       normalized = toE164India(phone.trim());
     } catch {
-      Alert.alert('Invalid phone', 'Enter a valid 10-digit mobile number.');
+      setFormError('Enter a valid 10-digit mobile number.');
       return;
     }
     if (normalized.length < 13) {
-      Alert.alert('Invalid phone', 'Enter a valid 10-digit mobile number.');
+      setFormError('Enter a valid 10-digit mobile number.');
       return;
     }
 
@@ -49,24 +46,26 @@ export default function LoginScreen() {
     setIsSubmitting(false);
 
     if (error) {
-      Alert.alert('OTP failed', error.message);
+      setFormError(error.message);
       return;
     }
 
     setStep('otp');
-    Alert.alert('OTP sent', `Verification code sent to ${normalized}`);
+    setFormNotice(`Verification code sent to ${normalized}`);
   };
 
   const handleVerifyOtp = async () => {
+    setFormError(null);
+    setFormNotice(null);
     let normalized: string;
     try {
       normalized = toE164India(phone.trim());
     } catch {
-      Alert.alert('Invalid phone', 'Enter a valid 10-digit mobile number.');
+      setFormError('Enter a valid 10-digit mobile number.');
       return;
     }
     if (otp.trim().length < 4) {
-      Alert.alert('Invalid OTP', 'Enter the verification code from SMS.');
+      setFormError('Enter the verification code from SMS.');
       return;
     }
 
@@ -79,12 +78,12 @@ export default function LoginScreen() {
     setIsSubmitting(false);
 
     if (error) {
-      Alert.alert('Verification failed', error.message);
+      setFormError(error.message);
       return;
     }
 
     if (!data.user) {
-      Alert.alert('Verification failed', 'No user session returned.');
+      setFormError('No user session returned.');
       return;
     }
 
@@ -111,52 +110,54 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.form}>
-          <ThemedText type="title">Girvi Shop Login</ThemedText>
-          <ThemedText style={styles.subtitle}>
+          <ThemedText style={TypeScale.display}>Girvi Shop Login</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
             Sign in with your mobile number to view receipts or manage loans.
           </ThemedText>
 
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="10-digit mobile number"
-            placeholderTextColor={colors.textSecondary}
-            keyboardType="phone-pad"
-            editable={step === 'phone' && !isSubmitting}
-            style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
-          />
-
-          {step === 'otp' ? (
-            <TextInput
-              value={otp}
-              onChangeText={setOtp}
-              placeholder="Enter OTP"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="number-pad"
-              maxLength={6}
-              editable={!isSubmitting}
-              style={[styles.input, { borderColor: colors.backgroundSelected, color: colors.text }]}
+          <Card>
+            <Field
+              label="Mobile number"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="10-digit mobile number"
+              keyboardType="phone-pad"
+              editable={step === 'phone' && !isSubmitting}
             />
-          ) : null}
 
-          <Pressable
-            style={[styles.button, { backgroundColor: colors.backgroundSelected }]}
-            onPress={step === 'phone' ? handleSendOtp : handleVerifyOtp}
-            disabled={isSubmitting}>
-            {isSubmitting ? (
-              <ActivityIndicator />
-            ) : (
-              <ThemedText type="smallBold">{step === 'phone' ? 'Send OTP' : 'Verify & Sign In'}</ThemedText>
-            )}
-          </Pressable>
+            {step === 'otp' ? (
+              <Field
+                label="Verification code"
+                value={otp}
+                onChangeText={setOtp}
+                placeholder="Enter OTP"
+                keyboardType="number-pad"
+                maxLength={6}
+                editable={!isSubmitting}
+              />
+            ) : null}
 
-          {step === 'otp' ? (
-            <Pressable onPress={() => setStep('phone')} disabled={isSubmitting}>
-              <ThemedText type="small" style={styles.link}>
-                Change phone number
-              </ThemedText>
-            </Pressable>
-          ) : null}
+            <FormNotice error={formError} notice={formNotice} />
+
+            <Button
+              label={step === 'phone' ? 'Send OTP' : 'Verify & Sign In'}
+              loading={isSubmitting}
+              onPress={() => void (step === 'phone' ? handleSendOtp() : handleVerifyOtp())}
+            />
+
+            {step === 'otp' ? (
+              <Button
+                label="Change phone number"
+                variant="secondary"
+                disabled={isSubmitting}
+                onPress={() => {
+                  setStep('phone');
+                  setFormError(null);
+                  setFormNotice(null);
+                }}
+              />
+            ) : null}
+          </Card>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
@@ -167,18 +168,4 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, justifyContent: 'center', padding: Spacing.four },
   form: { gap: Spacing.three },
-  subtitle: { opacity: 0.8 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 16,
-  },
-  button: {
-    borderRadius: 12,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-  },
-  link: { textAlign: 'center', opacity: 0.7 },
 });

@@ -1,7 +1,6 @@
 import { useCallback, useReducer, useRef, useState, type ComponentRef } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,12 +14,14 @@ import SignatureCanvas from 'react-native-signature-canvas';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
+import { FormNotice } from '@/components/form-notice';
 import { GoldRateCard } from '@/components/gold-rate-card';
 import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Spacing, TypeScale } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { todayInKolkata } from '@/lib/money';
 import { useAuth } from '@/providers/auth-provider';
@@ -201,6 +202,10 @@ export default function AdminScannerScreen() {
   const [items, dispatchItems] = useReducer(scannerItemsReducer, [emptyScannerItem('item-1')]);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
+  const [savedLoanId, setSavedLoanId] = useState<string | null>(null);
+  const [photoGap, setPhotoGap] = useState<LoanPhotosIncompleteError | null>(null);
 
   const updateForm = useCallback((key: keyof LoanFormData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -210,6 +215,7 @@ export default function AdminScannerScreen() {
     if (!cameraRef.current) return;
 
     setIsBusy(true);
+    setFormError(null);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
       if (!photo?.uri) {
@@ -234,7 +240,35 @@ export default function AdminScannerScreen() {
       });
       setStep('review');
     } catch (error) {
-      Alert.alert('Scan failed', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const retryPhotos = async (error: LoanPhotosIncompleteError) => {
+    setIsBusy(true);
+    setFormError(null);
+    try {
+      await attachItemPhotos({
+        loanId: error.loanId,
+        serialNumber: error.serialNumber,
+        customerId: error.customerId,
+        items,
+        itemIds: error.itemIds,
+        fromIndex: error.nextIndex,
+      });
+      setPhotoGap(null);
+      setSavedLoanId(error.loanId);
+      setFormNotice('Item photos attached.');
+    } catch (retryError) {
+      if (retryError instanceof LoanPhotosIncompleteError) {
+        setPhotoGap(retryError);
+        setSavedLoanId(retryError.loanId);
+        setFormError(retryError.message);
+      } else {
+        setFormError(retryError instanceof Error ? retryError.message : 'Unknown error');
+      }
     } finally {
       setIsBusy(false);
     }
@@ -242,61 +276,26 @@ export default function AdminScannerScreen() {
 
   const handleSave = async () => {
     if (!localPhotoUri) {
-      Alert.alert('Missing receipt', 'Capture a receipt image before saving.');
+      setFormError('Capture a receipt image before saving.');
       return;
     }
 
     setIsBusy(true);
+    setFormError(null);
+    setFormNotice(null);
     try {
       const loanId = await createLoanWithCustomer(form, items, localPhotoUri, signatureDataUrl);
-      Alert.alert('Saved', 'Girvi loan created successfully.', [
-        { text: 'View loan', onPress: () => router.replace(`/(admin)/loan/${loanId}`) },
-        { text: 'Dashboard', onPress: () => router.replace('/(admin)/dashboard') },
-      ]);
+      setSavedLoanId(loanId);
+      setPhotoGap(null);
+      setFormNotice('Girvi loan created successfully.');
     } catch (error) {
       if (error instanceof LoanPhotosIncompleteError) {
-        Alert.alert('Loan saved, photos incomplete', error.message, [
-          {
-            text: 'Retry photos',
-            onPress: () => {
-              void (async () => {
-                setIsBusy(true);
-                try {
-                  await attachItemPhotos({
-                    loanId: error.loanId,
-                    serialNumber: error.serialNumber,
-                    customerId: error.customerId,
-                    items,
-                    itemIds: error.itemIds,
-                    fromIndex: error.nextIndex,
-                  });
-                  Alert.alert('Saved', 'Item photos attached.', [
-                    {
-                      text: 'View loan',
-                      onPress: () => router.replace(`/(admin)/loan/${error.loanId}`),
-                    },
-                  ]);
-                } catch (retryError) {
-                  Alert.alert(
-                    retryError instanceof LoanPhotosIncompleteError
-                      ? 'Loan saved, photos incomplete'
-                      : 'Save failed',
-                    retryError instanceof Error ? retryError.message : 'Unknown error',
-                  );
-                } finally {
-                  setIsBusy(false);
-                }
-              })();
-            },
-          },
-          {
-            text: 'View loan',
-            onPress: () => router.replace(`/(admin)/loan/${error.loanId}`),
-          },
-        ]);
+        setPhotoGap(error);
+        setSavedLoanId(error.loanId);
+        setFormError(error.message);
         return;
       }
-      Alert.alert('Save failed', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsBusy(false);
     }
@@ -313,8 +312,12 @@ export default function AdminScannerScreen() {
   if (!permission.granted) {
     return (
       <ThemedView style={styles.centered}>
-        <ThemedText style={styles.centerText}>Camera permission is required to scan receipts.</ThemedText>
-        <Button label="Grant permission" onPress={() => void requestPermission()} />
+        <EmptyState
+          title="Camera needed"
+          body="Camera permission is required to scan receipts."
+          actionLabel="Grant permission"
+          onAction={() => void requestPermission()}
+        />
       </ThemedView>
     );
   }
@@ -324,9 +327,14 @@ export default function AdminScannerScreen() {
       <ThemedView style={styles.container}>
         <CameraView ref={cameraRef} style={styles.camera} facing="back" />
         <SafeAreaView style={styles.cameraOverlay}>
-          <ThemedText type="title" style={{ color: colors.overlay, textShadowColor: colors.overlayShadow, textShadowRadius: 6 }}>
+          <ThemedText
+            style={[
+              TypeScale.display,
+              { color: colors.overlay, textShadowColor: colors.overlayShadow, textShadowRadius: 6 },
+            ]}>
             Scan Girvi Receipt
           </ThemedText>
+          <FormNotice error={formError} />
           <Button label="Capture & Extract" loading={isBusy} onPress={() => void captureAndProcess()} />
           <Button label="Cancel" variant="secondary" onPress={() => router.back()} />
         </SafeAreaView>
@@ -398,6 +406,28 @@ export default function AdminScannerScreen() {
         </View>
 
         <Button label="Save Girvi Loan" loading={isBusy} onPress={() => void handleSave()} />
+        <FormNotice error={formError} notice={formNotice} />
+        {photoGap ? (
+          <Button
+            label="Retry photos"
+            variant="secondary"
+            loading={isBusy}
+            onPress={() => void retryPhotos(photoGap)}
+          />
+        ) : null}
+        {savedLoanId ? (
+          <>
+            <Button
+              label="View loan"
+              onPress={() => router.replace(`/(admin)/loan/${savedLoanId}`)}
+            />
+            <Button
+              label="Dashboard"
+              variant="secondary"
+              onPress={() => router.replace('/(admin)/dashboard')}
+            />
+          </>
+        ) : null}
       </ScrollView>
     </ThemedView>
   );
@@ -406,7 +436,6 @@ export default function AdminScannerScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.four, gap: Spacing.three },
-  centerText: { textAlign: 'center' },
   camera: { flex: 1 },
   cameraOverlay: {
     position: 'absolute',

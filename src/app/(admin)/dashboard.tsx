@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -17,6 +16,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
+import { FormNotice } from '@/components/form-notice';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
@@ -63,6 +63,9 @@ export default function AdminDashboardScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
 
   const loadLoans = useCallback(async () => {
     const { data, error } = await supabase
@@ -76,8 +79,7 @@ export default function AdminDashboardScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn(error.message);
-      return;
+      throw new Error(error.message);
     }
 
     setLoans((data ?? []) as LoanWithCustomer[]);
@@ -94,7 +96,7 @@ export default function AdminDashboardScreen() {
       setYieldRows(rateRows);
       setNotices(noticeRows);
     } catch (err) {
-      console.warn(err instanceof Error ? err.message : err);
+      throw err instanceof Error ? err : new Error('Could not load shop panels.');
     }
   }, []);
 
@@ -105,8 +107,14 @@ export default function AdminDashboardScreen() {
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
-      await loadAll();
-      setIsLoading(false);
+      setLoadError(null);
+      try {
+        await loadAll();
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Could not load dashboard.');
+      } finally {
+        setIsLoading(false);
+      }
     })();
   }, [loadAll]);
 
@@ -131,17 +139,18 @@ export default function AdminDashboardScreen() {
 
   const onGenerateNotices = useCallback(async () => {
     setIsGenerating(true);
+    setFormError(null);
+    setFormNotice(null);
     try {
       const inserted = await generateLoanNotices();
       await loadShopPanels();
-      Alert.alert(
-        'In-app notices',
+      setFormNotice(
         inserted === 0
           ? 'No new notices. Existing rows were left in place.'
           : `Wrote ${inserted} in-app notice(s).`,
       );
     } catch (err) {
-      Alert.alert('Could not generate notices', err instanceof Error ? err.message : 'Unknown error');
+      setFormError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsGenerating(false);
     }
@@ -152,7 +161,7 @@ export default function AdminDashboardScreen() {
     try {
       await Share.share({ message: csv, title: 'Overdue call list' });
     } catch (err) {
-      Alert.alert('Could not share call list', err instanceof Error ? err.message : 'Unknown error');
+      setFormError(err instanceof Error ? err.message : 'Unknown error');
     }
   }, [overdue]);
 
@@ -166,6 +175,11 @@ export default function AdminDashboardScreen() {
             <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
           </View>
         </Row>
+
+        {loadError ? <EmptyState title="Could not load dashboard" body={loadError} /> : null}
+        <View style={styles.noticeWrap}>
+          <FormNotice error={formError} notice={formNotice} />
+        </View>
 
         {isOwner ? (
           <>
@@ -299,7 +313,14 @@ export default function AdminDashboardScreen() {
                 refreshing={isRefreshing}
                 onRefresh={() => {
                   setIsRefreshing(true);
-                  void loadAll().finally(() => setIsRefreshing(false));
+                  setLoadError(null);
+                  void loadAll()
+                    .catch((error: unknown) => {
+                      setLoadError(
+                        error instanceof Error ? error.message : 'Could not load dashboard.',
+                      );
+                    })
+                    .finally(() => setIsRefreshing(false));
                 }}
               />
             }
@@ -381,6 +402,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchWrap: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three },
+  noticeWrap: { paddingHorizontal: Spacing.four, paddingTop: Spacing.two },
   loader: { marginTop: Spacing.five },
   listContent: { padding: Spacing.four, gap: Spacing.two },
 });

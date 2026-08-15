@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +9,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
+import { FormNotice } from '@/components/form-notice';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
 import { ThemedText } from '@/components/themed-text';
@@ -57,6 +53,9 @@ export default function LoanDetailScreen() {
   const [amountRupees, setAmountRupees] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formNotice, setFormNotice] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -85,12 +84,10 @@ export default function LoanDetailScreen() {
       ]);
 
     if (loanError) {
-      Alert.alert('Error', loanError.message);
-      return;
+      throw new Error(loanError.message);
     }
     if (paymentError) {
-      Alert.alert('Error', paymentError.message);
-      return;
+      throw new Error(paymentError.message);
     }
 
     setLoan(loanData as LoanWithCustomer | null);
@@ -117,10 +114,11 @@ export default function LoanDetailScreen() {
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
+      setLoadError(null);
       try {
         await loadData();
       } catch (error) {
-        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to load balances');
+        setLoadError(error instanceof Error ? error.message : 'Failed to load balances');
       } finally {
         setIsLoading(false);
       }
@@ -129,12 +127,14 @@ export default function LoanDetailScreen() {
 
   const handleLogPayment = async () => {
     if (!loan || !id) return;
+    setFormError(null);
+    setFormNotice(null);
 
     let amountPaise: number;
     try {
       amountPaise = rupeesInputToPaise(amountRupees);
     } catch (error) {
-      Alert.alert('Invalid amount', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
       return;
     }
 
@@ -143,21 +143,34 @@ export default function LoanDetailScreen() {
       await logPayment(id, amountPaise, todayInKolkata());
       await loadData();
       setAmountRupees('');
-      Alert.alert(
-        'Saved',
+      setFormNotice(
         'Payment logged. Interest is allocated server-side (interest first). Closing the loan is a separate owner-only redemption.',
       );
     } catch (error) {
-      Alert.alert('Failed', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isLoading || !loan || !balances) {
+  if (isLoading) {
     return (
       <ThemedView style={styles.centered}>
         <ActivityIndicator />
+      </ThemedView>
+    );
+  }
+
+  if (loadError || !loan || !balances) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <EmptyState
+            title={loadError ? 'Could not load loan' : 'Loan not found'}
+            body={loadError ?? 'This girvi could not be found.'}
+          />
+        </SafeAreaView>
       </ThemedView>
     );
   }
@@ -167,6 +180,7 @@ export default function LoanDetailScreen() {
     isOwner && isRenewalEligible(loan.disbursed_on, loan.simple_period_days, asOf, dueOn);
 
   const printPledge = async () => {
+    setFormError(null);
     try {
       const html = buildPledgeAgreementHtml({
         serialNumber: loan.serial_number,
@@ -183,13 +197,14 @@ export default function LoanDetailScreen() {
       });
       await shareHtmlAsPdf(html, `Pledge ${loan.serial_number}`);
     } catch (error) {
-      Alert.alert('Could not print', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
   const printRedemption = async () => {
+    setFormError(null);
     if (loan.status !== 'redeemed' || loan.closure_balance_paise == null || !loan.redeemed_on) {
-      Alert.alert('Not redeemed', 'A redemption receipt is only available after owner redemption.');
+      setFormError('A redemption receipt is only available after owner redemption.');
       return;
     }
     try {
@@ -206,7 +221,7 @@ export default function LoanDetailScreen() {
       });
       await shareHtmlAsPdf(html, `Redemption ${loan.serial_number}`);
     } catch (error) {
-      Alert.alert('Could not print', error instanceof Error ? error.message : 'Unknown error');
+      setFormError(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
@@ -214,6 +229,7 @@ export default function LoanDetailScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+        <FormNotice error={formError} notice={formNotice} />
 
         <ThemedText type="subtitle">{loan.serial_number}</ThemedText>
         <ThemedText>{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>

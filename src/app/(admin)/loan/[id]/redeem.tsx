@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   View,
@@ -14,6 +13,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
+import { FormNotice } from '@/components/form-notice';
 import { ItemReleaseChecklist } from '@/components/item-release-checklist';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
@@ -54,6 +54,9 @@ export default function RedeemLoanScreen() {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [doneNotice, setDoneNotice] = useState<string | null>(null);
 
   const gate = redeemGate(profile?.role, loan?.status);
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
@@ -97,10 +100,11 @@ export default function RedeemLoanScreen() {
   useEffect(() => {
     void (async () => {
       setIsLoading(true);
+      setLoadError(null);
       try {
         await load();
       } catch (error) {
-        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to load loan');
+        setLoadError(error instanceof Error ? error.message : 'Failed to load loan');
       } finally {
         setIsLoading(false);
       }
@@ -121,6 +125,7 @@ export default function RedeemLoanScreen() {
 
   const handleRedeem = async () => {
     if (!id || !loan || !balances) return;
+    setFormError(null);
 
     const submit = canSubmitRedemption({
       releasedToName,
@@ -128,7 +133,7 @@ export default function RedeemLoanScreen() {
       checkedIds,
     });
     if (!submit.ok) {
-      Alert.alert('Cannot redeem', submit.reason);
+      setFormError(submit.reason);
       return;
     }
 
@@ -138,7 +143,7 @@ export default function RedeemLoanScreen() {
       try {
         finalPaymentPaise = rupeesInputToPaise(trimmed);
       } catch (error) {
-        Alert.alert('Invalid amount', error instanceof Error ? error.message : 'Unknown error');
+        setFormError(error instanceof Error ? error.message : 'Unknown error');
         return;
       }
     }
@@ -160,17 +165,15 @@ export default function RedeemLoanScreen() {
         releaseSignatureUrl: signaturePath,
       });
 
-      Alert.alert(
-        result.already_redeemed ? 'Already redeemed' : 'Redeemed',
+      setDoneNotice(
         `Collected ${formatPaiseAsInr(asPaise(result.closure_balance_paise))} on ${result.redeemed_on}.`,
-        [{ text: 'OK', onPress: () => router.replace(`/(admin)/loan/${id}`) }],
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       if (parseOwnerOnlyError(message)) {
-        Alert.alert('Owner only', 'Only the shop owner can redeem a loan.');
+        setFormError('Only the shop owner can redeem a loan.');
       } else {
-        Alert.alert('Failed', message);
+        setFormError(message);
       }
     } finally {
       setIsSaving(false);
@@ -181,6 +184,32 @@ export default function RedeemLoanScreen() {
     return (
       <ThemedView style={styles.centered}>
         <ActivityIndicator />
+      </ThemedView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <EmptyState title="Could not load loan" body={loadError} />
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+
+  if (doneNotice) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <EmptyState
+            title="Redeemed"
+            body={doneNotice}
+            actionLabel="Back to loan"
+            onAction={() => router.replace(`/(admin)/loan/${id}`)}
+          />
+        </SafeAreaView>
       </ThemedView>
     );
   }
@@ -202,8 +231,11 @@ export default function RedeemLoanScreen() {
 
   if (!loan || !balances) {
     return (
-      <ThemedView style={styles.centered}>
-        <ThemedText>Loan not found.</ThemedText>
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <Button label="← Back" variant="secondary" onPress={() => router.back()} />
+          <EmptyState title="Loan not found" body="This girvi could not be found." />
+        </SafeAreaView>
       </ThemedView>
     );
   }
@@ -244,6 +276,7 @@ export default function RedeemLoanScreen() {
           <Button label="← Back" variant="secondary" onPress={() => router.back()} />
           <ThemedText type="subtitle">Redeem {loan.serial_number}</ThemedText>
           <ThemedText type="small">{loan.profiles?.full_name ?? 'Unknown customer'}</ThemedText>
+          <FormNotice error={formError} />
 
           <Card>
             <ThemedText type="smallBold">Balances today (server)</ThemedText>
