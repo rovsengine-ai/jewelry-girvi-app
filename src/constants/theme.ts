@@ -699,8 +699,12 @@ export const Sizes = {
   receiptPlaceholderHeight: 160,
   /** Scanner OCR preview and similar still previews. */
   imagePreviewHeight: 200,
+  /** Pledged-item photo thumbnail on create-loan review. */
+  itemPhotoThumbHeight: 96,
   /** Loan detail receipt thumbnail. */
   receiptThumbHeight: 180,
+  /** Stored pledge / release signature still. */
+  signatureThumbHeight: 140,
   /** Signature pad on create-loan review (taller canvas). */
   signaturePadHeight: 220,
   /** Signature pad on redeem (compact canvas). */

@@ -86,7 +86,7 @@ describe('ocrErrorMessageKey', () => {
 });
 
 describe('ocrErrorDisplayMessage', () => {
-  test('shows upstream detail for provider_rejected errors', () => {
+  test('maps Moonshot auth failures to misconfigured display copy', () => {
     expect(
       ocrErrorDisplayMessage(
         new OcrServiceError(
@@ -95,10 +95,10 @@ describe('ocrErrorDisplayMessage', () => {
         ),
         t,
       ),
-    ).toBe('OCR provider rejected the request (401): Invalid Authentication');
+    ).toBe('loans.scanner.ocrProviderRejected');
   });
 
-  test('falls back to i18n for misconfigured errors', () => {
+  test('shows setup guidance for misconfigured errors', () => {
     expect(
       ocrErrorDisplayMessage(
         new OcrServiceError('misconfigured', 'MOONSHOT_API_KEY is not configured'),
@@ -161,7 +161,7 @@ describe('extractReceiptData auth', () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  test('classifies structured provider_rejected edge payloads', async () => {
+  test('classifies Moonshot auth failures as misconfigured', async () => {
     auth.getSession.mockResolvedValue({
       data: {
         session: {
@@ -176,15 +176,14 @@ describe('extractReceiptData auth', () => {
         error: 'OCR provider rejected the request',
         code: 'provider_rejected',
         upstream_status: 401,
-        upstream_detail: 'Invalid Authentication',
+        upstream_detail: '{"error":{"message":"Invalid Authentication","type":"invalid_authentication_error"}}',
       },
       error: null,
     });
 
     await expect(extractReceiptData('file:///tmp/receipt.jpg')).rejects.toMatchObject({
       name: 'OcrServiceError',
-      code: 'provider_rejected',
-      message: 'OCR provider rejected the request (401): Invalid Authentication',
+      code: 'misconfigured',
     });
   });
 

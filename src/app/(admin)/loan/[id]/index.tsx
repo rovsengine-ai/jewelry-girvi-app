@@ -52,10 +52,12 @@ import {
     archiveLoan,
     fetchLoanBalances,
     fetchLoanCurrentDueOn,
+    fetchLoanItemPhotos,
     fetchLoanItems,
     fetchOverdueLoans,
     logPayment,
     resolveReceiptDisplayUrl,
+    unredeemLoan,
 } from '@/services/loanService';
 import { shareHtmlAsPdf } from '@/services/printService';
 import { resolveCustomerPhotoUrl } from '@/services/kycService';
@@ -76,6 +78,7 @@ export default function LoanDetailScreen() {
   const [customerPhotoUrl, setCustomerPhotoUrl] = useState<string | null>(null);
   const [dueOn, setDueOn] = useState<string | null>(null);
   const [items, setItems] = useState<LoanItem[]>([]);
+  const [itemPhotoUrls, setItemPhotoUrls] = useState<Record<string, string>>({});
   const [isOverdue, setIsOverdue] = useState(false);
   const [amountRupees, setAmountRupees] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -87,6 +90,12 @@ export default function LoanDetailScreen() {
   const [archiveReason, setArchiveReason] = useState('');
   const [archiveSaving, setArchiveSaving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [unredeemOpen, setUnredeemOpen] = useState(false);
+  const [unredeemReason, setUnredeemReason] = useState('');
+  const [unredeemSaving, setUnredeemSaving] = useState(false);
+  const [unredeemError, setUnredeemError] = useState<string | null>(null);
+  const [pledgeSignatureUrl, setPledgeSignatureUrl] = useState<string | null>(null);
+  const [releaseSignatureUrl, setReleaseSignatureUrl] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [itemsOpen, setItemsOpen] = useState(false);
   const customerChevron = useChevronRotation(customerOpen);
@@ -130,12 +139,15 @@ export default function LoanDetailScreen() {
     setPayments((paymentData ?? []) as Payment[]);
 
     if (loanData) {
-      const [nextBalances, signed, photoSigned, nextDueOn, nextItems, overdueRows] = await Promise.all([
+      const [nextBalances, signed, photoSigned, pledgeSigned, releaseSigned, nextDueOn, nextItems, overdueRows] =
+        await Promise.all([
         fetchLoanBalances(id, todayInKolkata()),
         resolveReceiptDisplayUrl(loanData.receipt_image_url),
         resolveCustomerPhotoUrl(
           (loanData as LoanWithCustomer).profiles?.photo_path ?? null,
         ),
+        resolveReceiptDisplayUrl(loanData.digital_signature_url),
+        resolveReceiptDisplayUrl(loanData.release_signature_url),
         fetchLoanCurrentDueOn(id),
         fetchLoanItems(id),
         fetchOverdueLoans(),
@@ -143,13 +155,30 @@ export default function LoanDetailScreen() {
       setBalances(nextBalances);
       setReceiptDisplayUrl(signed);
       setCustomerPhotoUrl(photoSigned);
+      setPledgeSignatureUrl(pledgeSigned);
+      setReleaseSignatureUrl(releaseSigned);
       setDueOn(nextDueOn);
       setItems(nextItems);
       setIsOverdue(overdueRows.some((row) => row.loan_id === id));
+      const itemPhotos = await fetchLoanItemPhotos(nextItems.map((item) => item.id));
+      const signedByItem: Record<string, string> = {};
+      await Promise.all(
+        itemPhotos.map(async (photo) => {
+          const url = await resolveReceiptDisplayUrl(photo.storage_path);
+          if (url && signedByItem[photo.loan_item_id] == null) {
+            signedByItem[photo.loan_item_id] = url;
+          }
+        }),
+      );
+      setItemPhotoUrls(signedByItem);
     } else {
       setReceiptDisplayUrl(null);
+      setCustomerPhotoUrl(null);
+      setPledgeSignatureUrl(null);
+      setReleaseSignatureUrl(null);
       setDueOn(null);
       setItems([]);
+      setItemPhotoUrls({});
       setIsOverdue(false);
     }
   }, [id]);
@@ -211,6 +240,26 @@ export default function LoanDetailScreen() {
       setArchiveError(parseOwnerOnlyError(message) ? t('archive.ownerOnly') : message);
     } finally {
       setArchiveSaving(false);
+    }
+  };
+
+  const handleUnredeem = async () => {
+    if (!id) return;
+    const trimmed = unredeemReason.trim();
+    if (trimmed === '') return;
+    setUnredeemError(null);
+    setUnredeemSaving(true);
+    try {
+      await unredeemLoan({ loanId: id, reason: trimmed });
+      setUnredeemOpen(false);
+      setUnredeemReason('');
+      setFormNotice(t('unredeem.notice'));
+      await loadData();
+    } catch (error) {
+      const message = unknownMessage(error, t);
+      setUnredeemError(parseOwnerOnlyError(message) ? t('unredeem.ownerOnly') : message);
+    } finally {
+      setUnredeemSaving(false);
     }
   };
 
@@ -418,6 +467,39 @@ export default function LoanDetailScreen() {
         ) : null}
 
         <Card style={styles.block}>
+          <ThemedText type="smallBold">{t('loans.detail.pledgeSignature')}</ThemedText>
+          {pledgeSignatureUrl ? (
+            <Image
+              source={{ uri: pledgeSignatureUrl }}
+              style={styles.signature}
+              contentFit="contain"
+              accessibilityLabel={t('loans.detail.pledgeSignature')}
+            />
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('loans.detail.noSignature')}
+            </ThemedText>
+          )}
+          {loan.status === 'redeemed' ? (
+            <>
+              <ThemedText type="smallBold">{t('loans.detail.releaseSignature')}</ThemedText>
+              {releaseSignatureUrl ? (
+                <Image
+                  source={{ uri: releaseSignatureUrl }}
+                  style={styles.signature}
+                  contentFit="contain"
+                  accessibilityLabel={t('loans.detail.releaseSignature')}
+                />
+              ) : (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('loans.detail.noSignature')}
+                </ThemedText>
+              )}
+            </>
+          ) : null}
+        </Card>
+
+        <Card style={styles.block}>
           <View style={styles.termsHead}>
             <View style={[styles.serialBadge, { backgroundColor: colors.tintWarning }]}>
               <ThemedText type="caption" style={{ color: colors.accentWarning }}>
@@ -428,12 +510,17 @@ export default function LoanDetailScreen() {
           </View>
           <View style={styles.dateRow}>
             <AppIcon ios="calendar" android="calendar_month" color={colors.textSecondary} />
-            <ThemedText type="label" themeColor="textSecondary">
-              {t('loans.detail.dateRange', {
-                from: loan.disbursed_on,
-                to: dueOn ?? t('common.emDash'),
-              })}
-            </ThemedText>
+            <View style={styles.dateCopy}>
+              <ThemedText type="label" themeColor="textSecondary">
+                {t('loans.detail.dateRange', {
+                  from: loan.disbursed_on,
+                  to: dueOn ?? t('common.emDash'),
+                })}
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textSecondary">
+                {t('loans.detail.asOfDate', { date: asOf })}
+              </ThemedText>
+            </View>
           </View>
           <View style={styles.fourUp}>
             <View style={styles.stat}>
@@ -465,6 +552,12 @@ export default function LoanDetailScreen() {
               </ThemedText>
               <ThemedText type="bodyBold">
                 {t('loans.detail.tenureDays', { days: loan.simple_period_days })}
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textSecondary">
+                {t('loans.detail.simplePeriodDeadline', {
+                  days: loan.simple_period_days,
+                  months: Math.round(loan.simple_period_days / 30),
+                })}
               </ThemedText>
             </View>
           </View>
@@ -608,11 +701,20 @@ export default function LoanDetailScreen() {
                   tone="elevated"
                   isLast={index === items.length - 1}
                   leading={
-                    <AppIcon
-                      ios={item.metal === 'silver' ? 'circle' : 'circle.fill'}
-                      android={item.metal === 'silver' ? 'radio_button_unchecked' : 'circle'}
-                      color={item.metal === 'silver' ? colors.textSecondary : colors.gold}
-                    />
+                    itemPhotoUrls[item.id] ? (
+                      <Image
+                        source={{ uri: itemPhotoUrls[item.id] }}
+                        style={styles.itemThumb}
+                        contentFit="cover"
+                        accessibilityLabel={t('items.photo')}
+                      />
+                    ) : (
+                      <AppIcon
+                        ios={item.metal === 'silver' ? 'circle' : 'circle.fill'}
+                        android={item.metal === 'silver' ? 'radio_button_unchecked' : 'circle'}
+                        color={item.metal === 'silver' ? colors.textSecondary : colors.gold}
+                      />
+                    )
                   }
                   content={
                     <ThemedText type="label">
@@ -663,6 +765,18 @@ export default function LoanDetailScreen() {
               label={t('loans.detail.defaultLoan')}
               variant="danger"
               onPress={() => router.push(`/(admin)/loan/${id}/default`)}
+            />
+          ) : null}
+          {isOwner && loan.status === 'redeemed' && loan.archived_at == null ? (
+            <Button
+              testID="open-unredeem"
+              label={t('unredeem.revert')}
+              variant="secondary"
+              onPress={() => {
+                setUnredeemError(null);
+                setUnredeemReason('');
+                setUnredeemOpen(true);
+              }}
             />
           ) : null}
           {isOwner ? (
@@ -777,6 +891,30 @@ export default function LoanDetailScreen() {
           error={archiveError}
         />
       ) : null}
+      {unredeemOpen ? (
+        <ArchiveConfirm
+          serial={loan.serial_number}
+          reason={unredeemReason}
+          onChangeReason={setUnredeemReason}
+          onCancel={() => {
+            setUnredeemOpen(false);
+            setUnredeemReason('');
+            setUnredeemError(null);
+          }}
+          onConfirm={() => void handleUnredeem()}
+          loading={unredeemSaving}
+          error={unredeemError}
+          title={t('unredeem.confirmTitle', { serial: loan.serial_number })}
+          body={t('unredeem.confirmBody')}
+          confirmLabel={t('unredeem.confirm')}
+          confirmVariant="danger"
+          reasonLabel={t('unredeem.reasonLabel')}
+          reasonPlaceholder={t('unredeem.reasonPlaceholder')}
+          testID="unredeem-confirm"
+          confirmTestID="unredeem-confirm-button"
+          reasonTestID="unredeem-reason"
+        />
+      ) : null}
     </ThemedView>
   );
 }
@@ -844,6 +982,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     minHeight: MinTouchTarget,
   },
+  dateCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: Spacing.half,
+  },
   marketBar: {
     marginHorizontal: Spacing.four,
     borderRadius: Radii.md,
@@ -857,6 +1000,17 @@ const styles = StyleSheet.create({
     height: Sizes.receiptThumbHeight,
     borderRadius: Radii.md,
     marginVertical: Spacing.two,
+  },
+  signature: {
+    width: '100%',
+    height: Sizes.signatureThumbHeight,
+    borderRadius: Radii.sm,
+    backgroundColor: '#FFFFFF',
+  },
+  itemThumb: {
+    width: MinTouchTarget,
+    height: MinTouchTarget,
+    borderRadius: Radii.sm,
   },
   actions: {
     paddingHorizontal: Spacing.four,

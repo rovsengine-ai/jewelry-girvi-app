@@ -4,7 +4,6 @@ import { Platform } from 'react-native';
 
 import {
   currentI18nLocale,
-  deviceLanguage,
   isAppLanguage,
   LANGUAGE_STORE_KEY,
   setI18nLocale,
@@ -72,17 +71,20 @@ const fallbackValue: LanguageContextValue = {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>(() => {
-    const initial = deviceLanguage();
-    setI18nLocale(initial);
-    return initial;
+    setI18nLocale('hi');
+    return 'hi';
   });
 
   useEffect(() => {
     let mounted = true;
     void readStoredLanguage().then((stored) => {
-      if (!mounted || !stored) return;
-      setI18nLocale(stored);
-      setLanguageState(stored);
+      if (!mounted) return;
+      const next = stored ?? 'hi';
+      setI18nLocale(next);
+      setLanguageState(next);
+      if (!stored) {
+        void persistLanguage('hi');
+      }
     });
     return () => {
       mounted = false;

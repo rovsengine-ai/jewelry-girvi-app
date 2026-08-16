@@ -22,8 +22,12 @@ import { useLanguage } from '@/providers/language-provider';
 import { resolveReceiptDisplayUrl } from '@/services/loanService';
 import type { Loan } from '@/types/database';
 
-type CustomerLoanView = Pick<Loan, 'id' | 'serial_number' | 'receipt_image_url' | 'status'> & {
+type CustomerLoanView = Pick<
+  Loan,
+  'id' | 'serial_number' | 'receipt_image_url' | 'digital_signature_url' | 'status'
+> & {
   displayUrl?: string | null;
+  signatureUrl?: string | null;
 };
 
 export default function CustomerLoansScreen() {
@@ -42,7 +46,7 @@ export default function CustomerLoansScreen() {
 
     const { data, error } = await supabase
       .from('loans')
-      .select('id, serial_number, receipt_image_url, status')
+      .select('id, serial_number, receipt_image_url, digital_signature_url, status')
       .eq('customer_id', session.user.id)
       .order('created_at', { ascending: false });
 
@@ -55,6 +59,7 @@ export default function CustomerLoansScreen() {
       rows.map(async (row) => ({
         ...row,
         displayUrl: await resolveReceiptDisplayUrl(row.receipt_image_url).catch(() => null),
+        signatureUrl: await resolveReceiptDisplayUrl(row.digital_signature_url).catch(() => null),
       })),
     );
     setLoans(withUrls);
@@ -126,6 +131,14 @@ export default function CustomerLoansScreen() {
                       <ThemedText type="small">{t('loans.customer.noReceiptImage')}</ThemedText>
                     </View>
                   )}
+                  {item.signatureUrl ? (
+                    <Image
+                      source={{ uri: item.signatureUrl }}
+                      style={styles.signatureImage}
+                      contentFit="contain"
+                      accessibilityLabel={t('loans.detail.pledgeSignature')}
+                    />
+                  ) : null}
                   <View style={styles.badgeWrap}>
                     <Badge
                       status={item.status}
@@ -157,6 +170,12 @@ const styles = StyleSheet.create({
   listContent: { gap: Spacing.three, paddingBottom: Spacing.five },
   card: { overflow: 'hidden', padding: 0 },
   receiptImage: { width: '100%', height: Sizes.receiptImageHeight, borderRadius: Radii.md },
+  signatureImage: {
+    width: '100%',
+    height: Sizes.signatureThumbHeight,
+    marginTop: Spacing.two,
+    backgroundColor: '#FFFFFF',
+  },
   receiptPlaceholder: {
     minHeight: Sizes.receiptPlaceholderHeight,
     alignItems: 'center',

@@ -53,8 +53,10 @@ function classifyEdgeMessage(raw: string): OcrFailureCode {
   const lower = raw.toLowerCase();
   if (
     lower.includes('moonshot_api_key') ||
+    lower.includes('gemini_api_key') ||
     lower.includes('misconfigured') ||
-    lower.includes('not configured')
+    lower.includes('not configured') ||
+    lower.includes('no ocr key')
   ) {
     return 'misconfigured';
   }
@@ -98,11 +100,25 @@ function formatProviderRejectedMessage(payload: EdgeErrorPayload): string {
   return parts.join(': ');
 }
 
+function isMoonshotAuthPayload(payload: EdgeErrorPayload): boolean {
+  if (payload.upstream_status === 401) return true;
+  const haystack = `${payload.error ?? ''} ${payload.upstream_detail ?? ''}`.toLowerCase();
+  return (
+    haystack.includes('invalid_authentication') ||
+    haystack.includes('incorrect_api_key') ||
+    haystack.includes('invalid authentication')
+  );
+}
+
 function resolveEdgeFailure(payload: EdgeErrorPayload, fallbackMessage: string): OcrServiceError {
-  const code =
+  let code =
     typeof payload.code === 'string' && payload.code.trim()
       ? mapEdgeCode(payload.code.trim())
       : classifyEdgeMessage(payload.error ?? fallbackMessage);
+
+  if (code === 'provider_rejected' && isMoonshotAuthPayload(payload)) {
+    code = 'misconfigured';
+  }
 
   if (code === 'provider_rejected') {
     return new OcrServiceError(code, formatProviderRejectedMessage(payload));
@@ -167,8 +183,8 @@ async function requireAccessToken(): Promise<string> {
 
 /**
  * Extract girvi receipt fields via the extract-receipt Edge Function
- * (Moonshot key stays server-side). Hindi and English handwriting both OK —
- * values are returned as written (Devanagari kept).
+ * (GEMINI_API_KEY or MOONSHOT_API_KEY stays server-side). Hindi and English
+ * handwriting both OK — values are returned as written (Devanagari kept).
  *
  * Returns a JPEG-resized `preparedUri` suitable for the review thumbnail and
  * storage upload (gallery HEIC/large stills are compressed first).
@@ -260,8 +276,18 @@ export function ocrErrorMessageKey(error: unknown): string {
 /** Prefer a detailed provider message when the edge function returned one. */
 export function ocrErrorDisplayMessage(error: unknown, t: (key: string) => string): string {
   if (error instanceof OcrServiceError) {
-    if (error.code === 'provider_rejected' && error.message.includes(':')) {
-      return error.message;
+    if (error.code === 'misconfigured') {
+      return t('loans.scanner.ocrMisconfigured');
+    }
+    if (error.code === 'provider_rejected') {
+      const detail = error.message.includes(':') ? error.message.split(':').slice(1).join(':').trim() : '';
+      if (detail.includes('{') || detail.toLowerCase().includes('invalid authentication')) {
+        return t('loans.scanner.ocrProviderRejected');
+      }
+      if (error.message.includes(':')) {
+        return error.message;
+      }
+      return t('loans.scanner.ocrProviderRejected');
     }
     if (error.code === 'upstream' && error.message.trim() && !error.message.includes('non-2xx')) {
       return error.message;

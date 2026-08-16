@@ -39,6 +39,7 @@ jest.mock('@/services/loanService', () => ({
   fetchLoanBalances: jest.fn(),
   fetchLoanItems: jest.fn(),
   redeemLoan: jest.fn(),
+  resolveReceiptDisplayUrl: jest.fn(async () => null),
   uploadSignatureDataUrl: jest.fn(),
 }));
 

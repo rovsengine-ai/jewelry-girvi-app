@@ -36,7 +36,8 @@ import {
   inferMetalFromItemName,
   isOcrExtractionPartial,
 } from '@/lib/ocr-receipt-parse';
-import { pickStillImage } from '@/lib/pick-image';
+import { pickStillImage, PermissionDeniedError } from '@/lib/pick-image';
+import { prepareItemPhoto } from '@/lib/prepare-item-photo';
 import {
   emptyScannerItem,
   scannerItemsReducer,
@@ -50,9 +51,9 @@ import {
   attachItemPhotos,
   createLoanWithCustomer,
   LoanPhotosIncompleteError,
+  type CounterCustomerRole,
 } from '@/services/loanService';
 import { extractReceiptData, ocrErrorDisplayMessage } from '@/services/ocrService';
-import { PermissionDeniedError } from '@/lib/pick-image';
 import type { LoanFormData, OcrExtractionResult } from '@/types/database';
 
 const GOLD_PURITY_OPTIONS: Array<{ labelKey: string; value: number | null }> = [
@@ -103,6 +104,32 @@ function PledgeItemCard({
   onRemove: () => void;
 }) {
   const { t } = useLanguage();
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  const pickItemPhoto = async (source: 'camera' | 'library') => {
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const uri = await pickStillImage(source, { quality: 0.2 });
+      if (!uri) return;
+      const prepared = await prepareItemPhoto(uri);
+      onPatch({ localPhotoUri: prepared.uri });
+    } catch (error) {
+      if (error instanceof PermissionDeniedError) {
+        setPhotoError(
+          error.kind === 'library'
+            ? t('loans.scanner.galleryPermission')
+            : t('loans.scanner.cameraNeededBody'),
+        );
+        return;
+      }
+      setPhotoError(error instanceof Error ? error.message : t('errors.unknown'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   return (
     <Card>
       <Row>
@@ -187,6 +214,44 @@ function PledgeItemCard({
       ) : (
         <ThemedText type="small">{t('items.chooseMetalFirst')}</ThemedText>
       )}
+
+      <ThemedText type="smallBold">{t('items.photo')}</ThemedText>
+      {item.localPhotoUri ? (
+        <Image
+          source={{ uri: item.localPhotoUri }}
+          style={styles.itemPhoto}
+          contentFit="cover"
+        />
+      ) : null}
+      <View style={styles.chipRow}>
+        <Button
+          label={t('items.photographItem')}
+          variant="secondary"
+          loading={photoBusy}
+          onPress={() => void pickItemPhoto('camera')}
+        />
+        <Button
+          label={t('items.chooseItemPhoto')}
+          variant="secondary"
+          loading={photoBusy}
+          onPress={() => void pickItemPhoto('library')}
+        />
+      </View>
+      {item.localPhotoUri ? (
+        <>
+          <ThemedText type="small">{t('items.photoPending')}</ThemedText>
+          <Button
+            label={t('items.removePhoto')}
+            variant="secondary"
+            onPress={() => onPatch({ localPhotoUri: null })}
+          />
+        </>
+      ) : null}
+      {photoError ? (
+        <ThemedText type="small" themeColor="danger">
+          {photoError}
+        </ThemedText>
+      ) : null}
     </Card>
   );
 }
@@ -216,6 +281,7 @@ export default function AdminScannerScreen() {
   const [kycPendingCustomerId, setKycPendingCustomerId] = useState<string | null>(null);
   const [kycDraft, setKycDraft] = useState<KycDraft>(() => emptyKycDraft());
   const [photoGap, setPhotoGap] = useState<LoanPhotosIncompleteError | null>(null);
+  const [customerRole, setCustomerRole] = useState<CounterCustomerRole>('retail_customer');
   // CameraView.isAvailableAsync is web-only; use Device.isDevice for simulators.
   // https://docs.expo.dev/versions/v57.0.0/sdk/device/
   const cameraAvailable = Device.isDevice;
@@ -236,6 +302,7 @@ export default function AdminScannerScreen() {
     setKycPendingCustomerId(null);
     setKycDraft(emptyKycDraft());
     setPhotoGap(null);
+    setCustomerRole('retail_customer');
     setCameraMountError(null);
   }, []);
 
@@ -396,6 +463,7 @@ export default function AdminScannerScreen() {
         localPhotoUri,
         signatureDataUrl,
         kycInput,
+        customerRole,
       );
       setSavedLoanId(outcome.loanId);
       setPhotoGap(null);
@@ -412,7 +480,13 @@ export default function AdminScannerScreen() {
         setFormError(error.message);
         return;
       }
-      setFormError(error instanceof Error ? error.message : t('errors.unknown'));
+      setFormError(
+        error instanceof Error && error.message.toLowerCase().includes('non-2xx')
+          ? t('loans.scanner.saveEdgeFailed')
+          : error instanceof Error
+            ? error.message
+            : t('errors.unknown'),
+      );
     } finally {
       setIsBusy(false);
     }
@@ -600,6 +674,22 @@ export default function AdminScannerScreen() {
         />
 
         <Card>
+          <ThemedText type="smallBold">{t('loans.scanner.customerType')}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('loans.scanner.customerTypeHint')}
+          </ThemedText>
+          <View style={styles.chipRow}>
+            <ChoiceChip
+              label={t('loans.retailCustomers')}
+              selected={customerRole === 'retail_customer'}
+              onPress={() => setCustomerRole('retail_customer')}
+            />
+            <ChoiceChip
+              label={t('loans.merchants')}
+              selected={customerRole === 'merchant'}
+              onPress={() => setCustomerRole('merchant')}
+            />
+          </View>
           <Field
             label={t('loans.scanner.serialNumber')}
             value={form.serial_number}
@@ -799,6 +889,11 @@ const styles = StyleSheet.create({
     padding: Spacing.one,
   },
   preview: { width: '100%', height: Sizes.imagePreviewHeight, borderRadius: Radii.sm },
+  itemPhoto: {
+    width: '100%',
+    height: Sizes.itemPhotoThumbHeight,
+    borderRadius: Radii.sm,
+  },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
   signatureGlass: {
     borderRadius: Radii.md,

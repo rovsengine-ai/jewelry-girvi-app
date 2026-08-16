@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -37,6 +38,7 @@ import {
     fetchLoanBalances,
     fetchLoanItems,
     redeemLoan,
+    resolveReceiptDisplayUrl,
     uploadSignatureDataUrl,
 } from '@/services/loanService';
 import type { LoanBalances, LoanItem, LoanWithCustomer } from '@/types/database';
@@ -68,6 +70,8 @@ export default function RedeemLoanScreen() {
   const [archiveSaving, setArchiveSaving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [archivedNotice, setArchivedNotice] = useState<string | null>(null);
+  const [pledgeSignatureUrl, setPledgeSignatureUrl] = useState<string | null>(null);
+  const [releaseSignatureUrl, setReleaseSignatureUrl] = useState<string | null>(null);
 
   const gate = redeemGate(profile?.role, loan?.status);
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
@@ -95,14 +99,20 @@ export default function RedeemLoanScreen() {
     if (!nextLoan) {
       setItems([]);
       setBalances(null);
+      setPledgeSignatureUrl(null);
+      setReleaseSignatureUrl(null);
       return;
     }
-    const [nextItems, nextBalances] = await Promise.all([
+    const [nextItems, nextBalances, pledgeSigned, releaseSigned] = await Promise.all([
       fetchLoanItems(id),
       fetchLoanBalances(id, todayInKolkata()),
+      resolveReceiptDisplayUrl(nextLoan.digital_signature_url),
+      resolveReceiptDisplayUrl(nextLoan.release_signature_url),
     ]);
     setItems(nextItems);
     setBalances(nextBalances);
+    setPledgeSignatureUrl(pledgeSigned);
+    setReleaseSignatureUrl(releaseSigned);
     setReleasedToName((current) => current || nextLoan.profiles?.full_name || '');
     if (nextBalances.totalDuePaise > 0) {
       setAmountRupees(paiseToRupeesInput(nextBalances.totalDuePaise));
@@ -331,6 +341,28 @@ export default function RedeemLoanScreen() {
           {loan.closure_balance_paise != null ? (
             <MoneyText paise={asPaise(loan.closure_balance_paise)} />
           ) : null}
+          {pledgeSignatureUrl ? (
+            <>
+              <ThemedText type="smallBold">{t('redeem.pledgeSignature')}</ThemedText>
+              <Image
+                source={{ uri: pledgeSignatureUrl }}
+                style={styles.signature}
+                contentFit="contain"
+                accessibilityLabel={t('redeem.pledgeSignature')}
+              />
+            </>
+          ) : null}
+          {releaseSignatureUrl ? (
+            <>
+              <ThemedText type="smallBold">{t('loans.detail.releaseSignature')}</ThemedText>
+              <Image
+                source={{ uri: releaseSignatureUrl }}
+                style={styles.signature}
+                contentFit="contain"
+                accessibilityLabel={t('loans.detail.releaseSignature')}
+              />
+            </>
+          ) : null}
         </View>
       </ThemedView>
     );
@@ -408,6 +440,19 @@ export default function RedeemLoanScreen() {
         </Card>
 
         <Card>
+          <ThemedText type="smallBold">{t('redeem.pledgeSignature')}</ThemedText>
+          {pledgeSignatureUrl ? (
+            <Image
+              source={{ uri: pledgeSignatureUrl }}
+              style={styles.signature}
+              contentFit="contain"
+              accessibilityLabel={t('redeem.pledgeSignature')}
+            />
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('loans.detail.noSignature')}
+            </ThemedText>
+          )}
           <ThemedText type="smallBold">{t('redeem.signatureTitle')}</ThemedText>
           <SignaturePad
             ref={signaturePadRef}
@@ -435,4 +480,9 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
   archiveHint: { marginTop: Spacing.two },
+  signature: {
+    width: '100%',
+    height: Sizes.signatureThumbHeight,
+    backgroundColor: '#FFFFFF',
+  },
 });

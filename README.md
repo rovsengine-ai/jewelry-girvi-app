@@ -33,8 +33,52 @@ this command.
 
 Edge Function secrets (never `EXPO_PUBLIC_*`):
 
+**Local OCR — Gemini free tier (recommended):**
+
 ```bash
-npx supabase secrets set MOONSHOT_API_KEY=sk-...   # OCR, if used
+cp supabase/functions/.env.example supabase/functions/.env
+# Edit .env — key from https://aistudio.google.com/apikey
+# GEMINI_API_KEY=...
+npx supabase stop && npx supabase start
+```
+
+If both `GEMINI_API_KEY` and `MOONSHOT_API_KEY` are set, Gemini is used.
+
+**Local OCR — Kimi / Moonshot (paid):**
+
+```bash
+# Key from https://platform.kimi.ai/api-keys (international Secret Key sk-...)
+# MOONSHOT_API_KEY=sk-...
+npx supabase stop && npx supabase start
+```
+
+If your key is from `platform.moonshot.cn`, set
+`MOONSHOT_API_BASE_URL=https://api.moonshot.cn/v1` in that same file.
+
+**Modal Kimi (OpenAI-compatible proxy):**
+
+```bash
+# 1. Create proxy token: modal token new  → wk-... and ws-...
+# 2. Get endpoint URL: modal endpoint list  (NOT https://modal.com)
+cp supabase/functions/.env.example supabase/functions/.env
+```
+
+In `supabase/functions/.env`:
+
+```bash
+MOONSHOT_API_BASE_URL=https://YOUR-ENDPOINT.modal.run/v1
+MOONSHOT_API_KEY=wk-YOUR-ID.ws-YOUR-SECRET
+MOONSHOT_MODEL=moonshotai/Kimi-K3
+npx supabase stop && npx supabase start
+```
+
+See [Modal endpoints](https://modal.com/docs/guide/endpoints) and [Kimi K3 on Modal](https://modal.com/library/moonshot/kimi-k3).
+
+**Hosted project:**
+
+```bash
+npx supabase secrets set GEMINI_API_KEY=...
+# or: npx supabase secrets set MOONSHOT_API_KEY=sk-...
 ```
 
 There is no live gold feed. Pledge valuation freezes from manual `gold_rates`

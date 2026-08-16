@@ -41,6 +41,15 @@ describe('scannerItemsReducer', () => {
     expect(seeded[0]?.metal).toBeNull();
   });
 
+  test('patch can attach a local item photo uri', () => {
+    const next = scannerItemsReducer([emptyScannerItem('item-1')], {
+      type: 'patch',
+      key: 'item-1',
+      patch: { localPhotoUri: 'file:///cache/item.jpg' },
+    });
+    expect(next[0]?.localPhotoUri).toBe('file:///cache/item.jpg');
+  });
+
   test('add appends another empty item without inventing purity', () => {
     const next = scannerItemsReducer([emptyScannerItem('item-1')], { type: 'add' });
     expect(next).toHaveLength(2);

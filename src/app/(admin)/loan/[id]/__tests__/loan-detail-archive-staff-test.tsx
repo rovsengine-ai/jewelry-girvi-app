@@ -25,13 +25,19 @@ jest.mock('@/services/loanService', () => ({
   fetchLoanBalances: jest.fn(),
   fetchLoanCurrentDueOn: jest.fn(),
   fetchLoanItems: jest.fn(),
+  fetchLoanItemPhotos: jest.fn(async () => []),
   fetchOverdueLoans: jest.fn(),
   logPayment: jest.fn(),
   resolveReceiptDisplayUrl: jest.fn(),
+  unredeemLoan: jest.fn(),
 }));
 
 jest.mock('@/services/printService', () => ({
   shareHtmlAsPdf: jest.fn(),
+}));
+
+jest.mock('@/services/kycService', () => ({
+  resolveCustomerPhotoUrl: jest.fn(async () => null),
 }));
 
 import { useAuth } from '@/providers/auth-provider';
@@ -190,11 +196,39 @@ describe('loan detail archive action', () => {
   test('renders Archive for role owner', async () => {
     useAuthMock.mockReturnValue(authValue('owner') as never);
 
-    const { getByTestId, getAllByText } = await renderDetail();
+    const { getByTestId, getAllByText, queryByTestId } = await renderDetail();
 
     await waitFor(() => {
       expect(getAllByText('G-1001').length).toBeGreaterThan(0);
     });
     getByTestId('open-archive');
+    expect(queryByTestId('open-unredeem')).toBeNull();
+  });
+
+  test('owner can mark a redeemed loan unpaid', async () => {
+    useAuthMock.mockReturnValue(authValue('owner') as never);
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'loans') {
+        return thenable({
+          data: {
+            ...sampleLoan(),
+            status: 'redeemed',
+            redeemed_on: '2026-01-31',
+            redeemed_by: 'user-1',
+            closure_balance_paise: 1030000,
+            released_to_name: 'Asha Patil',
+          },
+          error: null,
+        }) as never;
+      }
+      return thenable({ data: [], error: null }) as never;
+    });
+
+    const { getByTestId, getAllByText } = await renderDetail();
+
+    await waitFor(() => {
+      expect(getAllByText('G-1001').length).toBeGreaterThan(0);
+    });
+    getByTestId('open-unredeem');
   });
 });

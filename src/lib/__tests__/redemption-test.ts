@@ -6,6 +6,7 @@ import {
   defaultNewMaturityOn,
   isRenewalEligible,
   loanStatusLabel,
+  parseNoTermChangeError,
   parseOwnerOnlyError,
   redeemGate,
 } from '@/lib/redemption';
@@ -107,5 +108,12 @@ describe('parseOwnerOnlyError', () => {
   test('matches the RPC prefix and nothing else', () => {
     expect(parseOwnerOnlyError('owner_only: only the owner may redeem a loan')).toBe(true);
     expect(parseOwnerOnlyError('balance_remaining: loan still has 1 paise')).toBe(false);
+  });
+});
+
+describe('parseNoTermChangeError', () => {
+  test('matches the RPC prefix used when Save terms has no field diffs', () => {
+    expect(parseNoTermChangeError('no_term_change: nothing to update')).toBe(true);
+    expect(parseNoTermChangeError('term_change_reason is required')).toBe(false);
   });
 });

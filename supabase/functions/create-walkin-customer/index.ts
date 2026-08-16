@@ -90,6 +90,7 @@ Deno.serve(async (req: Request) => {
       phone_number?: string;
       full_name?: string;
       address?: string;
+      role?: string;
     };
 
     const phone = normalizePhoneE164(body.phone_number ?? '');
@@ -105,6 +106,9 @@ Deno.serve(async (req: Request) => {
 
     const fullName = body.full_name?.trim() || null;
     const address = body.address?.trim() || null;
+    const requestedRole = body.role?.trim();
+    const customerRole =
+      requestedRole === 'merchant' ? 'merchant' : 'retail_customer';
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -115,7 +119,7 @@ Deno.serve(async (req: Request) => {
     // into profiles, and phone_number is UNIQUE there.
     const { data: existing, error: existingError } = await admin
       .from('profiles')
-      .select('id')
+      .select('id, role')
       .eq('phone_number', phone)
       .maybeSingle();
 
@@ -124,6 +128,18 @@ Deno.serve(async (req: Request) => {
     }
 
     if (existing) {
+      const existingRole = existing.role;
+      const canRetype =
+        existingRole === 'retail_customer' || existingRole === 'merchant';
+      if (canRetype && existingRole !== customerRole) {
+        const { error: roleError } = await admin
+          .from('profiles')
+          .update({ role: customerRole })
+          .eq('id', existing.id);
+        if (roleError) {
+          return jsonResponse({ error: roleError.message }, 500);
+        }
+      }
       return jsonResponse({ customer_id: existing.id, created: false });
     }
 
@@ -131,7 +147,7 @@ Deno.serve(async (req: Request) => {
       phone,
       phone_confirm: true,
       user_metadata: {
-        role: 'retail_customer',
+        role: customerRole,
         full_name: fullName,
         created_by_shop_user: user.id,
       },

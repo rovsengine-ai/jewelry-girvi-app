@@ -101,3 +101,7 @@ export function defaultNewMaturityOn(renewedOn: string, simplePeriodDays: number
 export function parseOwnerOnlyError(message: string): boolean {
   return message.startsWith('owner_only:');
 }
+
+export function parseNoTermChangeError(message: string): boolean {
+  return message.startsWith('no_term_change:');
+}

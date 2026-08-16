@@ -1,10 +1,16 @@
 import * as FileSystem from 'expo-file-system/legacy';
 
+import {
+  edgeFunctionErrorMessage,
+  readEdgeFunctionErrorBody,
+  requireUserAccessToken,
+} from '@/lib/edge-invoke';
+import { kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
 import { isReminderKind, type LoanReminderSlot } from '@/lib/loan-reminders';
 import { asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { toE164India } from '@/lib/phone';
+import { prepareItemPhoto } from '@/lib/prepare-item-photo';
 import { convertScannerItem, type ScannerItemDraft } from '@/lib/scanner-items';
-import { kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
 import { supabase } from '@/lib/supabase';
 import { saveKycCapture, uploadCustomerPhoto, uploadKycImage } from '@/services/kycService';
 import type { Json } from '@/types/supabase';
@@ -17,6 +23,7 @@ import type {
   LoanBalances,
   LoanFormData,
   LoanItem,
+  LoanItemPhoto,
   LoanNotice,
   OverdueLoan,
   PartialPeriodMode,
@@ -25,7 +32,11 @@ import type {
   RenewLoanResult,
   ShopDefaults,
   UnarchiveLoanResult,
+  UnredeemLoanResult,
+  UserRole,
 } from '@/types/database';
+
+export type CounterCustomerRole = Extract<UserRole, 'retail_customer' | 'merchant'>;
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const CUSTOMER_UUID_RE =
@@ -158,21 +169,32 @@ export async function createWalkInCustomer(
   phoneNumber: string,
   fullName: string,
   address: string,
+  role: CounterCustomerRole = 'retail_customer',
 ): Promise<string> {
+  const customerRole: CounterCustomerRole = role === 'merchant' ? 'merchant' : 'retail_customer';
+  const accessToken = await requireUserAccessToken();
   const { data, error } = await supabase.functions.invoke<{
     customer_id?: string;
     created?: boolean;
     error?: string;
   }>('create-walkin-customer', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: {
       phone_number: toE164India(phoneNumber),
       full_name: fullName,
       address,
+      role: customerRole,
     },
   });
 
   if (error) {
-    throw new Error(error.message);
+    const payload = await readEdgeFunctionErrorBody(error);
+    throw new Error(
+      payload?.error?.trim() ||
+        edgeFunctionErrorMessage(error, 'Could not register the customer.'),
+    );
   }
   if (!data?.customer_id) {
     throw new Error(data?.error ?? 'Could not register the customer.');
@@ -269,7 +291,8 @@ export async function attachItemPhotos(input: {
       continue;
     }
     try {
-      const storagePath = await uploadImageToStorage(uri, 'items', input.customerId);
+      const prepared = await prepareItemPhoto(uri);
+      const storagePath = await uploadImageToStorage(prepared.uri, 'items', input.customerId);
       const { error: photoError } = await supabase.from('loan_item_photos').insert({
         loan_item_id: itemId,
         storage_path: storagePath,
@@ -322,12 +345,21 @@ export async function createLoanWithCustomer(
   receiptLocalUri: string | null,
   signatureDataUrl: string | null,
   kycDraft?: KycDraft | null,
+  customerRole: CounterCustomerRole = 'retail_customer',
 ): Promise<CreateLoanOutcome> {
+  const selectedRole: CounterCustomerRole =
+    customerRole === 'merchant' ? 'merchant' : 'retail_customer';
+
   // A walk-in customer no longer has to sign up before staff can write the
   // loan: if the number is unknown, register it at the counter and carry on.
   const customerId =
     (await findCustomerIdByPhone(form.phone_number)) ??
-    (await createWalkInCustomer(form.phone_number, form.customer_name, form.address));
+    (await createWalkInCustomer(
+      form.phone_number,
+      form.customer_name,
+      form.address,
+      selectedRole,
+    ));
 
   const receiptPath = receiptLocalUri
     ? await uploadImageToStorage(receiptLocalUri, 'receipts', customerId)
@@ -339,18 +371,7 @@ export async function createLoanWithCustomer(
   const principalPaise = rupeesInputToPaise(form.loan_amount_rupees);
   const defaults = await loadShopDefaults();
 
-  const { data: customerProfile, error: profileReadError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', customerId)
-    .single();
-
-  if (profileReadError) {
-    throw new Error(profileReadError.message);
-  }
-
-  const interestModel: InterestModel =
-    customerProfile.role === 'merchant' ? 'merchant' : 'retail';
+  const interestModel: InterestModel = selectedRole === 'merchant' ? 'merchant' : 'retail';
 
   const rateBps = form.interest_percent_monthly.trim()
     ? percentInputToBps(form.interest_percent_monthly)
@@ -364,6 +385,7 @@ export async function createLoanWithCustomer(
       full_name: form.customer_name.trim() || null,
       address: form.address.trim() || null,
       phone_number: toE164India(form.phone_number),
+      role: selectedRole,
     })
     .eq('id', customerId);
 
@@ -482,6 +504,25 @@ export async function fetchLoanItems(loanId: string): Promise<LoanItem[]> {
   }
 
   return (data ?? []) as LoanItem[];
+}
+
+/** Item stills in the private receipts bucket; signed URLs are created at display time. */
+export async function fetchLoanItemPhotos(itemIds: string[]): Promise<LoanItemPhoto[]> {
+  if (itemIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('loan_item_photos')
+    .select('*')
+    .in('loan_item_id', itemIds)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as LoanItemPhoto[];
 }
 
 export async function fetchLatestMaturityOn(loanId: string): Promise<string | null> {
@@ -630,6 +671,35 @@ export async function unarchiveLoan(loanId: string): Promise<UnarchiveLoanResult
   return {
     loan_id: row.loan_id,
     unarchived: row.unarchived,
+  };
+}
+
+/**
+ * Owner-only. Turns a redeemed loan back to active and reverses the
+ * closing payment so the owner can edit terms or collect again.
+ */
+export async function unredeemLoan(input: {
+  loanId: string;
+  reason: string;
+}): Promise<UnredeemLoanResult> {
+  const { data, error } = await supabase.rpc('unredeem_loan', {
+    p_loan_id: input.loanId,
+    p_reason: input.reason,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('unredeem_loan returned no row');
+  }
+
+  return {
+    loan_id: row.loan_id,
+    status: row.status,
+    reversed_payment_id: row.reversed_payment_id ?? null,
   };
 }
 

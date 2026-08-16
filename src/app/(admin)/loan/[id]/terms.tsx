@@ -21,7 +21,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import type { TranslateFn } from '@/i18n';
 import { formatBpsAsPercent, percentInputToBps } from '@/lib/money';
-import { parseOwnerOnlyError } from '@/lib/redemption';
+import { parseNoTermChangeError, parseOwnerOnlyError } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
@@ -47,6 +47,15 @@ function parseWholeNumber(raw: string, field: string, t: TranslateFn): number {
   return Number.parseInt(trimmed, 10);
 }
 
+function simplePeriodDeadlineParts(raw: string, fallbackDays: number): {
+  days: number;
+  months: number;
+} {
+  const parsed = Number.parseInt(raw.trim(), 10);
+  const days = Number.isFinite(parsed) ? parsed : fallbackDays;
+  return { days, months: Math.round(days / 30) };
+}
+
 export default function EditLoanTermsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -70,7 +79,6 @@ export default function EditLoanTermsScreen() {
   const [formNotice, setFormNotice] = useState<string | null>(null);
 
   const isOwner = profile?.role === 'owner';
-  const reasonReady = reason.trim() !== '';
   const headerTitle = loan
     ? t('loans.terms.editTitle', { serial: loan.serial_number })
     : t('loans.detail.editTerms');
@@ -83,6 +91,7 @@ export default function EditLoanTermsScreen() {
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
     void (async () => {
       setIsLoading(true);
       setLoadError(null);
@@ -100,6 +109,7 @@ export default function EditLoanTermsScreen() {
         if (error) {
           throw new Error(error.message);
         }
+        if (cancelled) return;
         const nextLoan = data as LoanWithCustomer | null;
         setLoan(nextLoan);
         if (!nextLoan) return;
@@ -111,15 +121,26 @@ export default function EditLoanTermsScreen() {
         setPartialPeriodMode(nextLoan.partial_period_mode);
         setInterestModel(nextLoan.interest_model);
       } catch (error) {
+        if (cancelled) return;
         setLoadError(error instanceof Error ? error.message : t('errors.failedLoadLoan'));
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [id, t]);
 
   const handleSave = async () => {
-    if (!id || !reasonReady) return;
+    if (!id) return;
+    const trimmedReason = reason.trim();
+    if (trimmedReason === '') {
+      setFormError(t('loans.terms.reasonRequired'));
+      return;
+    }
     setFormError(null);
     setFormNotice(null);
     setIsSaving(true);
@@ -137,13 +158,15 @@ export default function EditLoanTermsScreen() {
           t('loans.terms.roundUpThreshold'),
           t,
         ),
-        reason: reason.trim(),
+        reason: trimmedReason,
       });
       setFormNotice(t('loans.terms.saved', { count: result.change_count }));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('errors.unknown');
       if (parseOwnerOnlyError(message)) {
         setFormError(t('loans.terms.ownerOnly'));
+      } else if (parseNoTermChangeError(message)) {
+        setFormError(t('loans.terms.noChange'));
       } else {
         setFormError(message);
       }
@@ -197,9 +220,11 @@ export default function EditLoanTermsScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScreenHeader showBack title={headerTitle} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
-        <FormNotice error={formError} notice={formNotice} />
         <ThemedText type="small">{t('loans.terms.auditHint')}</ThemedText>
 
         <Card>
@@ -226,6 +251,12 @@ export default function EditLoanTermsScreen() {
             onChangeText={setSimplePeriodDays}
             keyboardType="number-pad"
           />
+          <ThemedText type="small">
+            {t('loans.terms.simplePeriodDeadline', simplePeriodDeadlineParts(
+              simplePeriodDays,
+              loan.simple_period_days,
+            ))}
+          </ThemedText>
           <Field
             label={t('loans.terms.compoundEvery')}
             value={compoundEveryDays}
@@ -259,14 +290,16 @@ export default function EditLoanTermsScreen() {
             label={t('loans.terms.reason')}
             value={reason}
             onChangeText={setReason}
+            placeholder={t('loans.terms.reasonHint')}
             testID="term-reason"
           />
+          <ThemedText type="small">{t('loans.terms.reasonHint')}</ThemedText>
         </Card>
 
+        <FormNotice error={formError} notice={formNotice} />
         <Button
           testID="save-loan-terms"
           label={t('loans.terms.save')}
-          disabled={!reasonReady}
           loading={isSaving}
           onPress={() => void handleSave()}
         />

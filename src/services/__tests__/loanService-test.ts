@@ -15,11 +15,16 @@ import {
   renewLoan,
   resolveReceiptDisplayUrl,
   unarchiveLoan,
+  unredeemLoan,
   updateShopDefaults,
   uploadImageToStorage,
 } from '@/services/loanService';
 import type { ScannerItemDraft } from '@/lib/scanner-items';
 import type { LoanFormData, ShopDefaults } from '@/types/database';
+
+jest.mock('@/lib/prepare-item-photo', () => ({
+  prepareItemPhoto: jest.fn(async (uri: string) => ({ uri, mimeType: 'image/jpeg' as const })),
+}));
 
 jest.mock('@/lib/supabase', () => {
   const createSignedUrl = jest.fn();
@@ -27,13 +32,16 @@ jest.mock('@/lib/supabase', () => {
   const storageFrom = jest.fn(() => ({ createSignedUrl, upload }));
   const invoke = jest.fn();
   const rpc = jest.fn();
+  const getSession = jest.fn();
+  const refreshSession = jest.fn();
   return {
-    __storageMocks: { createSignedUrl, upload, storageFrom, invoke, rpc },
+    __storageMocks: { createSignedUrl, upload, storageFrom, invoke, rpc, getSession, refreshSession },
     supabase: {
       storage: { from: storageFrom },
       functions: { invoke },
       from: jest.fn(),
       rpc,
+      auth: { getSession, refreshSession },
     },
   };
 });
@@ -55,7 +63,7 @@ const saveKycCaptureMock = jest.requireMock('@/services/kycService').saveKycCapt
 const uploadKycImageMock = jest.requireMock('@/services/kycService').uploadKycImage as jest.Mock;
 const uploadCustomerPhotoMock = jest.requireMock('@/services/kycService').uploadCustomerPhoto as jest.Mock;
 
-const { createSignedUrl, upload, storageFrom, invoke, rpc } = (
+const { createSignedUrl, upload, storageFrom, invoke, rpc, getSession, refreshSession } = (
   jest.requireMock('@/lib/supabase') as {
     __storageMocks: {
       createSignedUrl: jest.Mock;
@@ -63,6 +71,8 @@ const { createSignedUrl, upload, storageFrom, invoke, rpc } = (
       storageFrom: jest.Mock;
       invoke: jest.Mock;
       rpc: jest.Mock;
+      getSession: jest.Mock;
+      refreshSession: jest.Mock;
     };
   }
 ).__storageMocks;
@@ -74,6 +84,16 @@ beforeEach(() => {
   jest.clearAllMocks();
   createSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://signed.example/x' }, error: null });
   upload.mockResolvedValue({ error: null });
+  getSession.mockResolvedValue({
+    data: {
+      session: {
+        access_token: 'user-jwt',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      },
+    },
+    error: null,
+  });
+  refreshSession.mockResolvedValue({ data: { session: null }, error: null });
 });
 
 describe('resolveReceiptDisplayUrl', () => {
@@ -260,7 +280,28 @@ describe('createWalkInCustomer', () => {
 
     await expect(createWalkInCustomer('98765 43210', 'Asha Patil', 'Pune')).resolves.toBe(CUSTOMER);
     expect(invoke).toHaveBeenCalledWith('create-walkin-customer', {
-      body: { phone_number: '+919876543210', full_name: 'Asha Patil', address: 'Pune' },
+      headers: { Authorization: 'Bearer user-jwt' },
+      body: {
+        phone_number: '+919876543210',
+        full_name: 'Asha Patil',
+        address: 'Pune',
+        role: 'retail_customer',
+      },
+    });
+  });
+
+  test('sends merchant role when registering a merchant walk-in', async () => {
+    invoke.mockResolvedValue({ data: { customer_id: CUSTOMER, created: true }, error: null });
+
+    await createWalkInCustomer('98765 43210', 'Trade Co', 'Pune', 'merchant');
+    expect(invoke).toHaveBeenCalledWith('create-walkin-customer', {
+      headers: { Authorization: 'Bearer user-jwt' },
+      body: {
+        phone_number: '+919876543210',
+        full_name: 'Trade Co',
+        address: 'Pune',
+        role: 'merchant',
+      },
     });
   });
 
@@ -282,6 +323,16 @@ describe('createWalkInCustomer', () => {
     invoke.mockResolvedValue({ data: null, error: { message: 'Failed to send a request' } });
     await expect(createWalkInCustomer('9876543210', 'Asha', '')).rejects.toThrow(
       'Failed to send a request',
+    );
+  });
+
+  test('replaces opaque non-2xx invoke errors with a register failure', async () => {
+    invoke.mockResolvedValue({
+      data: null,
+      error: { message: 'Edge Function returned a non-2xx status code' },
+    });
+    await expect(createWalkInCustomer('9876543210', 'Asha', '')).rejects.toThrow(
+      'Could not register the customer.',
     );
   });
 
@@ -424,6 +475,18 @@ describe('createLoanWithCustomer', () => {
         },
       ],
     });
+  });
+
+  test('uses merchant interest model and default rate when counter type is merchant', async () => {
+    await createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null, null, 'merchant');
+
+    expect(rpc).toHaveBeenCalledWith(
+      'create_loan',
+      expect.objectContaining({
+        p_interest_model: 'merchant',
+        p_rate_bps: 150,
+      }),
+    );
   });
 
   test('rejects a missing metal before calling create_loan', async () => {
@@ -756,6 +819,26 @@ describe('unarchiveLoan', () => {
       unarchived: true,
     });
     expect(rpc).toHaveBeenCalledWith('unarchive_loan', { p_loan_id: 'loan-1' });
+  });
+});
+
+describe('unredeemLoan', () => {
+  test('calls the RPC with a reason', async () => {
+    rpc.mockResolvedValue({
+      data: [{ loan_id: 'loan-1', status: 'active', reversed_payment_id: 'pay-1' }],
+      error: null,
+    });
+    await expect(
+      unredeemLoan({ loanId: 'loan-1', reason: 'Wrong ticket' }),
+    ).resolves.toEqual({
+      loan_id: 'loan-1',
+      status: 'active',
+      reversed_payment_id: 'pay-1',
+    });
+    expect(rpc).toHaveBeenCalledWith('unredeem_loan', {
+      p_loan_id: 'loan-1',
+      p_reason: 'Wrong ticket',
+    });
   });
 });
 

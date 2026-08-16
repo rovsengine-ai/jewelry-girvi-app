@@ -2,10 +2,31 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const MOONSHOT_API_URL = 'https://api.moonshot.ai/v1/chat/completions';
+const DEFAULT_MOONSHOT_API_BASE = 'https://api.moonshot.ai/v1';
+/** Free-tier multimodal model — see https://ai.google.dev/gemini-api/docs/models */
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
 /** Vision + reasoning; see https://platform.moonshot.ai/docs/guide/use-kimi-vision-model */
-const KIMI_VISION_MODEL = 'kimi-k3';
+const DEFAULT_KIMI_VISION_MODEL = 'kimi-k3';
 const UPSTREAM_DETAIL_MAX = 200;
+
+function moonshotChatCompletionsUrl(): string {
+  const base = Deno.env.get('MOONSHOT_API_BASE_URL')?.trim().replace(/\/+$/, '') ||
+    DEFAULT_MOONSHOT_API_BASE;
+  return `${base}/chat/completions`;
+}
+
+function kimiVisionModel(): string {
+  return Deno.env.get('MOONSHOT_MODEL')?.trim() || DEFAULT_KIMI_VISION_MODEL;
+}
+
+function geminiModel(): string {
+  return Deno.env.get('GEMINI_MODEL')?.trim() || DEFAULT_GEMINI_MODEL;
+}
+
+function geminiGenerateContentUrl(model: string): string {
+  const encoded = encodeURIComponent(model);
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encoded}:generateContent`;
+}
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -71,6 +92,33 @@ const RECEIPT_JSON_SCHEMA = {
   },
 } as const;
 
+/** Gemini generateContent responseSchema (OpenAPI subset). */
+const GEMINI_RECEIPT_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    serial_number: { type: 'STRING' },
+    date: { type: 'STRING' },
+    customer_name: { type: 'STRING' },
+    phone_number: { type: 'STRING' },
+    address: { type: 'STRING' },
+    item_name: { type: 'STRING' },
+    weight_grams: { type: 'NUMBER' },
+    loan_amount: { type: 'NUMBER' },
+    interest_rate: { type: 'NUMBER' },
+  },
+  required: [
+    'serial_number',
+    'date',
+    'customer_name',
+    'phone_number',
+    'address',
+    'item_name',
+    'weight_grams',
+    'loan_amount',
+    'interest_rate',
+  ],
+} as const;
+
 type OcrFields = {
   serial_number: string;
   date: string;
@@ -92,6 +140,8 @@ type EdgeErrorBody = {
   upstream_detail?: string;
 };
 
+type OcrProvider = 'gemini' | 'moonshot';
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -105,7 +155,46 @@ function truncateDetail(raw: string): string {
   return `${trimmed.slice(0, UPSTREAM_DETAIL_MAX)}…`;
 }
 
+function resolveOcrProvider(): { provider: OcrProvider; apiKey: string } | null {
+  const geminiKey = Deno.env.get('GEMINI_API_KEY')?.trim();
+  if (geminiKey) return { provider: 'gemini', apiKey: geminiKey };
+
+  const moonshotKey = Deno.env.get('MOONSHOT_API_KEY')?.trim();
+  if (moonshotKey) return { provider: 'moonshot', apiKey: moonshotKey };
+
+  return null;
+}
+
+function isProviderAuthFailure(upstreamStatus: number, upstreamBody: string): boolean {
+  const lower = upstreamBody.toLowerCase();
+  if (
+    lower.includes('api_key_invalid') ||
+    lower.includes('api key not valid') ||
+    lower.includes('incorrect_api_key') ||
+    lower.includes('invalid_authentication') ||
+    lower.includes('invalid authentication') ||
+    (lower.includes('permission_denied') && lower.includes('api key'))
+  ) {
+    return true;
+  }
+  return upstreamStatus === 401;
+}
+
+function misconfiguredResponse(upstreamBody?: string): Response {
+  const body: EdgeErrorBody = {
+    error:
+      'OCR key is missing or invalid. Prefer GEMINI_API_KEY from https://aistudio.google.com/apikey (free tier). Or use MOONSHOT_API_KEY from platform.kimi.ai with billing.',
+    code: 'misconfigured',
+    upstream_status: 401,
+    upstream_detail: upstreamBody ? truncateDetail(upstreamBody) : undefined,
+  };
+  return jsonResponse(body, 500);
+}
+
 function providerRejectedResponse(upstreamStatus: number, upstreamBody: string): Response {
+  if (isProviderAuthFailure(upstreamStatus, upstreamBody)) {
+    return misconfiguredResponse(upstreamBody);
+  }
   const detail = truncateDetail(upstreamBody);
   const body: EdgeErrorBody = {
     error: 'OCR provider rejected the request',
@@ -215,14 +304,14 @@ async function callMoonshot(
   dataUrl: string,
   responseFormat: { type: 'json_schema'; json_schema: typeof RECEIPT_JSON_SCHEMA } | { type: 'json_object' },
 ): Promise<Response> {
-  return fetch(MOONSHOT_API_URL, {
+  return fetch(moonshotChatCompletionsUrl(), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: KIMI_VISION_MODEL,
+      model: kimiVisionModel(),
       reasoning_effort: 'low',
       max_completion_tokens: 2048,
       messages: [
@@ -237,6 +326,123 @@ async function callMoonshot(
       response_format: responseFormat,
     }),
   });
+}
+
+async function callGemini(
+  apiKey: string,
+  imageBase64: string,
+  mimeType: string,
+): Promise<Response> {
+  return fetch(geminiGenerateContentUrl(geminiModel()), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: EXTRACTION_PROMPT },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: GEMINI_RECEIPT_SCHEMA,
+        temperature: 0.1,
+      },
+    }),
+  });
+}
+
+function extractGeminiText(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const candidates = (payload as { candidates?: unknown }).candidates;
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+  const first = candidates[0];
+  if (!first || typeof first !== 'object') return null;
+  const content = (first as { content?: unknown }).content;
+  if (!content || typeof content !== 'object') return null;
+  const parts = (content as { parts?: unknown }).parts;
+  if (!Array.isArray(parts)) return null;
+  const texts: string[] = [];
+  for (const part of parts) {
+    if (part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string') {
+      texts.push((part as { text: string }).text);
+    }
+  }
+  const joined = texts.join('').trim();
+  return joined.length > 0 ? joined : null;
+}
+
+async function runMoonshotOcr(apiKey: string, dataUrl: string): Promise<Response> {
+  let moonshotResponse = await callMoonshot(apiKey, dataUrl, {
+    type: 'json_schema',
+    json_schema: RECEIPT_JSON_SCHEMA,
+  });
+
+  if (!moonshotResponse.ok) {
+    const errorBody = await moonshotResponse.text();
+    if (shouldRetryWithJsonObject(moonshotResponse.status, errorBody)) {
+      moonshotResponse = await callMoonshot(apiKey, dataUrl, { type: 'json_object' });
+      if (!moonshotResponse.ok) {
+        const retryBody = await moonshotResponse.text();
+        return providerRejectedResponse(moonshotResponse.status, retryBody);
+      }
+    } else {
+      return providerRejectedResponse(moonshotResponse.status, errorBody);
+    }
+  }
+
+  const payload = (await moonshotResponse.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = payload.choices?.[0]?.message?.content;
+  if (!content) {
+    return jsonResponse({ error: 'Kimi Vision returned an empty response', code: 'upstream' }, 502);
+  }
+
+  return jsonResponse(parseJsonFromContent(content));
+}
+
+async function runGeminiOcr(
+  apiKey: string,
+  imageBase64: string,
+  mimeType: string,
+): Promise<Response> {
+  const geminiResponse = await callGemini(apiKey, imageBase64, mimeType);
+  if (!geminiResponse.ok) {
+    const errorBody = await geminiResponse.text();
+    return providerRejectedResponse(geminiResponse.status, errorBody);
+  }
+
+  const payload: unknown = await geminiResponse.json();
+  const content = extractGeminiText(payload);
+  if (!content) {
+    const blockReason =
+      payload &&
+      typeof payload === 'object' &&
+      (payload as { promptFeedback?: { blockReason?: string } }).promptFeedback?.blockReason;
+    return jsonResponse(
+      {
+        error: blockReason
+          ? `Gemini blocked the image (${blockReason})`
+          : 'Gemini returned an empty response',
+        code: 'upstream',
+      },
+      502,
+    );
+  }
+
+  return jsonResponse(parseJsonFromContent(content));
 }
 
 Deno.serve(async (req: Request) => {
@@ -282,10 +488,14 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Forbidden: shop users only' }, 403);
     }
 
-    const apiKey = Deno.env.get('MOONSHOT_API_KEY');
-    if (!apiKey) {
+    const resolved = resolveOcrProvider();
+    if (!resolved) {
       return jsonResponse(
-        { error: 'MOONSHOT_API_KEY is not configured', code: 'misconfigured' },
+        {
+          error:
+            'No OCR key configured. Set GEMINI_API_KEY (recommended free) or MOONSHOT_API_KEY in supabase/functions/.env',
+          code: 'misconfigured',
+        },
         500,
       );
     }
@@ -301,35 +511,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const mimeType = body.mime_type?.trim() || 'image/jpeg';
+
+    if (resolved.provider === 'gemini') {
+      return await runGeminiOcr(resolved.apiKey, imageBase64, mimeType);
+    }
+
     const dataUrl = `data:${mimeType};base64,${imageBase64}`;
-
-    let moonshotResponse = await callMoonshot(apiKey, dataUrl, {
-      type: 'json_schema',
-      json_schema: RECEIPT_JSON_SCHEMA,
-    });
-
-    if (!moonshotResponse.ok) {
-      const errorBody = await moonshotResponse.text();
-      if (shouldRetryWithJsonObject(moonshotResponse.status, errorBody)) {
-        moonshotResponse = await callMoonshot(apiKey, dataUrl, { type: 'json_object' });
-        if (!moonshotResponse.ok) {
-          const retryBody = await moonshotResponse.text();
-          return providerRejectedResponse(moonshotResponse.status, retryBody);
-        }
-      } else {
-        return providerRejectedResponse(moonshotResponse.status, errorBody);
-      }
-    }
-
-    const payload = (await moonshotResponse.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = payload.choices?.[0]?.message?.content;
-    if (!content) {
-      return jsonResponse({ error: 'Kimi Vision returned an empty response', code: 'upstream' }, 502);
-    }
-
-    return jsonResponse(parseJsonFromContent(content));
+    return await runMoonshotOcr(resolved.apiKey, dataUrl);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return jsonResponse({ error: message, code: 'upstream' }, 500);

@@ -19,6 +19,7 @@ export class PermissionDeniedError extends Error {
 
 export async function pickStillImage(
   source: 'camera' | 'library',
+  options?: { quality?: number },
 ): Promise<string | null> {
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -27,7 +28,7 @@ export async function pickStillImage(
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      quality: 0.85,
+      quality: options?.quality ?? 0.85,
     });
     if (result.canceled) {
       return null;
@@ -41,7 +42,7 @@ export async function pickStillImage(
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    quality: 0.85,
+    quality: options?.quality ?? 0.85,
   });
   if (result.canceled) {
     return null;

@@ -162,6 +162,12 @@ export interface UnarchiveLoanResult {
   unarchived: boolean;
 }
 
+export interface UnredeemLoanResult {
+  loan_id: string;
+  status: LoanStatus;
+  reversed_payment_id: string | null;
+}
+
 export interface ArchivedLoan {
   id: string;
   serial_number: string;

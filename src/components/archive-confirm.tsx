@@ -5,7 +5,7 @@
  */
 import { StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/button';
+import { Button, type ButtonVariant } from '@/components/button';
 import { Card } from '@/components/card';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
@@ -22,6 +22,15 @@ export function ArchiveConfirm({
   onConfirm,
   loading = false,
   error,
+  title,
+  body,
+  confirmLabel,
+  confirmVariant = 'danger',
+  reasonLabel,
+  reasonPlaceholder,
+  testID = 'archive-confirm',
+  confirmTestID = 'archive-confirm-button',
+  reasonTestID = 'archive-reason',
 }: {
   serial: string;
   reason: string;
@@ -30,29 +39,38 @@ export function ArchiveConfirm({
   onConfirm: () => void;
   loading?: boolean;
   error?: string | null;
+  title?: string;
+  body?: string;
+  confirmLabel?: string;
+  confirmVariant?: ButtonVariant;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  testID?: string;
+  confirmTestID?: string;
+  reasonTestID?: string;
 }) {
   const colors = useTheme();
   const { t } = useLanguage();
   const reasonReady = reason.trim() !== '';
 
   return (
-    <View testID="archive-confirm" style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+    <View testID={testID} style={[styles.overlay, { backgroundColor: colors.overlay }]}>
       <Card>
-        <ThemedText type="smallBold">{t('archive.confirmTitle', { serial })}</ThemedText>
-        <ThemedText type="small">{t('archive.confirmBody')}</ThemedText>
+        <ThemedText type="smallBold">{title ?? t('archive.confirmTitle', { serial })}</ThemedText>
+        <ThemedText type="small">{body ?? t('archive.confirmBody')}</ThemedText>
         <FormNotice error={error} />
         <Field
-          label={t('archive.reasonLabel')}
+          label={reasonLabel ?? t('archive.reasonLabel')}
           value={reason}
           onChangeText={onChangeReason}
-          placeholder={t('archive.reasonPlaceholder')}
-          testID="archive-reason"
+          placeholder={reasonPlaceholder ?? t('archive.reasonPlaceholder')}
+          testID={reasonTestID}
         />
         <Button label={t('common.cancel')} variant="secondary" onPress={onCancel} />
         <Button
-          testID="archive-confirm-button"
-          label={t('archive.archive')}
-          variant="danger"
+          testID={confirmTestID}
+          label={confirmLabel ?? t('archive.archive')}
+          variant={confirmVariant}
           disabled={!reasonReady}
           loading={loading}
           onPress={onConfirm}

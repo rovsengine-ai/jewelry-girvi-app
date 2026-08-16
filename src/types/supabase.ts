@@ -481,6 +481,46 @@ export interface Database {
           },
         ];
       };
+      loan_unredeem_events: {
+        Row: {
+          id: string;
+          loan_id: string;
+          acted_by: string;
+          reason: string;
+          previous_redeemed_on: string;
+          previous_closure_balance_paise: number;
+          reversed_payment_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          loan_id: string;
+          acted_by: string;
+          reason: string;
+          previous_redeemed_on: string;
+          previous_closure_balance_paise: number;
+          reversed_payment_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          loan_id?: string;
+          acted_by?: string;
+          reason?: string;
+          previous_redeemed_on?: string;
+          previous_closure_balance_paise?: number;
+          reversed_payment_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'loan_unredeem_events_loan_id_fkey';
+            columns: ['loan_id'];
+            isOneToOne: false;
+            referencedRelation: 'loans';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       gold_rates: {
         Row: {
           id: string;
@@ -742,6 +782,17 @@ export interface Database {
         Returns: {
           loan_id: string;
           unarchived: boolean;
+        }[];
+      };
+      unredeem_loan: {
+        Args: {
+          p_loan_id: string;
+          p_reason: string;
+        };
+        Returns: {
+          loan_id: string;
+          status: LoanStatus;
+          reversed_payment_id: string | null;
         }[];
       };
     };
