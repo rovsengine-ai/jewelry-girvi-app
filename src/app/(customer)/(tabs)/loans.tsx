@@ -1,6 +1,6 @@
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
 
 import { Badge } from '@/components/badge';
@@ -11,9 +11,10 @@ import { ListSkeleton } from '@/components/list-row-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radii, Spacing } from '@/constants/theme';
+import { Radii, Sizes, Spacing } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
+import { customerLoanStatusLabel } from '@/lib/redemption';
 import { rowEntering } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -27,7 +28,7 @@ type CustomerLoanView = Pick<Loan, 'id' | 'serial_number' | 'receipt_image_url' 
 
 export default function CustomerLoansScreen() {
   const { session } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const tabBarPadding = useTabBarScrollPadding();
   const reduceMotion = useReduceMotion();
 
@@ -86,7 +87,7 @@ export default function CustomerLoansScreen() {
   }, [loadLoans, t]);
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.container} type="surfaceSunken">
       <ScreenHeader title={t('loans.customer.title')} />
       <View style={styles.body}>
         <ThemedText type="small" themeColor="textSecondary">
@@ -126,8 +127,19 @@ export default function CustomerLoansScreen() {
                     </View>
                   )}
                   <View style={styles.badgeWrap}>
-                    <Badge status={item.status} />
+                    <Badge
+                      status={item.status}
+                      label={customerLoanStatusLabel(item.status, language)}
+                    />
                   </View>
+                  {item.status === 'redeemed' ? (
+                    <View style={styles.collectBanner} testID={`customer-loan-collect-${item.serial_number}`}>
+                      <ThemedText type="smallBold">{t('loans.customer.collectItemsTitle')}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {t('loans.customer.collectItemsBody')}
+                      </ThemedText>
+                    </View>
+                  ) : null}
                 </Card>
               </Animated.View>
             )}
@@ -144,9 +156,9 @@ const styles = StyleSheet.create({
   loader: { marginTop: Spacing.five },
   listContent: { gap: Spacing.three, paddingBottom: Spacing.five },
   card: { overflow: 'hidden', padding: 0 },
-  receiptImage: { width: '100%', height: 220, borderRadius: Radii.md },
+  receiptImage: { width: '100%', height: Sizes.receiptImageHeight, borderRadius: Radii.md },
   receiptPlaceholder: {
-    height: 160,
+    minHeight: Sizes.receiptPlaceholderHeight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -154,5 +166,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.two,
     right: Spacing.two,
+  },
+  collectBanner: {
+    gap: Spacing.one,
+    padding: Spacing.three,
+    paddingTop: Spacing.two,
   },
 });

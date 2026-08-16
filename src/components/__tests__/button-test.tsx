@@ -15,10 +15,21 @@ describe('<Button />', () => {
   });
 
   test('primary uses the primary token', async () => {
-    const { getByRole } = await render(<Button label="Save loan" />);
+    const { getByRole, getByTestId } = await render(
+      <Button testID="save-loan" label="Save loan" />,
+    );
     expect(flatStyle(getByRole('button'))).toMatchObject({
-      backgroundColor: Colors.light.primary,
       minHeight: 44,
+    });
+    expect(flatStyle(getByTestId('save-loan-surface'))).toMatchObject({
+      backgroundColor: Colors.light.primary,
+    });
+  });
+
+  test('primary label uses onPrimary for contrast', async () => {
+    const { getByText } = await render(<Button label="Save loan" />);
+    expect(flatStyle(getByText('Save loan'))).toMatchObject({
+      color: Colors.light.onPrimary,
     });
   });
 
@@ -44,8 +55,10 @@ describe('<Button />', () => {
   });
 
   test('danger variant uses the danger token', async () => {
-    const { getByRole } = await render(<Button label="Redeem" variant="danger" />);
-    expect(flatStyle(getByRole('button'))).toMatchObject({
+    const { getByTestId } = await render(
+      <Button testID="redeem" label="Redeem" variant="danger" />,
+    );
+    expect(flatStyle(getByTestId('redeem-surface'))).toMatchObject({
       backgroundColor: Colors.light.danger,
     });
   });

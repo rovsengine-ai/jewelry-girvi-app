@@ -15,6 +15,13 @@ const ExpoSecureStoreAdapter = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
+/** Used when Platform is web but localStorage is missing (Expo Router SSR / Node). */
+const memoryStorageAdapter = {
+  getItem: (_key: string) => Promise.resolve(null as string | null),
+  setItem: (_key: string, _value: string) => Promise.resolve(),
+  removeItem: (_key: string) => Promise.resolve(),
+};
+
 const webStorageAdapter =
   typeof localStorage !== 'undefined'
     ? {
@@ -28,7 +35,7 @@ const webStorageAdapter =
           return Promise.resolve();
         },
       }
-    : ExpoSecureStoreAdapter;
+    : memoryStorageAdapter;
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {

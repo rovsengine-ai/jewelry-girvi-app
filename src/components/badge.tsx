@@ -1,7 +1,7 @@
 import { View, type ViewProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Radii, Spacing, type Palette } from '@/constants/theme';
+import { Radii, Spacing, type Palette } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { loanStatusLabel } from '@/lib/redemption';
 import { useLanguage } from '@/providers/language-provider';
@@ -43,14 +43,16 @@ export function statusOnToken(status: LoanStatus, colors: Palette): string {
 
 export function Badge({
   status,
+  label,
   style,
   showDot = true,
   ...rest
-}: ViewProps & { status: LoanStatus; showDot?: boolean }) {
+}: ViewProps & { status: LoanStatus; label?: string; showDot?: boolean }) {
   const colors = useTheme();
   const { language } = useLanguage();
   const backgroundColor = statusToken(status, colors);
   const foreground = statusOnToken(status, colors);
+  const text = label ?? loanStatusLabel(status, language);
 
   return (
     <View
@@ -62,8 +64,7 @@ export function Badge({
           backgroundColor,
           borderRadius: Radii.pill,
           paddingHorizontal: Spacing.two + Spacing.one,
-          paddingVertical: Spacing.one,
-          minHeight: MinTouchTarget,
+          paddingVertical: Spacing.one + Spacing.half,
           justifyContent: 'center',
           gap: Spacing.one,
         },
@@ -83,7 +84,7 @@ export function Badge({
         />
       ) : null}
       <ThemedText type="caption" style={{ color: foreground }}>
-        {loanStatusLabel(status, language)}
+        {text}
       </ThemedText>
     </View>
   );

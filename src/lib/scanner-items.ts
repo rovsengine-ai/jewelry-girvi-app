@@ -25,7 +25,13 @@ export interface ScannerItemDraft {
 }
 
 export type ScannerItemsAction =
-  | { type: 'seedFromOcr'; ornamentType: string; grossGrams: string }
+  | {
+      type: 'seedFromOcr';
+      ornamentType: string;
+      grossGrams: string;
+      metal?: PledgeMetal | null;
+    }
+  | { type: 'reset' }
   | { type: 'add' }
   | { type: 'remove'; key: string }
   | { type: 'patch'; key: string; patch: Partial<Omit<ScannerItemDraft, 'key'>> };
@@ -91,10 +97,13 @@ export function scannerItemsReducer(
         applyPatch(first, {
           ornament_type: action.ornamentType,
           gross_grams: action.grossGrams,
+          ...(action.metal ? { metal: action.metal } : {}),
         }),
         ...state.slice(1),
       ];
     }
+    case 'reset':
+      return [emptyScannerItem('item-1')];
     case 'add':
       return [...state, emptyScannerItem(`item-${state.length + 1}`)];
     case 'remove':

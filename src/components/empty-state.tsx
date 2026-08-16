@@ -1,5 +1,5 @@
-import { View, type ViewProps } from 'react-native';
 import type { AndroidSymbol } from 'expo-symbols';
+import { View, type ViewProps } from 'react-native';
 import type { SFSymbol } from 'sf-symbols-typescript';
 
 import { AppIcon } from '@/components/app-icon';
@@ -40,9 +40,7 @@ export function EmptyState({
         size={Spacing.five}
         accessibilityLabel={t('a11y.empty')}
       />
-      <ThemedText type="subtitle" style={{ ...TypeScale.title, textAlign: 'center' }}>
-        {title}
-      </ThemedText>
+      <ThemedText style={{ ...TypeScale.display, textAlign: 'center' }}>{title}</ThemedText>
       <ThemedText type="small" themeColor="textSecondary" style={{ textAlign: 'center' }}>
         {body}
       </ThemedText>

@@ -14,6 +14,10 @@ export const MOTION = {
   pressMs: 100,
   pressScale: 0.98,
   shimmerMs: 900,
+  accordionMs: 220,
+  chevronRotateDeg: 180,
+  /** Alias of tabFadeMs — gold tab indicator and language chip. */
+  tabIndicatorMs: 150,
 } as const;
 
 export type StackAnimationName = 'none' | 'slide_from_right';

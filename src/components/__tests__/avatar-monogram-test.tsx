@@ -1,12 +1,12 @@
 import { render } from '@testing-library/react-native';
 
 import {
-  AvatarMonogram,
-  avatarColorIndex,
-  initialsFromName,
+    AvatarMonogram,
+    avatarColorIndex,
+    avatarTintPair,
+    initialsFromName,
 } from '@/components/avatar-monogram';
 import { Colors } from '@/constants/theme';
-import { avatarTintPair } from '@/components/avatar-monogram';
 import { flatStyle } from '@/test-utils/flat-style';
 
 describe('AvatarMonogram', () => {

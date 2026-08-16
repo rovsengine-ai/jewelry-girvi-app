@@ -16,6 +16,7 @@ export type ThemedTextProps = TextProps & {
     | 'overline'
     | 'label'
     | 'bodyLarge'
+    | 'bodyBold'
     | 'moneyLarge'
     | 'caption';
   themeColor?: ThemeColor;
@@ -40,6 +41,7 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'overline' && styles.overline,
         type === 'label' && styles.label,
         type === 'bodyLarge' && styles.bodyLarge,
+        type === 'bodyBold' && styles.bodyBold,
         type === 'moneyLarge' && styles.moneyLarge,
         type === 'caption' && styles.caption,
         style,
@@ -50,47 +52,22 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 }
 
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
-  },
-  smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
-  },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
-  linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
+  small: TypeScale.small,
+  smallBold: { ...TypeScale.small, fontWeight: '700' },
+  default: TypeScale.body,
+  title: TypeScale.heroTitle,
+  subtitle: TypeScale.heroSubtitle,
+  link: TypeScale.link,
+  linkPrimary: TypeScale.link,
   code: {
+    ...TypeScale.codeSize,
     fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
+    fontWeight: Platform.select({ android: '700' as const, default: '500' as const }),
   },
   overline: TypeScale.overline,
   label: TypeScale.label,
   bodyLarge: TypeScale.bodyLarge,
+  bodyBold: TypeScale.bodyBold,
   moneyLarge: TypeScale.moneyLarge,
   caption: TypeScale.caption,
 });

@@ -32,6 +32,7 @@ const CUSTOMER: CustomerKyc = {
   id_document_path: null,
   date_of_birth: null,
   guardian_name: null,
+  photo_path: null,
   kyc_verified_on: null,
   kyc_verified_by: null,
 };

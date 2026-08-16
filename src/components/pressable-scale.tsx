@@ -5,7 +5,12 @@
  * https://docs.expo.dev/versions/v57.0.0/sdk/haptics/
  */
 import * as Haptics from 'expo-haptics';
-import { Pressable, type PressableProps, type PressableStateCallbackType } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  type PressableProps,
+  type PressableStateCallbackType,
+} from 'react-native';
 import Animated, {
   ReduceMotion,
   useAnimatedStyle,
@@ -31,14 +36,16 @@ export function PressableScale({
     transform: [{ scale: scale.value }],
   }));
 
+  const resolveStyle = (state: PressableStateCallbackType) => {
+    const resolved = typeof style === 'function' ? style(state) : style;
+    // Flatten so Reanimated + nested arrays cannot drop static fills (e.g. Button primary).
+    return [animatedStyle, StyleSheet.flatten(resolved)];
+  };
+
   return (
     <AnimatedPressable
       disabled={disabled}
-      style={
-        typeof style === 'function'
-          ? (state: PressableStateCallbackType) => [animatedStyle, style(state)]
-          : [animatedStyle, style]
-      }
+      style={resolveStyle}
       onPressIn={(event) => {
         if (!disabled) {
           const target = pressScaleValue(reduceMotion);

@@ -147,7 +147,7 @@ export function AdminLoanRow({
           trailing={
             <>
               <MoneyText paise={asPaise(loan.principal_paise)} />
-              <Badge status={loan.status} style={styles.badge} />
+              <Badge status={loan.status} />
             </>
           }
         />
@@ -180,9 +180,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: Radii.sm,
-  },
-  badge: {
-    minHeight: MinTouchTarget,
-    alignSelf: 'flex-end',
   },
 });

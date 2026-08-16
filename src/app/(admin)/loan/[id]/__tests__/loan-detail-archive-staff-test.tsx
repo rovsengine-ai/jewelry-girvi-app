@@ -115,6 +115,7 @@ function sampleLoan(): LoanWithCustomer {
       id_document_type: null,
       kyc_verified_on: null,
       guardian_name: null,
+      photo_path: null,
     },
   };
 }
@@ -178,10 +179,10 @@ describe('loan detail archive action', () => {
   test('does not render Archive for role staff', async () => {
     useAuthMock.mockReturnValue(authValue('staff') as never);
 
-    const { queryByTestId, getByText } = await renderDetail();
+    const { queryByTestId, getAllByText } = await renderDetail();
 
     await waitFor(() => {
-      getByText('G-1001');
+      expect(getAllByText('G-1001').length).toBeGreaterThan(0);
     });
     expect(queryByTestId('open-archive')).toBeNull();
   });
@@ -189,10 +190,10 @@ describe('loan detail archive action', () => {
   test('renders Archive for role owner', async () => {
     useAuthMock.mockReturnValue(authValue('owner') as never);
 
-    const { getByTestId, getByText } = await renderDetail();
+    const { getByTestId, getAllByText } = await renderDetail();
 
     await waitFor(() => {
-      getByText('G-1001');
+      expect(getAllByText('G-1001').length).toBeGreaterThan(0);
     });
     getByTestId('open-archive');
   });

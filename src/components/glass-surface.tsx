@@ -5,7 +5,11 @@
  *   solid / reduce-transparency → opaque View
  *   iOS 26+ Liquid Glass → GlassView
  *   other iOS → BlurView
- *   Android → tinted View; optional BlurView when EXPO_PUBLIC_ENABLE_ANDROID_BLUR
+ *   Android + blurTarget → BlurView (dimezisBlurViewSdk31Plus)
+ *   Android otherwise → tinted View
+ *
+ * Android dimezis blur requires a BlurTargetView ref (SDK 55+). Without it we
+ * never set blurMethod, so Expo does not warn and fall back to none.
  *
  * Docs (SDK 57):
  * https://docs.expo.dev/versions/v57.0.0/sdk/glass-effect/
@@ -13,7 +17,7 @@
  */
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import {
   AccessibilityInfo,
   Platform,
@@ -21,19 +25,32 @@ import {
   type ViewProps,
 } from 'react-native';
 
-import { Glass } from '@/constants/theme';
+import { Glass, Sizes } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type GlassSurfaceProps = ViewProps & {
   solid?: boolean;
+  /**
+   * Request Android dimezis blur when a `blurTarget` is also provided.
+   * Without `blurTarget`, Android stays on the tinted fallback (no warning).
+   * Never use behind MoneyText / weights / rates / dates.
+   * https://docs.expo.dev/versions/v57.0.0/sdk/blur-view/
+   */
+  androidBlur?: boolean;
+  /**
+   * Ref to a `BlurTargetView` wrapping the content behind this chrome.
+   * Required for real Android blur (dimezisBlurViewSdk31Plus).
+   */
+  blurTarget?: RefObject<View | null>;
+  /** Slightly stronger blur for floating sheets / camera docks. */
+  intensity?: 'default' | 'strong';
   children?: ReactNode;
 };
 
-function androidBlurEnabled(): boolean {
-  // Default OFF. SDK 57's documented prop is blurMethod (not experimentalBlurMethod).
-  // dimezisBlurView costs frames on Android SDK 30 and below:
-  // https://docs.expo.dev/versions/v57.0.0/sdk/blur-view/
+function androidBlurEnabled(force?: boolean): boolean {
+  if (force) return true;
+  // Default OFF globally. Costs frames on Android SDK 30 and below.
   const flag = process.env.EXPO_PUBLIC_ENABLE_ANDROID_BLUR;
   return flag === 'true' || flag === '1';
 }
@@ -47,18 +64,28 @@ function GlassHighlight({ color }: { color: string }) {
         top: 0,
         left: 0,
         right: 0,
-        height: 1,
+        height: Sizes.hairline,
         backgroundColor: color,
       }}
     />
   );
 }
 
-export function GlassSurface({ solid = false, style, children, ...rest }: GlassSurfaceProps) {
+export function GlassSurface({
+  solid = false,
+  androidBlur = false,
+  blurTarget,
+  intensity = 'default',
+  style,
+  children,
+  ...rest
+}: GlassSurfaceProps) {
   const colors = useTheme();
   const scheme = useColorScheme();
   const blurTint = scheme === 'dark' ? 'dark' : 'light';
   const [reduceTransparency, setReduceTransparency] = useState(false);
+  const blurIntensity =
+    intensity === 'strong' ? Glass.blurIntensityStrong : Glass.blurIntensity;
 
   useEffect(() => {
     let mounted = true;
@@ -109,7 +136,7 @@ export function GlassSurface({ solid = false, style, children, ...rest }: GlassS
   if (Platform.OS === 'ios') {
     return (
       <BlurView
-        intensity={Glass.blurIntensity}
+        intensity={blurIntensity}
         tint={blurTint}
         style={[{ backgroundColor: colors.glassTint }, chrome, style]}
         {...rest}>
@@ -119,12 +146,13 @@ export function GlassSurface({ solid = false, style, children, ...rest }: GlassS
     );
   }
 
-  if (Platform.OS === 'android' && androidBlurEnabled()) {
+  if (Platform.OS === 'android' && androidBlurEnabled(androidBlur) && blurTarget) {
     return (
       <BlurView
-        intensity={Glass.blurIntensity}
+        intensity={blurIntensity}
         tint={blurTint}
-        blurMethod="dimezisBlurView"
+        blurTarget={blurTarget}
+        blurMethod="dimezisBlurViewSdk31Plus"
         style={[{ backgroundColor: colors.glassTint }, chrome, style]}
         {...rest}>
         <GlassHighlight color={colors.glassHighlight} />

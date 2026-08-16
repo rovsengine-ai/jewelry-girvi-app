@@ -1,8 +1,13 @@
 import {
   saveKycCapture,
+  uploadCustomerPhoto,
   uploadKycImage,
   verifyKyc,
 } from '@/services/kycService';
+
+jest.mock('@/lib/prepare-customer-photo', () => ({
+  prepareCustomerPhoto: jest.fn(async (uri: string) => ({ uri, mimeType: 'image/jpeg' as const })),
+}));
 
 jest.mock('@/lib/supabase', () => {
   const createSignedUrl = jest.fn();
@@ -84,6 +89,15 @@ describe('uploadKycImage', () => {
     const path = await uploadKycImage('file:///tmp/pan.jpg', CUSTOMER, 'pan');
     expect(path).toMatch(new RegExp(`^${CUSTOMER}/\\d+-[a-z0-9]+\\.jpg$`));
     expect(path).not.toMatch(/\/items\//);
+    expect(path).not.toMatch(/\/photo\//);
+    expect(upload).toHaveBeenCalled();
+  });
+});
+
+describe('uploadCustomerPhoto', () => {
+  test('uploads a face photo to {customer_id}/photo/filename', async () => {
+    const path = await uploadCustomerPhoto('file:///tmp/face.jpg', CUSTOMER);
+    expect(path).toMatch(new RegExp(`^${CUSTOMER}/photo/\\d+-[a-z0-9]+\\.jpg$`));
     expect(upload).toHaveBeenCalled();
   });
 });
@@ -98,6 +112,7 @@ describe('saveKycCapture', () => {
       dateOfBirth: '1990-01-15',
       guardianName: 'Ramesh',
       idDocumentPath: `${CUSTOMER}/pan.jpg`,
+      photoPath: `${CUSTOMER}/photo/face.jpg`,
     });
     expect(payloads).toEqual([
       {
@@ -106,6 +121,7 @@ describe('saveKycCapture', () => {
         date_of_birth: '1990-01-15',
         guardian_name: 'Ramesh',
         id_document_path: `${CUSTOMER}/pan.jpg`,
+        photo_path: `${CUSTOMER}/photo/face.jpg`,
       },
     ]);
     expect(JSON.stringify(payloads)).not.toMatch(/kyc_verified/);

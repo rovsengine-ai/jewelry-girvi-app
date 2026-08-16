@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { FormNotice } from '@/components/form-notice';
 import { ListRow } from '@/components/list-row';
 import { ListSkeleton } from '@/components/list-row-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -62,33 +63,38 @@ export default function CustomerAlertsScreen() {
   }, [loadNotices, t]);
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={styles.container} type="surfaceSunken">
       <ScreenHeader title={t('notices.customer.title')} />
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void refresh()} />
         }
         contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="small" themeColor="textSecondary" style={styles.lede}>
           {t('notices.customer.subtitle')}
         </ThemedText>
-        <FormNotice error={loadError} />
+        <View style={styles.lede}>
+          <FormNotice error={loadError} />
+        </View>
         {isLoading ? <ListSkeleton rows={4} /> : null}
         {notices.length > 0 ? (
-          notices.map((notice, index) => (
-            <ListRow
-              key={notice.id}
-              isLast={index === notices.length - 1}
-              content={
-                <ThemedText type="label">
-                  {t('notices.customer.row', {
-                    type: noticeTypeLabel(notice.notice_type, language),
-                    date: notice.scheduled_for,
-                  })}
-                </ThemedText>
-              }
-            />
-          ))
+          <SettingsGroup>
+            {notices.map((notice, index) => (
+              <ListRow
+                key={notice.id}
+                tone="elevated"
+                isLast={index === notices.length - 1}
+                content={
+                  <ThemedText type="label">
+                    {t('notices.customer.row', {
+                      type: noticeTypeLabel(notice.notice_type, language),
+                      date: notice.scheduled_for,
+                    })}
+                  </ThemedText>
+                }
+              />
+            ))}
+          </SettingsGroup>
         ) : !isLoading ? (
           <EmptyState title={t('notices.customer.emptyTitle')} body={t('notices.customer.emptyBody')} />
         ) : null}
@@ -100,8 +106,10 @@ export default function CustomerAlertsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: {
-    paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
     gap: Spacing.three,
+  },
+  lede: {
+    paddingHorizontal: Spacing.four,
   },
 });

@@ -1,4 +1,8 @@
 export const en = {
+  app: {
+    name: 'Girvi',
+    nameSecondary: 'गिरवी',
+  },
   common: {
     langEn: 'EN',
     langHi: 'हिं',
@@ -22,6 +26,10 @@ export const en = {
     notIbja: 'not IBJA',
     per10g: '/ 10g',
   },
+  signaturePad: {
+    captured: 'Signature captured',
+    notSignedYet: 'Not signed yet',
+  },
   a11y: {
     language: 'Language',
     search: 'Search',
@@ -30,6 +38,11 @@ export const en = {
     person: 'Customer',
     chevron: 'Opens',
     empty: 'Nothing here',
+    info: 'About this figure',
+    call: 'Call',
+    expand: 'Show details',
+    collapse: 'Hide details',
+    print: 'Print',
   },
   tabs: {
     loans: 'Loans',
@@ -85,6 +98,10 @@ export const en = {
       emptyTitle: 'No receipts yet',
       emptyBody: 'No girvi receipts linked to your account yet.',
       noReceiptImage: 'No receipt image',
+      collectItemsStatus: 'Paid — collect items',
+      collectItemsTitle: 'Paid — collect your items',
+      collectItemsBody:
+        'Visit the shop to collect your pledged jewellery. This receipt stays here until the shop closes the record.',
     },
     detail: {
       loadErrorTitle: 'Could not load loan',
@@ -121,6 +138,9 @@ export const en = {
       editTerms: 'Edit terms',
       printPledge: 'Print pledge',
       printReceipt: 'Print receipt',
+      redeemedAwaitingArchive:
+        'Redeemed — items released. After the customer collects their jewellery, archive this girvi to remove it from their app.',
+      redeemedLive: 'This loan is redeemed. Items were released at the counter.',
       recordPaymentTitle: 'Record Payment',
       recordPaymentHint: 'Server allocates to accrued interest first, then principal.',
       amountInRupees: 'Amount in ₹',
@@ -136,6 +156,13 @@ export const en = {
       shareRedemption: 'Redemption %{serial}',
       sectionCustomer: 'Customer',
       sectionActions: 'Actions',
+      totalItems: 'Total items : %{count}',
+      addTransaction: '+ Add Transaction',
+      marketValue: 'Market value',
+      marketValueEmpty: 'No assessed value on these items.',
+      marketValueCaption: 'Frozen item valuations (%{notIbja})',
+      tenureDays: '%{days} days',
+      dateRange: '%{from} – %{to}',
     },
     terms: {
       editTitle: 'Edit terms %{serial}',
@@ -157,6 +184,13 @@ export const en = {
     },
     scanner: {
       cameraTitle: 'Scan Girvi Receipt',
+      choiceTitle: 'Add girvi',
+      choiceSubtitle: 'Scan a receipt or enter details at the counter.',
+      scanReceipt: 'Scan receipt',
+      enterManually: 'Enter manually',
+      pickFromGallery: 'Choose from gallery',
+      retake: 'Retake',
+      attachReceipt: 'Attach receipt photo',
       captureExtract: 'Capture & Extract',
       reviewTitle: 'Review & Save',
       serialNumber: 'Serial Number',
@@ -176,10 +210,34 @@ export const en = {
       goToLoans: 'Loans',
       cameraNeededTitle: 'Camera needed',
       cameraNeededBody: 'Camera permission is required to scan receipts.',
-      captureBeforeSave: 'Capture a receipt image before saving.',
+      captureBeforeSave: 'Capture a receipt image before saving a scanned girvi.',
+      ocrPartialNotice:
+        'Some fields could not be read clearly. Please check every amount, weight, rate, and date before saving.',
+      ocrUnavailable:
+        'Receipt scan is offline. Start the local Edge Runtime (supabase start / docker start edge runtime), then try again.',
+      ocrUnauthorized: 'Sign in again, then scan the receipt.',
+      ocrForbidden: 'Only shop owner or staff can scan receipts.',
+      ocrMisconfigured: 'OCR is not configured (Moonshot key missing on the server).',
+      ocrUpstream: 'The vision model could not read this image. Try a clearer photo or enter manually.',
+      ocrProviderRejected: 'OCR provider rejected the request. Check the server key and try again.',
+      ocrImageTooLarge: 'This photo is too large to scan. Try a smaller image or enter manually.',
+      ocrEmpty: 'No data came back from the scanner. Try again or enter manually.',
+      ocrFailed: 'Could not read the receipt. Try again or enter manually.',
+      ocrWorking: 'Reading receipt…',
+      bilingualHint: 'Hindi and English on the same slip are both supported. Check every field before saving.',
       createdSuccess: 'Girvi loan created successfully.',
+      kycSectionTitle: 'Identity & KYC',
+      kycSaveFailed:
+        'Loan saved. KYC could not be saved — capture it from the loan screen or open KYC below.',
+      openKyc: 'Open KYC capture',
       photosAttached: 'Item photos attached.',
       cameraNoImage: 'Camera did not return an image.',
+      galleryPermission: 'Photo library permission is required to attach a receipt.',
+      cameraPreviewHint: 'Point at the आंकलन pad, or choose a photo from the gallery.',
+      cameraUnavailableTitle: 'No camera on this device',
+      cameraUnavailableBody:
+        'The iOS Simulator has no camera. Choose a photo from the gallery, or enter the girvi manually.',
+      cameraMountFailed: 'Camera preview failed to start. Use the gallery or enter manually.',
     },
     insights: {
       title: 'Insights',
@@ -192,6 +250,8 @@ export const en = {
       yieldEmptyTitle: 'No yield yet',
       yieldEmptyBody: 'No active loans to project.',
       yieldRow: '%{rate}% · %{count} %{loans}',
+      activeLoans: 'Active loans',
+      loanCount: '%{count}',
     },
     default: {
       title: 'Default %{serial}',
@@ -269,6 +329,10 @@ export const en = {
     photographId: 'Photograph ID',
     choosePhoto: 'Choose photo',
     photoPending: 'Photo ready to upload on save',
+    customerPhoto: 'Customer photo',
+    photographCustomer: 'Take photo',
+    chooseCustomerPhoto: 'Choose from gallery',
+    customerPhotoPending: 'Customer photo ready to upload on save',
     save: 'Save KYC',
     markVerified: 'Mark verified',
     saved: 'KYC saved.',
@@ -280,6 +344,9 @@ export const en = {
     title: 'Redeem %{serial}',
     successTitle: 'Redeemed',
     successBody: 'Collected %{amount} on %{date}.',
+    successArchiveHint:
+      'After the customer collects their items, open the loan and archive it to remove it from their app.',
+    archiveNow: 'Archive now',
     ownerOnlyTitle: 'Owner only',
     ownerOnlyBody:
       'Only the shop owner can redeem a loan and release pledged goods. Ask the owner to complete this at the counter.',
@@ -392,6 +459,8 @@ export const en = {
     groupPreferences: 'Preferences',
     groupShop: 'Shop',
     groupSession: 'Session',
+    roleOwner: 'Owner',
+    roleStaff: 'Staff',
   },
   errors: {
     unknown: 'Unknown error',
@@ -401,6 +470,7 @@ export const en = {
   archive: {
     call: 'Call',
     archive: 'Archive',
+    archiveAfterPickup: 'Archive after pickup',
     confirmTitle: 'Archive %{serial}?',
     confirmBody:
       'This girvi will disappear for the customer and for staff. The shop keeps the record.',

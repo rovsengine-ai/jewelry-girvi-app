@@ -1,17 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
+import { ListSkeleton } from '@/components/list-row-skeleton';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -20,10 +16,10 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { asPaise, formatPaiseAsInr, todayInKolkata } from '@/lib/money';
 import {
-  defaultNewMaturityOn,
-  isRenewalEligible,
-  parseOwnerOnlyError,
-  redeemGate,
+    defaultNewMaturityOn,
+    isRenewalEligible,
+    parseOwnerOnlyError,
+    redeemGate,
 } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -130,8 +126,9 @@ export default function RenewLoanScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+      <ThemedView style={styles.container} type="surfaceSunken">
+        <ScreenHeader showBack title={t('loans.detail.renew')} />
+        <ListSkeleton rows={6} />
       </ThemedView>
     );
   }
@@ -139,7 +136,7 @@ export default function RenewLoanScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.renew')} />
+        <ScreenHeader showBack title={t('loans.detail.renew')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.loadErrorTitle')} body={loadError} />
@@ -151,7 +148,7 @@ export default function RenewLoanScreen() {
   if (doneNotice) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('renew.successTitle')} />
+        <ScreenHeader showBack title={t('renew.successTitle')} />
         <View style={styles.body}>
           <EmptyState
             title={t('renew.successTitle')}
@@ -167,7 +164,7 @@ export default function RenewLoanScreen() {
   if (gate.kind === 'owner_only') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('renew.ownerOnlyTitle')} />
+        <ScreenHeader showBack title={t('renew.ownerOnlyTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('renew.ownerOnlyTitle')} body={t('renew.ownerOnlyBody')} />
@@ -179,7 +176,7 @@ export default function RenewLoanScreen() {
   if (!loan || !balances) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.renew')} />
+        <ScreenHeader showBack title={t('loans.detail.renew')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.notFoundTitle')} body={t('loans.detail.notFoundBody')} />
@@ -197,7 +194,7 @@ export default function RenewLoanScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={headerTitle} />
+      <ScreenHeader showBack title={headerTitle} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         <ThemedText type="small">{loan.profiles?.full_name ?? t('common.unknownCustomer')}</ThemedText>
@@ -244,6 +241,5 @@ export default function RenewLoanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
 });

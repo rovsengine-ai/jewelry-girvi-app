@@ -5,13 +5,14 @@
  *
  * Dynamic `[customerId]` matches the existing `(admin)/loan/[id]` file route.
  */
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { KycCaptureForm } from '@/components/kyc-capture-form';
+import { ListSkeleton } from '@/components/list-row-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -47,11 +48,11 @@ export default function KycCaptureScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={t('kyc.title')} />
+      <ScreenHeader showBack title={t('kyc.title')} />
       <ThemedView style={styles.body}>
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         {isLoading ? (
-          <ActivityIndicator />
+          <ListSkeleton rows={6} />
         ) : error || !customer ? (
           <EmptyState title={t('kyc.loadErrorTitle')} body={error ?? t('kyc.customerNotFound')} />
         ) : (

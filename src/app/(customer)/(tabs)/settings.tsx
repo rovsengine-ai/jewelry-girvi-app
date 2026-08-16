@@ -1,6 +1,7 @@
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppIcon, TintedIconWell } from '@/components/app-icon';
+import { Card } from '@/components/card';
 import { ListRow } from '@/components/list-row';
 import { LanguageSettingsRow, ScreenHeader } from '@/components/screen-header';
 import { SectionLabel } from '@/components/section-label';
@@ -23,15 +24,24 @@ export default function CustomerSettingsScreen() {
     <ThemedView style={styles.container} type="surfaceSunken">
       <ScreenHeader title={t('settings.title')} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
-        {profile?.full_name ? (
-          <ThemedText type="bodyLarge" style={styles.identity}>
-            {profile.full_name}
-          </ThemedText>
-        ) : null}
-        {profile?.phone_number ? (
-          <ThemedText type="label" themeColor="textSecondary" style={styles.identity}>
-            {profile.phone_number}
-          </ThemedText>
+        {profile ? (
+          <Card style={styles.accountCard}>
+            <View style={styles.accountRow}>
+              <TintedIconWell tint={colors.tintPrimary}>
+                <AppIcon ios="person.fill" android="person" color={colors.primary} />
+              </TintedIconWell>
+              <View style={styles.accountCopy}>
+                {profile.full_name ? (
+                  <ThemedText type="bodyLarge">{profile.full_name}</ThemedText>
+                ) : null}
+                {profile.phone_number ? (
+                  <ThemedText type="label" style={{ color: colors.accentWarning }}>
+                    {profile.phone_number}
+                  </ThemedText>
+                ) : null}
+              </View>
+            </View>
+          </Card>
         ) : null}
         <SectionLabel>{t('settings.groupPreferences')}</SectionLabel>
         <SettingsGroup>
@@ -71,7 +81,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     gap: Spacing.three,
   },
-  identity: {
-    paddingHorizontal: Spacing.four,
-  },
+  accountCard: { marginHorizontal: Spacing.four },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  accountCopy: { flex: 1, minWidth: 0, gap: Spacing.half },
 });

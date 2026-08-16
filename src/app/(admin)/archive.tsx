@@ -109,7 +109,7 @@ export default function AdminArchiveScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('archive.title')} />
+        <ScreenHeader showBack title={t('archive.title')} />
         <ListSkeleton rows={6} />
       </ThemedView>
     );
@@ -118,7 +118,7 @@ export default function AdminArchiveScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('archive.title')} />
+        <ScreenHeader showBack title={t('archive.title')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('archive.loadErrorTitle')} body={loadError} />
@@ -128,12 +128,14 @@ export default function AdminArchiveScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ScreenHeader title={t('archive.title')} />
+    <ThemedView style={styles.container} type="surfaceSunken">
+      <ScreenHeader showBack title={t('archive.title')} />
       <View style={styles.body}>
-        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
-        <ThemedText type="small">{t('archive.listHint')}</ThemedText>
-        <FormNotice error={formError} notice={formNotice} />
+        <View style={styles.padded}>
+          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+          <ThemedText type="small">{t('archive.listHint')}</ThemedText>
+          <FormNotice error={formError} notice={formNotice} />
+        </View>
         <FlatList
           data={rows}
           keyExtractor={(item) => item.id}
@@ -212,8 +214,9 @@ export default function AdminArchiveScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
+  body: { flex: 1, gap: Spacing.two },
+  padded: { paddingHorizontal: Spacing.four, gap: Spacing.two },
   list: { paddingBottom: Spacing.five },
-  meta: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.three, gap: Spacing.one },
+  meta: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.three, gap: Spacing.one },
   confirm: { gap: Spacing.two, paddingTop: Spacing.two },
 });

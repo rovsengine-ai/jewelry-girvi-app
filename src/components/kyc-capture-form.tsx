@@ -2,35 +2,25 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
-import { PressableScale } from '@/components/pressable-scale';
-import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
+import { KycCaptureFields } from '@/components/kyc-capture-fields';
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import {
-  acceptLast4Draft,
-  ID_DOCUMENT_TYPE_OPTIONS,
-  kycStatusLabel,
-} from '@/lib/kyc';
+import { Spacing } from '@/constants/theme';
+import { kycStatusLabel } from '@/lib/kyc';
+import { emptyKycDraft } from '@/lib/kyc-draft';
 import { todayInKolkata } from '@/lib/money';
-import { pickStillImage } from '@/lib/pick-image';
 import { useLanguage } from '@/providers/language-provider';
 import {
   saveKycCapture,
+  uploadCustomerPhoto,
   uploadKycImage,
   verifyKyc,
   type CustomerKyc,
 } from '@/services/kycService';
-import type { IdDocumentType } from '@/types/database';
 
 /**
- * DOC GATE (Expo SDK 57):
- * https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/
- * package: expo-image-picker  last-modified: August 12, 2026
- *
- * Photo capture uses pickStillImage (v57 mediaTypes: ['images']).
- * Aadhaar disables the control so the operator never hits profiles_no_aadhaar_image_chk.
+ * Full KYC screen: capture fields plus save / owner verify actions.
+ * Scanner review uses {@link KycCaptureFields} directly without verify.
  */
 
 type Props = {
@@ -38,69 +28,51 @@ type Props = {
 };
 
 export function KycCaptureForm({ customer }: Props) {
-  const colors = useTheme();
   const { t, language } = useLanguage();
-  const [documentType, setDocumentType] = useState<IdDocumentType | null>(customer.id_document_type);
-  const [last4, setLast4] = useState(customer.id_document_last4 ?? '');
-  const [last4Error, setLast4Error] = useState<string | null>(null);
-  const [dateOfBirth, setDateOfBirth] = useState(customer.date_of_birth ?? '');
-  const [guardianName, setGuardianName] = useState(customer.guardian_name ?? '');
+  const [kycDraft, setKycDraft] = useState(() => ({
+    ...emptyKycDraft(),
+    idDocumentType: customer.id_document_type,
+    idDocumentLast4: customer.id_document_last4 ?? '',
+    dateOfBirth: customer.date_of_birth ?? '',
+    guardianName: customer.guardian_name ?? '',
+  }));
   const [storedPath, setStoredPath] = useState<string | null>(customer.id_document_path);
-  const [localPhotoUri, setLocalPhotoUri] = useState<string | null>(null);
+  const [storedPhotoPath, setStoredPhotoPath] = useState<string | null>(customer.photo_path);
   const [verifiedOn, setVerifiedOn] = useState<string | null>(customer.kyc_verified_on);
   const [isSaving, setIsSaving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formNotice, setFormNotice] = useState<string | null>(null);
 
-  const photoLocked = documentType === 'aadhaar';
-
-  const selectType = (next: IdDocumentType) => {
-    setDocumentType(next);
-    if (next === 'aadhaar') {
-      setLocalPhotoUri(null);
-    }
-  };
-
-  const onLast4Change = (next: string) => {
-    const accepted = acceptLast4Draft(next);
-    if (!accepted.ok) {
-      setLast4Error(t('kyc.last4TooLong'));
-      return;
-    }
-    setLast4Error(null);
-    setLast4(accepted.value);
-  };
-
-  const pickPhoto = async (source: 'camera' | 'library') => {
-    if (photoLocked) {
-      return;
-    }
-    const uri = await pickStillImage(source);
-    if (uri) {
-      setLocalPhotoUri(uri);
-    }
-  };
-
   const handleSave = async () => {
     setIsSaving(true);
     setFormError(null);
     setFormNotice(null);
     try {
-      let path = documentType === 'aadhaar' ? null : storedPath;
-      if (localPhotoUri && documentType !== 'aadhaar') {
-        path = await uploadKycImage(localPhotoUri, customer.id, documentType);
+      let path = kycDraft.idDocumentType === 'aadhaar' ? null : storedPath;
+      if (kycDraft.localPhotoUri && kycDraft.idDocumentType !== 'aadhaar') {
+        path = await uploadKycImage(
+          kycDraft.localPhotoUri,
+          customer.id,
+          kycDraft.idDocumentType,
+        );
+      }
+      let photoPath: string | null | undefined;
+      if (kycDraft.localCustomerPhotoUri) {
+        photoPath = await uploadCustomerPhoto(kycDraft.localCustomerPhotoUri, customer.id);
       }
       await saveKycCapture({
         customerId: customer.id,
-        idDocumentType: documentType,
-        idDocumentLast4: last4,
-        dateOfBirth,
-        guardianName,
+        idDocumentType: kycDraft.idDocumentType,
+        idDocumentLast4: kycDraft.idDocumentLast4,
+        dateOfBirth: kycDraft.dateOfBirth,
+        guardianName: kycDraft.guardianName,
         idDocumentPath: path,
+        photoPath,
       });
       setStoredPath(path);
-      setLocalPhotoUri(null);
+      setStoredPhotoPath(photoPath ?? storedPhotoPath);
+      setKycDraft((prev) => ({ ...prev, localPhotoUri: null, localCustomerPhotoUri: null }));
       setFormNotice(t('kyc.saved'));
     } catch (error) {
       setFormError(error instanceof Error ? error.message : t('errors.unknown'));
@@ -132,84 +104,7 @@ export function KycCaptureForm({ customer }: Props) {
       </ThemedText>
       <FormNotice error={formError} notice={formNotice} />
 
-      <ThemedText type="smallBold">{t('kyc.idDocument')}</ThemedText>
-      <View style={styles.chipRow}>
-        {ID_DOCUMENT_TYPE_OPTIONS.map((option) => (
-          <PressableScale
-            key={option.value}
-            testID={`kyc-type-${option.value}`}
-            accessibilityRole="button"
-            onPress={() => selectType(option.value)}
-            style={[
-              styles.chip,
-              {
-                backgroundColor:
-                  documentType === option.value ? colors.backgroundSelected : colors.elevated,
-                borderColor: colors.border,
-              },
-            ]}>
-            <ThemedText type="small">{t(`kyc.idType.${option.value}`)}</ThemedText>
-          </PressableScale>
-        ))}
-      </View>
-
-      <Field
-        testID="kyc-last4"
-        label={t('kyc.last4')}
-        value={last4}
-        onChangeText={onLast4Change}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        placeholder={t('kyc.last4Placeholder')}
-        error={last4Error}
-      />
-      {!last4Error ? (
-        <ThemedText type="small">{t('kyc.last4Hint')}</ThemedText>
-      ) : null}
-
-      <Field
-        testID="kyc-dob"
-        label={t('kyc.dob')}
-        value={dateOfBirth}
-        onChangeText={setDateOfBirth}
-        placeholder={t('kyc.dobPlaceholder')}
-      />
-
-      <Field
-        testID="kyc-guardian"
-        label={t('kyc.guardian')}
-        value={guardianName}
-        onChangeText={setGuardianName}
-      />
-
-      {photoLocked ? (
-        <ThemedText type="small" testID="kyc-aadhaar-photo-reason">
-          {t('kyc.aadhaarPhotoReason')}
-        </ThemedText>
-      ) : null}
-      <View style={styles.photoRow}>
-        <Button
-          testID="kyc-photo-camera"
-          label={t('kyc.photographId')}
-          variant="secondary"
-          disabled={photoLocked}
-          onPress={() => void pickPhoto('camera')}
-          style={styles.photoBtn}
-        />
-        <Button
-          testID="kyc-photo-library"
-          label={t('kyc.choosePhoto')}
-          variant="secondary"
-          disabled={photoLocked}
-          onPress={() => void pickPhoto('library')}
-          style={styles.photoBtn}
-        />
-      </View>
-      {localPhotoUri && !photoLocked ? (
-        <ThemedText type="small" testID="kyc-photo-pending">
-          {t('kyc.photoPending')}
-        </ThemedText>
-      ) : null}
+      <KycCaptureFields value={kycDraft} onChange={setKycDraft} testIdPrefix="kyc" />
 
       <Button testID="kyc-save" label={t('kyc.save')} loading={isSaving} onPress={() => void handleSave()} />
 
@@ -226,14 +121,4 @@ export function KycCaptureForm({ customer }: Props) {
 
 const styles = StyleSheet.create({
   form: { gap: Spacing.two },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
-  chip: {
-    minHeight: MinTouchTarget,
-    borderRadius: Radii.pill,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    justifyContent: 'center',
-  },
-  photoRow: { flexDirection: 'row', gap: Spacing.two },
-  photoBtn: { flex: 1 },
 });

@@ -4,7 +4,9 @@ import { isReminderKind, type LoanReminderSlot } from '@/lib/loan-reminders';
 import { asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { toE164India } from '@/lib/phone';
 import { convertScannerItem, type ScannerItemDraft } from '@/lib/scanner-items';
+import { kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
 import { supabase } from '@/lib/supabase';
+import { saveKycCapture, uploadCustomerPhoto, uploadKycImage } from '@/services/kycService';
 import type { Json } from '@/types/supabase';
 import type {
   ArchivedLoan,
@@ -288,19 +290,48 @@ export async function attachItemPhotos(input: {
   }
 }
 
+export type CreateLoanOutcome = {
+  loanId: string;
+  customerId: string;
+  kycSaveFailed: boolean;
+};
+
+async function persistKycDraft(customerId: string, draft: KycDraft): Promise<void> {
+  let path: string | null = null;
+  if (draft.localPhotoUri && draft.idDocumentType !== 'aadhaar') {
+    path = await uploadKycImage(draft.localPhotoUri, customerId, draft.idDocumentType);
+  }
+  let photoPath: string | null | undefined;
+  if (draft.localCustomerPhotoUri) {
+    photoPath = await uploadCustomerPhoto(draft.localCustomerPhotoUri, customerId);
+  }
+  await saveKycCapture({
+    customerId,
+    idDocumentType: draft.idDocumentType,
+    idDocumentLast4: draft.idDocumentLast4,
+    dateOfBirth: draft.dateOfBirth,
+    guardianName: draft.guardianName,
+    idDocumentPath: path,
+    photoPath,
+  });
+}
+
 export async function createLoanWithCustomer(
   form: LoanFormData,
   items: ScannerItemDraft[],
-  receiptLocalUri: string,
+  receiptLocalUri: string | null,
   signatureDataUrl: string | null,
-): Promise<string> {
+  kycDraft?: KycDraft | null,
+): Promise<CreateLoanOutcome> {
   // A walk-in customer no longer has to sign up before staff can write the
   // loan: if the number is unknown, register it at the counter and carry on.
   const customerId =
     (await findCustomerIdByPhone(form.phone_number)) ??
     (await createWalkInCustomer(form.phone_number, form.customer_name, form.address));
 
-  const receiptPath = await uploadImageToStorage(receiptLocalUri, 'receipts', customerId);
+  const receiptPath = receiptLocalUri
+    ? await uploadImageToStorage(receiptLocalUri, 'receipts', customerId)
+    : null;
   const signaturePath = signatureDataUrl
     ? await uploadSignatureDataUrl(signatureDataUrl, customerId)
     : null;
@@ -335,6 +366,15 @@ export async function createLoanWithCustomer(
       phone_number: toE164India(form.phone_number),
     })
     .eq('id', customerId);
+
+  let kycSaveFailed = false;
+  if (kycDraft && kycDraftHasContent(kycDraft)) {
+    try {
+      await persistKycDraft(customerId, kycDraft);
+    } catch {
+      kycSaveFailed = true;
+    }
+  }
 
   const disbursedOn = form.disbursed_on.trim() || todayInKolkata();
 
@@ -373,7 +413,11 @@ export async function createLoanWithCustomer(
     });
   }
 
-  return created.loan_id;
+  return {
+    loanId: created.loan_id,
+    customerId,
+    kycSaveFailed,
+  };
 }
 
 export async function fetchLoanBalances(

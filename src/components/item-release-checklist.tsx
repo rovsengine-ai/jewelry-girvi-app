@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Sizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useLanguage } from '@/providers/language-provider';
 import type { LoanItem } from '@/types/database';
@@ -86,6 +86,11 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
     minHeight: MinTouchTarget,
   },
-  box: { width: 18, height: 18, borderWidth: 2, borderRadius: 4 },
-  body: { flex: 1, gap: 2 },
+  box: {
+    width: Sizes.checkbox,
+    height: Sizes.checkbox,
+    borderWidth: 2,
+    borderRadius: Radii.xs,
+  },
+  body: { flex: 1, gap: Spacing.half },
 });

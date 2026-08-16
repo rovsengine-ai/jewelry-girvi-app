@@ -3,15 +3,29 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const MOONSHOT_API_URL = 'https://api.moonshot.ai/v1/chat/completions';
+/** Vision + reasoning; see https://platform.moonshot.ai/docs/guide/use-kimi-vision-model */
 const KIMI_VISION_MODEL = 'kimi-k3';
+const UPSTREAM_DETAIL_MAX = 200;
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const EXTRACTION_PROMPT = `You are an OCR assistant for Indian jewelry pawn (girvi) shop handwritten receipt pads.
-Extract all fields from the receipt image and respond with ONLY valid JSON using this exact shape:
+const EXTRACTION_PROMPT = `You are an OCR assistant for Indian jewelry pawn (girvi) shop handwritten "आंकलन" (assessment) receipt pads.
+
+Pad layout (typical):
+- Orange/maroon header bar with white Hindi title आंकलन. Ignore large "AK" watermark.
+- Labels mix Hindi + English: क्रम सं० / serial, Name, Date.
+- Handwriting is mostly Devanagari (names, ornaments, addresses) but English digits and labels also appear. Keep Hindi strings in the ORIGINAL Devanagari script — do NOT transliterate to Latin. English names stay Latin.
+- Phone and address are often missing — empty string is correct.
+- Amounts look like 100000/-, 1000/, 5000/- or Hindi words (एक हजार रुपये मात्र). loan_amount must be the RUPEES number only (100000, 1000, 5000) — never paise. If only Hindi words are present and you can convert confidently, do so; else 0.
+- Weights: 25|800mg means 25 grams + 800 mg = 25.8 grams; 47 gm means 47. Always output weight_grams as a number in GRAMS.
+- Interest like "50/- प्रतिमाह" may be ₹ per month OR a percent. If ambiguous, set interest_rate to 0 (never invent compound interest). Only set a positive interest_rate when clearly a monthly PERCENT (e.g. 3%, 2.5).
+- Dates: 21|1|25, 30/10/23, 08/10/2022 → normalize to YYYY-MM-DD when confident; else "".
+- Items: सोना पेठा, पायल, etc. Put the ornament phrase in item_name as written.
+
+Respond with ONLY valid JSON using this exact shape:
 {
   "serial_number": "string",
   "date": "YYYY-MM-DD or empty string",
@@ -24,7 +38,7 @@ Extract all fields from the receipt image and respond with ONLY valid JSON using
   "interest_rate": number
 }
 Use 0 for missing numeric fields. Use empty string for missing text fields.
-interest_rate is the monthly percentage (e.g. 3 or 4, not 0.03).`;
+interest_rate is monthly percent when known (e.g. 3), else 0.`;
 
 const RECEIPT_JSON_SCHEMA = {
   name: 'girvi_receipt',
@@ -69,11 +83,96 @@ type OcrFields = {
   interest_rate: number;
 };
 
+type EdgeErrorCode = 'misconfigured' | 'provider_rejected' | 'upstream' | 'bad_request';
+
+type EdgeErrorBody = {
+  error: string;
+  code?: EdgeErrorCode;
+  upstream_status?: number;
+  upstream_detail?: string;
+};
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+function truncateDetail(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.length <= UPSTREAM_DETAIL_MAX) return trimmed;
+  return `${trimmed.slice(0, UPSTREAM_DETAIL_MAX)}…`;
+}
+
+function providerRejectedResponse(upstreamStatus: number, upstreamBody: string): Response {
+  const detail = truncateDetail(upstreamBody);
+  const body: EdgeErrorBody = {
+    error: 'OCR provider rejected the request',
+    code: 'provider_rejected',
+    upstream_status: upstreamStatus,
+    upstream_detail: detail,
+  };
+  const status = upstreamStatus >= 400 && upstreamStatus < 500 ? upstreamStatus : 502;
+  return jsonResponse(body, status);
+}
+
+function normalizeWeightGrams(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return raw;
+  if (typeof raw !== 'string') return 0;
+  const trimmed = raw.trim().toLowerCase().replace(/,/g, '');
+  const pipeMg = trimmed.match(/^(\d+)\s*[|／/]\s*(\d{1,3})\s*mg$/);
+  if (pipeMg) {
+    return Number.parseInt(pipeMg[1], 10) + Number.parseInt(pipeMg[2].padStart(3, '0').slice(0, 3), 10) / 1000;
+  }
+  const onlyMg = trimmed.match(/^(\d+)\s*mg$/);
+  if (onlyMg) return Number.parseInt(onlyMg[1], 10) / 1000;
+  const grams = trimmed.match(/^(\d+(?:\.\d{1,3})?)/);
+  if (grams) {
+    const value = Number.parseFloat(grams[1]);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  return 0;
+}
+
+function normalizeLoanAmount(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return Math.round(raw);
+  if (typeof raw !== 'string') return 0;
+  const cleaned = raw
+    .trim()
+    .replace(/,/g, '')
+    .replace(/\s+/g, '')
+    .replace(/\/-?\s*$/, '')
+    .replace(/₹/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return 0;
+  const value = Number.parseFloat(cleaned);
+  return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+}
+
+function normalizeDate(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parts = trimmed.split(/[|/.\-]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length !== 3) return '';
+  const a = Number.parseInt(parts[0], 10);
+  const b = Number.parseInt(parts[1], 10);
+  const c = Number.parseInt(parts[2], 10);
+  if (![a, b, c].every((n) => Number.isInteger(n))) return '';
+  let day: number;
+  let month: number;
+  let year: number;
+  if (parts[0].length === 4) {
+    year = a;
+    month = b;
+    day = c;
+  } else {
+    day = a;
+    month = b;
+    year = c < 100 ? (c >= 70 ? 1900 + c : 2000 + c) : c;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 function parseJsonFromContent(content: string): OcrFields {
@@ -83,18 +182,61 @@ function parseJsonFromContent(content: string): OcrFields {
     throw new Error('OCR response did not contain JSON.');
   }
 
-  const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrFields>;
+  const parsed = JSON.parse(jsonMatch[0]) as Partial<OcrFields> & Record<string, unknown>;
+  const interestRaw = Number(parsed.interest_rate ?? 0);
+  const interest_rate =
+    Number.isFinite(interestRaw) && interestRaw > 0 && interestRaw <= 20 ? interestRaw : 0;
+
   return {
     serial_number: String(parsed.serial_number ?? ''),
-    date: String(parsed.date ?? ''),
+    date: normalizeDate(parsed.date),
     customer_name: String(parsed.customer_name ?? ''),
     phone_number: String(parsed.phone_number ?? ''),
     address: String(parsed.address ?? ''),
     item_name: String(parsed.item_name ?? ''),
-    weight_grams: Number(parsed.weight_grams ?? 0),
-    loan_amount: Number(parsed.loan_amount ?? 0),
-    interest_rate: Number(parsed.interest_rate ?? 3),
+    weight_grams: normalizeWeightGrams(parsed.weight_grams),
+    loan_amount: normalizeLoanAmount(parsed.loan_amount),
+    interest_rate,
   };
+}
+
+function shouldRetryWithJsonObject(status: number, body: string): boolean {
+  if (status !== 400 && status !== 422) return false;
+  const lower = body.toLowerCase();
+  return (
+    lower.includes('json_schema') ||
+    lower.includes('response_format') ||
+    lower.includes('structured output')
+  );
+}
+
+async function callMoonshot(
+  apiKey: string,
+  dataUrl: string,
+  responseFormat: { type: 'json_schema'; json_schema: typeof RECEIPT_JSON_SCHEMA } | { type: 'json_object' },
+): Promise<Response> {
+  return fetch(MOONSHOT_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: KIMI_VISION_MODEL,
+      reasoning_effort: 'low',
+      max_completion_tokens: 2048,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: dataUrl } },
+            { type: 'text', text: EXTRACTION_PROMPT },
+          ],
+        },
+      ],
+      response_format: responseFormat,
+    }),
+  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -109,7 +251,7 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return jsonResponse({ error: 'Missing Authorization header' }, 401);
+      return jsonResponse({ error: 'Missing Authorization header', code: 'bad_request' }, 401);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -142,7 +284,10 @@ Deno.serve(async (req: Request) => {
 
     const apiKey = Deno.env.get('MOONSHOT_API_KEY');
     if (!apiKey) {
-      return jsonResponse({ error: 'MOONSHOT_API_KEY is not configured' }, 500);
+      return jsonResponse(
+        { error: 'MOONSHOT_API_KEY is not configured', code: 'misconfigured' },
+        500,
+      );
     }
 
     const body = (await req.json()) as {
@@ -152,44 +297,28 @@ Deno.serve(async (req: Request) => {
 
     const imageBase64 = body.image_base64?.trim();
     if (!imageBase64) {
-      return jsonResponse({ error: 'image_base64 is required' }, 400);
+      return jsonResponse({ error: 'image_base64 is required', code: 'bad_request' }, 400);
     }
 
     const mimeType = body.mime_type?.trim() || 'image/jpeg';
     const dataUrl = `data:${mimeType};base64,${imageBase64}`;
 
-    const moonshotResponse = await fetch(MOONSHOT_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: KIMI_VISION_MODEL,
-        reasoning_effort: 'low',
-        max_completion_tokens: 2048,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: dataUrl } },
-              { type: 'text', text: EXTRACTION_PROMPT },
-            ],
-          },
-        ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: RECEIPT_JSON_SCHEMA,
-        },
-      }),
+    let moonshotResponse = await callMoonshot(apiKey, dataUrl, {
+      type: 'json_schema',
+      json_schema: RECEIPT_JSON_SCHEMA,
     });
 
     if (!moonshotResponse.ok) {
       const errorBody = await moonshotResponse.text();
-      return jsonResponse(
-        { error: `Kimi Vision failed (${moonshotResponse.status}): ${errorBody}` },
-        502,
-      );
+      if (shouldRetryWithJsonObject(moonshotResponse.status, errorBody)) {
+        moonshotResponse = await callMoonshot(apiKey, dataUrl, { type: 'json_object' });
+        if (!moonshotResponse.ok) {
+          const retryBody = await moonshotResponse.text();
+          return providerRejectedResponse(moonshotResponse.status, retryBody);
+        }
+      } else {
+        return providerRejectedResponse(moonshotResponse.status, errorBody);
+      }
     }
 
     const payload = (await moonshotResponse.json()) as {
@@ -197,12 +326,12 @@ Deno.serve(async (req: Request) => {
     };
     const content = payload.choices?.[0]?.message?.content;
     if (!content) {
-      return jsonResponse({ error: 'Kimi Vision returned an empty response' }, 502);
+      return jsonResponse({ error: 'Kimi Vision returned an empty response', code: 'upstream' }, 502);
     }
 
     return jsonResponse(parseJsonFromContent(content));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return jsonResponse({ error: message }, 500);
+    return jsonResponse({ error: message, code: 'upstream' }, 500);
   }
 });

@@ -45,6 +45,16 @@ jest.mock('expo-file-system/legacy', () => ({
   writeAsStringAsync: jest.fn(async () => undefined),
 }));
 
+jest.mock('@/services/kycService', () => ({
+  saveKycCapture: jest.fn(async () => undefined),
+  uploadKycImage: jest.fn(async () => 'f47ac10b-58cc-4372-a567-0e02b2c3d479/id-doc.jpg'),
+  uploadCustomerPhoto: jest.fn(async () => 'f47ac10b-58cc-4372-a567-0e02b2c3d479/photo/face.jpg'),
+}));
+
+const saveKycCaptureMock = jest.requireMock('@/services/kycService').saveKycCapture as jest.Mock;
+const uploadKycImageMock = jest.requireMock('@/services/kycService').uploadKycImage as jest.Mock;
+const uploadCustomerPhotoMock = jest.requireMock('@/services/kycService').uploadCustomerPhoto as jest.Mock;
+
 const { createSignedUrl, upload, storageFrom, invoke, rpc } = (
   jest.requireMock('@/lib/supabase') as {
     __storageMocks: {
@@ -334,6 +344,12 @@ describe('createLoanWithCustomer', () => {
 
   beforeEach(() => {
     photoInserts.length = 0;
+    saveKycCaptureMock.mockReset();
+    saveKycCaptureMock.mockResolvedValue(undefined);
+    uploadKycImageMock.mockReset();
+    uploadKycImageMock.mockResolvedValue(`${CUSTOMER}/id-doc.jpg`);
+    uploadCustomerPhotoMock.mockReset();
+    uploadCustomerPhotoMock.mockResolvedValue(`${CUSTOMER}/photo/face.jpg`);
     const { supabase } = jest.requireMock('@/lib/supabase') as {
       supabase: { from: jest.Mock };
     };
@@ -378,9 +394,11 @@ describe('createLoanWithCustomer', () => {
   });
 
   test('creates the loan and items in one RPC after converting grams to milligrams', async () => {
-    await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).resolves.toBe(
-      'loan-uuid',
-    );
+    await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).resolves.toEqual({
+      loanId: 'loan-uuid',
+      customerId: CUSTOMER,
+      kycSaveFailed: false,
+    });
 
     expect(rpc).toHaveBeenCalledWith('create_loan', {
       p_customer_id: CUSTOMER,
@@ -451,7 +469,11 @@ describe('createLoanWithCustomer', () => {
 
     await expect(
       createLoanWithCustomer(form, photographed, 'file:///tmp/receipt.jpg', null),
-    ).resolves.toBe('loan-uuid');
+    ).resolves.toEqual({
+      loanId: 'loan-uuid',
+      customerId: CUSTOMER,
+      kycSaveFailed: false,
+    });
 
     expect(photoInserts.map((row) => row.loan_item_id)).toEqual(itemIds);
     expect(photoInserts.every((row) => row.storage_path.startsWith(`${CUSTOMER}/items/`))).toBe(
@@ -500,6 +522,67 @@ describe('createLoanWithCustomer', () => {
     expect(rpc).toHaveBeenCalledWith('create_loan', expect.objectContaining({ p_serial_number: 'T-1' }));
     expect(photoInserts).toHaveLength(1);
     expect(photoInserts[0]?.loan_item_id).toBe('item-a');
+  });
+
+  test('persists KYC after the customer id is known and still creates the loan', async () => {
+    const outcome = await createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null, {
+      idDocumentType: 'pan',
+      idDocumentLast4: '1234',
+      dateOfBirth: '1990-01-15',
+      guardianName: 'Parent',
+      localPhotoUri: 'file:///tmp/pan.jpg',
+      localCustomerPhotoUri: 'file:///tmp/face.jpg',
+    });
+
+    expect(outcome).toEqual({
+      loanId: 'loan-uuid',
+      customerId: CUSTOMER,
+      kycSaveFailed: false,
+    });
+    expect(uploadKycImageMock).toHaveBeenCalledWith('file:///tmp/pan.jpg', CUSTOMER, 'pan');
+    expect(uploadCustomerPhotoMock).toHaveBeenCalledWith('file:///tmp/face.jpg', CUSTOMER);
+    expect(saveKycCaptureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerId: CUSTOMER,
+        idDocumentType: 'pan',
+        idDocumentLast4: '1234',
+        photoPath: `${CUSTOMER}/photo/face.jpg`,
+      }),
+    );
+  });
+
+  test('still creates the loan when KYC persistence fails', async () => {
+    saveKycCaptureMock.mockRejectedValueOnce(new Error('RLS denied'));
+
+    const outcome = await createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null, {
+      idDocumentType: 'aadhaar',
+      idDocumentLast4: '5678',
+      dateOfBirth: '',
+      guardianName: '',
+      localPhotoUri: null,
+      localCustomerPhotoUri: null,
+    });
+
+    expect(outcome).toEqual({
+      loanId: 'loan-uuid',
+      customerId: CUSTOMER,
+      kycSaveFailed: true,
+    });
+    expect(rpc).toHaveBeenCalledWith('create_loan', expect.anything());
+  });
+
+  test('skips KYC writes when the draft is empty', async () => {
+    await createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null, {
+      idDocumentType: null,
+      idDocumentLast4: '',
+      dateOfBirth: '',
+      guardianName: '',
+      localPhotoUri: null,
+      localCustomerPhotoUri: null,
+    });
+
+    expect(saveKycCaptureMock).not.toHaveBeenCalled();
+    expect(uploadKycImageMock).not.toHaveBeenCalled();
   });
 });
 

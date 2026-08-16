@@ -54,7 +54,7 @@ export function AvatarMonogram({
   const colors = useTheme();
   const { t } = useLanguage();
   const initials = initialsFromName(name);
-  const tint = avatarTintPair(avatarColorIndex(name?.trim() || t('a11y.person')), colors);
+  const tint = avatarTintPair(avatarColorIndex(name?.trim() ?? ''), colors);
 
   return (
     <View

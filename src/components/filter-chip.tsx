@@ -1,5 +1,12 @@
+/**
+ * Filter pills. Selected/unselected fills sit on an inner View so
+ * PressableScale / Reanimated cannot drop backgroundColor (chips were
+ * rendering as bare labels on Owner loans).
+ *
+ * https://docs.expo.dev/versions/v57.0.0/sdk/haptics/
+ */
 import { type ReactNode } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
@@ -26,13 +33,21 @@ export function FilterChip({
       accessibilityState={{ selected }}
       accessibilityLabel={label}
       onPress={onPress}
-      style={[
-        styles.chip,
-        {
-          backgroundColor: selected ? colors.tintPrimary : colors.elevated,
-        },
-      ]}>
-      <ThemedText type="label">{label}</ThemedText>
+      style={styles.pressable}>
+      <View
+        testID={testID ? `${testID}-surface` : undefined}
+        style={[
+          styles.chip,
+          {
+            backgroundColor: selected ? colors.gold : colors.elevated,
+            borderColor: colors.border,
+          },
+          !selected && styles.chipOutline,
+        ]}>
+        <ThemedText type="label" style={{ color: selected ? colors.onGold : colors.text }}>
+          {label}
+        </ThemedText>
+      </View>
     </PressableScale>
   );
 }
@@ -55,10 +70,17 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingHorizontal: Spacing.four,
   },
+  pressable: {
+    minHeight: MinTouchTarget,
+    minWidth: MinTouchTarget,
+  },
   chip: {
     minHeight: MinTouchTarget,
     borderRadius: Radii.pill,
     paddingHorizontal: Spacing.three,
     justifyContent: 'center',
+  },
+  chipOutline: {
+    borderWidth: 1,
   },
 });

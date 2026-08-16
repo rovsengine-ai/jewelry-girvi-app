@@ -85,7 +85,7 @@ export default function AdminAlertsScreen() {
   }, [overdue, t]);
 
   return (
-    <ThemedView style={styles.container} type="surface">
+    <ThemedView style={styles.container} type="surfaceSunken">
       <ScreenHeader title={t('notices.admin.title')} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
         {loadError ? <EmptyState title={t('notices.admin.loadErrorTitle')} body={loadError} /> : null}

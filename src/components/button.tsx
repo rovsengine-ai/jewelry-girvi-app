@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, type PressableProps } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, type PressableProps } from 'react-native';
 
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +13,11 @@ export type ButtonProps = Omit<PressableProps, 'children'> & {
   loading?: boolean;
 };
 
+/**
+ * Primary fill lives on an inner View so Reanimated's AnimatedPressable
+ * transform cannot drop backgroundColor (white onPrimary on a missing fill
+ * made Send OTP / Save defaults look invisible).
+ */
 export function Button({
   label,
   variant = 'primary',
@@ -35,24 +40,36 @@ export function Button({
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
       style={(state) => [
-        styles.base,
-        { backgroundColor, borderColor: colors.border, opacity: isDisabled ? 0.5 : 1 },
-        variant === 'secondary' && styles.secondary,
+        styles.pressable,
+        { opacity: isDisabled ? 0.5 : 1 },
         typeof style === 'function' ? style(state) : style,
       ]}
       {...rest}>
-      {loading ? (
-        <ActivityIndicator color={foreground} />
-      ) : (
-        <ThemedText type="smallBold" style={{ color: foreground }}>
-          {label}
-        </ThemedText>
-      )}
+      <View
+        testID={rest.testID ? `${String(rest.testID)}-surface` : undefined}
+        style={[
+          styles.base,
+          { backgroundColor, borderColor: colors.border },
+          variant === 'secondary' && styles.secondary,
+        ]}>
+        {loading ? (
+          <ActivityIndicator color={foreground} />
+        ) : (
+          <ThemedText type="smallBold" style={{ color: foreground }}>
+            {label}
+          </ThemedText>
+        )}
+      </View>
     </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
+  pressable: {
+    alignSelf: 'stretch',
+    minHeight: MinTouchTarget,
+    minWidth: MinTouchTarget,
+  },
   base: {
     minHeight: MinTouchTarget,
     minWidth: MinTouchTarget,

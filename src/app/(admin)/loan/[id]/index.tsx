@@ -1,9 +1,20 @@
+/**
+ * Shopfront loan detail. RPCs and owner gates unchanged.
+ * Call: https://docs.expo.dev/versions/v57.0.0/sdk/linking/
+ * Photos: https://docs.expo.dev/versions/v57.0.0/sdk/image/
+ * Accordion: https://docs.expo.dev/versions/v57.0.0/sdk/reanimated/
+ */
+import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import Animated from 'react-native-reanimated';
 
+import { Accordion, useChevronRotation } from '@/components/accordion';
 import { ArchiveConfirm } from '@/components/archive-confirm';
+import { AppIcon } from '@/components/app-icon';
+import { CustomerAvatar } from '@/components/customer-avatar';
 import { Badge } from '@/components/badge';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -13,37 +24,41 @@ import { FormNotice } from '@/components/form-notice';
 import { ListRow } from '@/components/list-row';
 import { ListSkeleton } from '@/components/list-row-skeleton';
 import { MoneyText } from '@/components/money-text';
+import { PressableScale } from '@/components/pressable-scale';
 import { ScreenHeader } from '@/components/screen-header';
 import { SectionLabel } from '@/components/section-label';
+import { SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radii, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radii, Sizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { unknownMessage } from '@/i18n';
-import {
-  asBps,
-  asPaise,
-  formatBpsAsPercent,
-  rupeesInputToPaise,
-  todayInKolkata,
-} from '@/lib/money';
 import { kycStatusLabel } from '@/lib/kyc';
+import {
+    asBps,
+    asPaise,
+    formatBpsAsPercent,
+    rupeesInputToPaise,
+    todayInKolkata,
+} from '@/lib/money';
 import { buildPledgeAgreementHtml, buildRedemptionReceiptHtml } from '@/lib/print-documents';
 import { isRenewalEligible, parseOwnerOnlyError } from '@/lib/redemption';
+import { telHref } from '@/lib/phone';
 import { supabase } from '@/lib/supabase';
 import { mgToGramsInput } from '@/lib/weight';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
 import {
-  archiveLoan,
-  fetchLoanBalances,
-  fetchLoanCurrentDueOn,
-  fetchLoanItems,
-  fetchOverdueLoans,
-  logPayment,
-  resolveReceiptDisplayUrl,
+    archiveLoan,
+    fetchLoanBalances,
+    fetchLoanCurrentDueOn,
+    fetchLoanItems,
+    fetchOverdueLoans,
+    logPayment,
+    resolveReceiptDisplayUrl,
 } from '@/services/loanService';
 import { shareHtmlAsPdf } from '@/services/printService';
+import { resolveCustomerPhotoUrl } from '@/services/kycService';
 import type { LoanBalances, LoanItem, LoanWithCustomer, Payment } from '@/types/database';
 
 export default function LoanDetailScreen() {
@@ -58,6 +73,7 @@ export default function LoanDetailScreen() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [balances, setBalances] = useState<LoanBalances | null>(null);
   const [receiptDisplayUrl, setReceiptDisplayUrl] = useState<string | null>(null);
+  const [customerPhotoUrl, setCustomerPhotoUrl] = useState<string | null>(null);
   const [dueOn, setDueOn] = useState<string | null>(null);
   const [items, setItems] = useState<LoanItem[]>([]);
   const [isOverdue, setIsOverdue] = useState(false);
@@ -71,6 +87,10 @@ export default function LoanDetailScreen() {
   const [archiveReason, setArchiveReason] = useState('');
   const [archiveSaving, setArchiveSaving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [itemsOpen, setItemsOpen] = useState(false);
+  const customerChevron = useChevronRotation(customerOpen);
+  const itemsChevron = useChevronRotation(itemsOpen);
 
   const loadData = useCallback(async () => {
     if (!id) return;
@@ -89,7 +109,8 @@ export default function LoanDetailScreen() {
               role,
               id_document_type,
               kyc_verified_on,
-              guardian_name
+              guardian_name,
+              photo_path
             )
           `,
           )
@@ -109,15 +130,19 @@ export default function LoanDetailScreen() {
     setPayments((paymentData ?? []) as Payment[]);
 
     if (loanData) {
-      const [nextBalances, signed, nextDueOn, nextItems, overdueRows] = await Promise.all([
+      const [nextBalances, signed, photoSigned, nextDueOn, nextItems, overdueRows] = await Promise.all([
         fetchLoanBalances(id, todayInKolkata()),
         resolveReceiptDisplayUrl(loanData.receipt_image_url),
+        resolveCustomerPhotoUrl(
+          (loanData as LoanWithCustomer).profiles?.photo_path ?? null,
+        ),
         fetchLoanCurrentDueOn(id),
         fetchLoanItems(id),
         fetchOverdueLoans(),
       ]);
       setBalances(nextBalances);
       setReceiptDisplayUrl(signed);
+      setCustomerPhotoUrl(photoSigned);
       setDueOn(nextDueOn);
       setItems(nextItems);
       setIsOverdue(overdueRows.some((row) => row.loan_id === id));
@@ -192,7 +217,7 @@ export default function LoanDetailScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.loadErrorTitle')} />
+        <ScreenHeader showBack title={t('loans.detail.loadErrorTitle')} />
         <ListSkeleton rows={6} />
       </ThemedView>
     );
@@ -201,9 +226,8 @@ export default function LoanDetailScreen() {
   if (loadError || !loan || !balances) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.loadErrorTitle')} />
+        <ScreenHeader showBack title={t('loans.detail.loadErrorTitle')} />
         <View style={styles.body}>
-          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState
             title={loadError ? t('loans.detail.loadErrorTitle') : t('loans.detail.notFoundTitle')}
             body={loadError ?? t('loans.detail.notFoundBody')}
@@ -265,38 +289,122 @@ export default function LoanDetailScreen() {
     }
   };
 
+  const phoneHref = telHref(loan.profiles?.phone_number);
+  const valuedItems = items.filter((item) => item.valuation_paise != null);
+  const marketPaise = valuedItems.reduce(
+    (sum, item) => sum + (item.valuation_paise ?? 0),
+    0,
+  );
+
   return (
     <ThemedView style={styles.container} type="surfaceSunken">
-      <ScreenHeader title={loan.serial_number} />
+      <ScreenHeader
+        showBack
+        title={loan.serial_number}
+        trailing={
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.print')}
+            onPress={() => void printPledge()}
+            style={styles.iconHit}>
+            <AppIcon ios="printer" android="print" color={colors.onChrome} />
+          </PressableScale>
+        }
+      />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.padded}>
-          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <FormNotice error={formError} notice={formNotice} />
+          {loan.status === 'redeemed' && loan.archived_at == null ? (
+            <FormNotice
+              notice={
+                isOwner
+                  ? t('loans.detail.redeemedAwaitingArchive')
+                  : t('loans.detail.redeemedLive')
+              }
+            />
+          ) : null}
         </View>
 
-        <View style={[styles.hero, { backgroundColor: colors.elevated }]}>
-          <View style={styles.heroTop}>
-            <ThemedText type="bodyLarge" style={styles.heroName} numberOfLines={1}>
-              {loan.profiles?.full_name ?? t('common.unknownCustomer')}
-            </ThemedText>
-            <Badge status={loan.status} />
+        <Card style={styles.block}>
+          <View style={styles.customerHead}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityState={{ expanded: customerOpen }}
+              accessibilityLabel={
+                customerOpen ? t('a11y.collapse') : t('a11y.expand')
+              }
+              onPress={() => setCustomerOpen(!customerOpen)}
+              style={styles.customerPress}>
+              <CustomerAvatar
+                name={loan.profiles?.full_name}
+                photoUrl={customerPhotoUrl}
+              />
+              <View style={styles.customerCopy}>
+                <ThemedText type="bodyLarge">
+                  {loan.profiles?.full_name ?? t('common.unknownCustomer')}
+                </ThemedText>
+                <ThemedText type="label" style={{ color: colors.accentWarning }}>
+                  {loan.profiles?.phone_number ?? t('common.emDash')}
+                </ThemedText>
+              </View>
+              <Animated.View style={customerChevron}>
+                <AppIcon
+                  ios="chevron.down"
+                  android="expand_more"
+                  color={colors.textSecondary}
+                  accessibilityLabel={t('a11y.chevron')}
+                />
+              </Animated.View>
+            </PressableScale>
+            {phoneHref ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.call')}
+                onPress={() => {
+                  void Linking.openURL(phoneHref);
+                }}
+                style={styles.iconHit}>
+                <AppIcon ios="phone.fill" android="call" color={colors.accentWarning} />
+              </PressableScale>
+            ) : null}
           </View>
-          <ThemedText type="overline" themeColor="textSecondary">
-            {t('loans.detail.totalDue')}
-          </ThemedText>
-          <MoneyText size="large" paise={balances.totalDuePaise} />
-        </View>
+          <Accordion expanded={customerOpen}>
+            <View style={styles.threeUp}>
+              <View style={styles.stat}>
+                <ThemedText type="overline" themeColor="textSecondary">
+                  {t('loans.detail.totalDue')}
+                </ThemedText>
+                <MoneyText paise={balances.totalDuePaise} />
+              </View>
+              <View style={styles.stat}>
+                <ThemedText type="overline" themeColor="textSecondary">
+                  {t('loans.detail.outstandingPrincipal')}
+                </ThemedText>
+                <MoneyText paise={balances.outstandingPrincipalPaise} />
+              </View>
+              <View style={styles.stat}>
+                <ThemedText type="overline" themeColor="textSecondary">
+                  {t('loans.detail.accruedInterestDue')}
+                </ThemedText>
+                <MoneyText paise={balances.accruedInterestPaise} />
+              </View>
+            </View>
+          </Accordion>
+        </Card>
 
-        <SectionLabel>{t('loans.detail.sectionCustomer')}</SectionLabel>
-        <ThemedText type="label" themeColor="textSecondary" style={styles.padded}>
-          {loan.profiles?.phone_number ?? t('common.emDash')}
-        </ThemedText>
-        <ThemedText type="label" testID="loan-kyc-status" style={styles.padded}>
-          {t('loans.detail.kycLine', {
-            status: kycStatusLabel(loan.profiles?.kyc_verified_on ?? null, language),
-          })}
-        </ThemedText>
         <View style={styles.padded}>
+          <ListRow
+            tone="elevated"
+            isLast
+            testID="loan-kyc-status"
+            content={
+              <ThemedText type="label">
+                {t('loans.detail.kycLine', {
+                  status: kycStatusLabel(loan.profiles?.kyc_verified_on ?? null, language),
+                })}
+              </ThemedText>
+            }
+          />
           <Button
             testID="open-kyc"
             label={t('loans.detail.captureVerifyKyc')}
@@ -309,112 +417,227 @@ export default function LoanDetailScreen() {
           <Image source={{ uri: receiptDisplayUrl }} style={styles.receipt} contentFit="cover" />
         ) : null}
 
-        <SectionLabel>{t('loans.detail.summaryTitle')}</SectionLabel>
-        <View style={[styles.facts, { backgroundColor: colors.elevated }]}>
-          <ThemedText type="label" themeColor="textSecondary">
-            {t('loans.detail.summaryMeta', {
-              item: loan.item_name,
-              weight: loan.weight_grams,
-              rate: formatBpsAsPercent(asBps(loan.rate_bps)),
-              model: t(`loans.interestModel.${loan.interest_model}`),
-            })}
-          </ThemedText>
-          <ThemedText type="label">{t('loans.detail.disbursed', { date: loan.disbursed_on })}</ThemedText>
-          <ThemedText type="label">
-            {t('loans.detail.due', { date: dueOn ?? t('common.emDash') })}
-          </ThemedText>
-          <View style={styles.factRow}>
-            <ThemedText type="overline" themeColor="textSecondary">
-              {t('loans.detail.originalPrincipal')}
-            </ThemedText>
-            <MoneyText paise={asPaise(loan.principal_paise)} />
-          </View>
-          <View style={styles.factRow}>
-            <ThemedText type="overline" themeColor="textSecondary">
-              {t('loans.detail.interestPaid')}
-            </ThemedText>
-            <MoneyText paise={balances.interestPaidPaise} />
-          </View>
-          <View style={styles.factRow}>
-            <ThemedText type="overline" themeColor="textSecondary">
-              {t('loans.detail.principalPaid')}
-            </ThemedText>
-            <MoneyText paise={balances.principalPaidPaise} />
-          </View>
-          <View style={styles.factRow}>
-            <ThemedText type="overline" themeColor="textSecondary">
-              {t('loans.detail.outstandingPrincipal')}
-            </ThemedText>
-            <MoneyText paise={balances.outstandingPrincipalPaise} />
-          </View>
-          <View style={styles.factRow}>
-            <ThemedText type="overline" themeColor="textSecondary">
-              {t('loans.detail.accruedInterestDue')}
-            </ThemedText>
-            <MoneyText paise={balances.accruedInterestPaise} />
-          </View>
-          {loan.status === 'redeemed' && loan.closure_balance_paise != null ? (
-            <View style={styles.factRow}>
-              <ThemedText type="label">
-                {t('loans.detail.redeemedRow', {
-                  date: loan.redeemed_on ?? t('common.emDash'),
-                  name: loan.released_to_name ?? t('common.emDash'),
-                })}
+        <Card style={styles.block}>
+          <View style={styles.termsHead}>
+            <View style={[styles.serialBadge, { backgroundColor: colors.tintWarning }]}>
+              <ThemedText type="caption" style={{ color: colors.accentWarning }}>
+                {loan.serial_number}
               </ThemedText>
-              <MoneyText paise={asPaise(loan.closure_balance_paise)} />
             </View>
-          ) : null}
-          {loan.status === 'defaulted' && loan.default_balance_paise != null ? (
-            <View style={styles.factRow}>
-              <ThemedText type="label">
-                {loan.default_reason
-                  ? t('loans.detail.defaultedRowReason', {
-                      date: loan.defaulted_on ?? t('common.emDash'),
-                      reason: loan.default_reason,
-                    })
-                  : t('loans.detail.defaultedRow', {
-                      date: loan.defaulted_on ?? t('common.emDash'),
-                    })}
+            <Badge status={loan.status} />
+          </View>
+          <View style={styles.dateRow}>
+            <AppIcon ios="calendar" android="calendar_month" color={colors.textSecondary} />
+            <ThemedText type="label" themeColor="textSecondary">
+              {t('loans.detail.dateRange', {
+                from: loan.disbursed_on,
+                to: dueOn ?? t('common.emDash'),
+              })}
+            </ThemedText>
+          </View>
+          <View style={styles.fourUp}>
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.detail.originalPrincipal')}
               </ThemedText>
-              <MoneyText paise={asPaise(loan.default_balance_paise)} />
+              <MoneyText paise={asPaise(loan.principal_paise)} />
             </View>
-          ) : null}
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.terms.interestModel')}
+              </ThemedText>
+              <ThemedText type="bodyBold">
+                {t(`loans.interestModel.${loan.interest_model}`)}
+              </ThemedText>
+            </View>
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.terms.rateLabel')}
+              </ThemedText>
+              <ThemedText type="bodyBold">
+                {formatBpsAsPercent(asBps(loan.rate_bps))}
+                {t('common.ratePer30d')}
+              </ThemedText>
+            </View>
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.terms.simplePeriod')}
+              </ThemedText>
+              <ThemedText type="bodyBold">
+                {t('loans.detail.tenureDays', { days: loan.simple_period_days })}
+              </ThemedText>
+            </View>
+          </View>
+        </Card>
+
+        <View style={[styles.marketBar, { backgroundColor: colors.tintSuccess }]}>
+          <ThemedText type="overline" style={{ color: colors.onTintSuccess }}>
+            {t('loans.detail.marketValue')}
+          </ThemedText>
+          {valuedItems.length > 0 ? (
+            <>
+              <MoneyText paise={asPaise(marketPaise)} style={{ color: colors.onTintSuccess }} />
+              <ThemedText type="caption" style={{ color: colors.onTintSuccess }}>
+                {t('loans.detail.marketValueCaption', { notIbja: t('common.notIbja') })}
+              </ThemedText>
+            </>
+          ) : (
+            <ThemedText type="caption" style={{ color: colors.onTintSuccess }}>
+              {t('loans.detail.marketValueEmpty')}
+            </ThemedText>
+          )}
         </View>
 
-        <SectionLabel>{t('loans.detail.pledgedItems')}</SectionLabel>
+        <Card style={styles.block}>
+          <View style={styles.threeUp}>
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.detail.totalDue')}
+              </ThemedText>
+              <MoneyText paise={balances.totalDuePaise} />
+            </View>
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.detail.interestPaid')}
+              </ThemedText>
+              <MoneyText paise={balances.interestPaidPaise} style={{ color: colors.success }} />
+            </View>
+            <View style={styles.stat}>
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.detail.outstandingPrincipal')}
+              </ThemedText>
+              <MoneyText
+                paise={balances.outstandingPrincipalPaise}
+                style={{ color: colors.danger }}
+              />
+            </View>
+          </View>
+          <ListRow
+            tone="elevated"
+            content={
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.detail.principalPaid')}
+              </ThemedText>
+            }
+            trailing={
+              <MoneyText paise={balances.principalPaidPaise} style={{ color: colors.success }} />
+            }
+          />
+          <ListRow
+            tone="elevated"
+            isLast={
+              !(
+                (loan.status === 'redeemed' && loan.closure_balance_paise != null) ||
+                (loan.status === 'defaulted' && loan.default_balance_paise != null)
+              )
+            }
+            content={
+              <ThemedText type="overline" themeColor="textSecondary">
+                {t('loans.detail.accruedInterestDue')}
+              </ThemedText>
+            }
+            trailing={
+              <MoneyText paise={balances.accruedInterestPaise} style={{ color: colors.danger }} />
+            }
+          />
+          {loan.status === 'redeemed' && loan.closure_balance_paise != null ? (
+            <ListRow
+              tone="elevated"
+              isLast
+              content={
+                <ThemedText type="label">
+                  {t('loans.detail.redeemedRow', {
+                    date: loan.redeemed_on ?? t('common.emDash'),
+                    name: loan.released_to_name ?? t('common.emDash'),
+                  })}
+                </ThemedText>
+              }
+              trailing={<MoneyText paise={asPaise(loan.closure_balance_paise)} />}
+            />
+          ) : null}
+          {loan.status === 'defaulted' && loan.default_balance_paise != null ? (
+            <ListRow
+              tone="elevated"
+              isLast
+              content={
+                <ThemedText type="label">
+                  {loan.default_reason
+                    ? t('loans.detail.defaultedRowReason', {
+                        date: loan.defaulted_on ?? t('common.emDash'),
+                        reason: loan.default_reason,
+                      })
+                    : t('loans.detail.defaultedRow', {
+                        date: loan.defaulted_on ?? t('common.emDash'),
+                      })}
+                </ThemedText>
+              }
+              trailing={<MoneyText paise={asPaise(loan.default_balance_paise)} />}
+            />
+          ) : null}
+        </Card>
+
         {items.length === 0 ? (
           <EmptyState
             title={t('loans.detail.itemsEmptyTitle')}
             body={t('loans.detail.itemsEmptyBody')}
           />
         ) : (
-          items.map((item, index) => (
-            <ListRow
-              key={item.id}
-              tone="elevated"
-              isLast={index === items.length - 1}
-              content={
-                <ThemedText type="label">
-                  {t('loans.detail.itemMeta', {
-                    metal: item.metal ? t(`items.${item.metal}`) : t('loans.detail.metalUnknown'),
-                    ornament: item.ornament_type,
-                    grams: mgToGramsInput(item.net_weight_mg),
-                    purity:
-                      item.purity_karat != null
-                        ? t('loans.detail.purityKarat', { karat: item.purity_karat })
-                        : t('loans.detail.purityNotAssessed'),
-                    qty: item.quantity > 1 ? t('loans.detail.quantitySuffix', { qty: item.quantity }) : '',
-                    assessed: item.valuation_paise != null ? t('loans.detail.assessedNotIbja') : '',
-                  })}
-                </ThemedText>
-              }
-              trailing={
-                item.valuation_paise != null ? (
-                  <MoneyText paise={asPaise(item.valuation_paise)} />
-                ) : undefined
-              }
-            />
-          ))
+          <Card style={styles.block}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityState={{ expanded: itemsOpen }}
+              accessibilityLabel={itemsOpen ? t('a11y.collapse') : t('a11y.expand')}
+              onPress={() => setItemsOpen(!itemsOpen)}
+              style={styles.customerHead}>
+              <ThemedText type="bodyLarge" style={styles.heroName}>
+                {t('loans.detail.totalItems', { count: items.length })}
+              </ThemedText>
+              <Animated.View style={itemsChevron}>
+                <AppIcon
+                  ios="chevron.down"
+                  android="expand_more"
+                  color={colors.textSecondary}
+                  accessibilityLabel={t('a11y.chevron')}
+                />
+              </Animated.View>
+            </PressableScale>
+            <Accordion expanded={itemsOpen}>
+              {items.map((item, index) => (
+                <ListRow
+                  key={item.id}
+                  tone="elevated"
+                  isLast={index === items.length - 1}
+                  leading={
+                    <AppIcon
+                      ios={item.metal === 'silver' ? 'circle' : 'circle.fill'}
+                      android={item.metal === 'silver' ? 'radio_button_unchecked' : 'circle'}
+                      color={item.metal === 'silver' ? colors.textSecondary : colors.gold}
+                    />
+                  }
+                  content={
+                    <ThemedText type="label">
+                      {t('loans.detail.itemMeta', {
+                        metal: item.metal ? t(`items.${item.metal}`) : t('loans.detail.metalUnknown'),
+                        ornament: item.ornament_type,
+                        grams: mgToGramsInput(item.net_weight_mg),
+                        purity:
+                          item.purity_karat != null
+                            ? t('loans.detail.purityKarat', { karat: item.purity_karat })
+                            : t('loans.detail.purityNotAssessed'),
+                        qty: item.quantity > 1 ? t('loans.detail.quantitySuffix', { qty: item.quantity }) : '',
+                        assessed: item.valuation_paise != null ? t('loans.detail.assessedNotIbja') : '',
+                      })}
+                    </ThemedText>
+                  }
+                  trailing={
+                    item.valuation_paise != null ? (
+                      <MoneyText paise={asPaise(item.valuation_paise)} />
+                    ) : undefined
+                  }
+                />
+              ))}
+            </Accordion>
+          </Card>
         )}
 
         <SectionLabel>{t('loans.detail.sectionActions')}</SectionLabel>
@@ -453,8 +676,12 @@ export default function LoanDetailScreen() {
           {isOwner && loan.archived_at == null ? (
             <Button
               testID="open-archive"
-              label={t('archive.archive')}
-              variant="danger"
+              label={
+                loan.status === 'redeemed'
+                  ? t('archive.archiveAfterPickup')
+                  : t('archive.archive')
+              }
+              variant={loan.status === 'redeemed' ? 'primary' : 'danger'}
               onPress={() => {
                 setArchiveError(null);
                 setArchiveReason('');
@@ -494,9 +721,10 @@ export default function LoanDetailScreen() {
             />
             <Button
               testID="record-payment"
-              label={t('loans.detail.recordPayment')}
+              label={t('loans.detail.addTransaction')}
               loading={isSaving}
               onPress={() => void handleLogPayment()}
+              style={styles.addTxn}
             />
           </Card>
         ) : null}
@@ -508,19 +736,30 @@ export default function LoanDetailScreen() {
             body={t('loans.detail.paymentsEmptyBody')}
           />
         ) : (
-          payments.map((item, index) => (
-            <ListRow
-              key={item.id}
-              tone="elevated"
-              isLast={index === payments.length - 1}
-              content={
-                <ThemedText type="label">
-                  {t('loans.detail.paidOn', { date: item.paid_on })}
-                </ThemedText>
-              }
-              trailing={<MoneyText paise={asPaise(item.amount_paid_paise)} />}
-            />
-          ))
+          <SettingsGroup>
+            {payments.map((item, index) => {
+              const showDate = index === 0 || item.paid_on !== payments[index - 1]?.paid_on;
+              return (
+                <View key={item.id}>
+                  {showDate ? (
+                    <ThemedText type="label" themeColor="textSecondary" style={styles.dateGroup}>
+                      {item.paid_on}
+                    </ThemedText>
+                  ) : null}
+                  <ListRow
+                    tone="elevated"
+                    isLast={index === payments.length - 1}
+                    content={
+                      <ThemedText type="caption" themeColor="textSecondary">
+                        {t('loans.detail.paidOn', { date: item.paid_on })}
+                      </ThemedText>
+                    }
+                    trailing={<MoneyText paise={asPaise(item.amount_paid_paise)} />}
+                  />
+                </View>
+              );
+            })}
+          </SettingsGroup>
         )}
       </ScrollView>
       {archiveOpen ? (
@@ -545,35 +784,79 @@ export default function LoanDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   body: { paddingBottom: Spacing.six, gap: Spacing.two },
-  padded: { paddingHorizontal: Spacing.four },
-  hero: {
+  padded: { paddingHorizontal: Spacing.four, gap: Spacing.two },
+  block: {
     marginHorizontal: Spacing.four,
-    marginTop: Spacing.two,
-    borderRadius: Radii.md,
-    padding: Spacing.four,
-    gap: Spacing.two,
   },
-  heroTop: {
+  customerHead: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
   },
-  heroName: { flex: 1 },
-  receipt: {
-    width: 'auto',
-    marginHorizontal: Spacing.four,
-    height: 180,
-    borderRadius: Radii.md,
-    marginVertical: Spacing.two,
+  customerPress: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    minHeight: MinTouchTarget,
   },
-  facts: {
+  customerCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: Spacing.half,
+  },
+  iconHit: {
+    minWidth: MinTouchTarget,
+    minHeight: MinTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  threeUp: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+  },
+  fourUp: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  stat: {
+    flex: 1,
+    minWidth: 0,
+    gap: Spacing.half,
+  },
+  termsHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  serialBadge: {
+    borderRadius: Radii.pill,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    minHeight: MinTouchTarget,
+  },
+  marketBar: {
     marginHorizontal: Spacing.four,
     borderRadius: Radii.md,
     padding: Spacing.three,
-    gap: Spacing.three,
+    gap: Spacing.one,
   },
-  factRow: {
-    gap: Spacing.half,
+  heroName: { flex: 1, minWidth: 0 },
+  receipt: {
+    width: 'auto',
+    marginHorizontal: Spacing.four,
+    height: Sizes.receiptThumbHeight,
+    borderRadius: Radii.md,
+    marginVertical: Spacing.two,
   },
   actions: {
     paddingHorizontal: Spacing.four,
@@ -582,5 +865,12 @@ const styles = StyleSheet.create({
   },
   paymentCard: {
     marginHorizontal: Spacing.four,
+  },
+  addTxn: {
+    borderRadius: Radii.pill,
+  },
+  dateGroup: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
   },
 });

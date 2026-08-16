@@ -21,6 +21,14 @@ export function loanStatusLabel(status: LoanStatus, language?: AppLanguage): str
   }
 }
 
+/** Customer-facing label — redeemed loans prompt a shop visit, not admin “Redeemed”. */
+export function customerLoanStatusLabel(status: LoanStatus, language?: AppLanguage): string {
+  if (status === 'redeemed') {
+    return translate('loans.customer.collectItemsStatus', undefined, language);
+  }
+  return loanStatusLabel(status, language);
+}
+
 export function redeemGate(
   role: UserRole | undefined,
   status: LoanStatus | undefined,

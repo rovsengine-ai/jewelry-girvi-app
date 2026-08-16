@@ -22,7 +22,7 @@ export function ListRow({
   content,
   trailing,
   isLast = false,
-  tone = 'surface',
+  tone = 'elevated',
   onPress,
   disabled,
   testID,
@@ -117,7 +117,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.half,
     flexShrink: 0,
-    maxWidth: '42%',
   },
   divider: {
     height: Sizes.hairline,

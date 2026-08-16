@@ -26,6 +26,7 @@ export interface Database {
           id_document_type: IdDocumentType | null;
           id_document_last4: string | null;
           id_document_path: string | null;
+          photo_path: string | null;
           kyc_verified_on: string | null;
           kyc_verified_by: string | null;
           guardian_name: string | null;
@@ -42,6 +43,7 @@ export interface Database {
           id_document_type?: IdDocumentType | null;
           id_document_last4?: string | null;
           id_document_path?: string | null;
+          photo_path?: string | null;
           kyc_verified_on?: string | null;
           kyc_verified_by?: string | null;
           guardian_name?: string | null;
@@ -57,6 +59,7 @@ export interface Database {
           id_document_type?: IdDocumentType | null;
           id_document_last4?: string | null;
           id_document_path?: string | null;
+          photo_path?: string | null;
           kyc_verified_on?: string | null;
           kyc_verified_by?: string | null;
           guardian_name?: string | null;

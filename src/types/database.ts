@@ -51,6 +51,8 @@ export interface Profile {
    * is the full number, which UIDAI forbids storing. Enforced by a CHECK.
    */
   id_document_path: string | null;
+  /** Face photo in the private kyc bucket at `{customer_id}/photo/...`. */
+  photo_path: string | null;
   kyc_verified_on: string | null;
   kyc_verified_by: string | null;
   guardian_name: string | null;
@@ -181,6 +183,7 @@ export interface LoanWithCustomer extends Loan {
     | 'id_document_type'
     | 'kyc_verified_on'
     | 'guardian_name'
+    | 'photo_path'
   > | null;
 }
 

@@ -4,21 +4,21 @@
  * Expo Router nested stack (SDK 57):
  * https://docs.expo.dev/versions/v57.0.0/sdk/router/
  */
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
+import { FilterChip } from '@/components/filter-chip';
 import { FormNotice } from '@/components/form-notice';
-import { PressableScale } from '@/components/pressable-scale';
+import { ListSkeleton } from '@/components/list-row-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Spacing } from '@/constants/theme';
 import type { TranslateFn } from '@/i18n';
 import { formatBpsAsPercent, percentInputToBps } from '@/lib/money';
 import { parseOwnerOnlyError } from '@/lib/redemption';
@@ -48,7 +48,6 @@ function parseWholeNumber(raw: string, field: string, t: TranslateFn): number {
 }
 
 export default function EditLoanTermsScreen() {
-  const colors = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { profile } = useAuth();
@@ -155,16 +154,18 @@ export default function EditLoanTermsScreen() {
 
   if (!isOwner) {
     return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+      <ThemedView style={styles.container} type="surfaceSunken">
+        <ScreenHeader showBack title={t('loans.detail.editTerms')} />
+        <ListSkeleton rows={6} />
       </ThemedView>
     );
   }
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+      <ThemedView style={styles.container} type="surfaceSunken">
+        <ScreenHeader showBack title={t('loans.detail.editTerms')} />
+        <ListSkeleton rows={6} />
       </ThemedView>
     );
   }
@@ -172,7 +173,7 @@ export default function EditLoanTermsScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.editTerms')} />
+        <ScreenHeader showBack title={t('loans.detail.editTerms')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.loadErrorTitle')} body={loadError} />
@@ -184,7 +185,7 @@ export default function EditLoanTermsScreen() {
   if (!loan) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.editTerms')} />
+        <ScreenHeader showBack title={t('loans.detail.editTerms')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.notFoundTitle')} body={t('loans.detail.notFoundBody')} />
@@ -195,7 +196,7 @@ export default function EditLoanTermsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={headerTitle} />
+      <ScreenHeader showBack title={headerTitle} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         <FormNotice error={formError} notice={formNotice} />
@@ -205,19 +206,12 @@ export default function EditLoanTermsScreen() {
           <ThemedText type="smallBold">{t('loans.terms.interestModel')}</ThemedText>
           <View style={styles.modeRow}>
             {(Object.keys(MODEL_KEYS) as InterestModel[]).map((id) => (
-              <PressableScale
+              <FilterChip
                 key={id}
+                label={t(MODEL_KEYS[id])}
+                selected={interestModel === id}
                 onPress={() => setInterestModel(id)}
-                style={[
-                  styles.modeChip,
-                  {
-                    backgroundColor:
-                      interestModel === id ? colors.backgroundSelected : colors.elevated,
-                    borderColor: colors.border,
-                  },
-                ]}>
-                <ThemedText type="smallBold">{t(MODEL_KEYS[id])}</ThemedText>
-              </PressableScale>
+              />
             ))}
           </View>
           <Field
@@ -253,19 +247,12 @@ export default function EditLoanTermsScreen() {
           <ThemedText type="smallBold">{t('loans.terms.partialPeriodMode')}</ThemedText>
           <View style={styles.modeRow}>
             {(Object.keys(MODE_KEYS) as PartialPeriodMode[]).map((id) => (
-              <PressableScale
+              <FilterChip
                 key={id}
+                label={t(MODE_KEYS[id])}
+                selected={partialPeriodMode === id}
                 onPress={() => setPartialPeriodMode(id)}
-                style={[
-                  styles.modeChip,
-                  {
-                    backgroundColor:
-                      partialPeriodMode === id ? colors.backgroundSelected : colors.elevated,
-                    borderColor: colors.border,
-                  },
-                ]}>
-                <ThemedText type="smallBold">{t(MODE_KEYS[id])}</ThemedText>
-              </PressableScale>
+              />
             ))}
           </View>
           <Field
@@ -291,14 +278,6 @@ export default function EditLoanTermsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
-  modeRow: { gap: Spacing.two },
-  modeChip: {
-    minHeight: MinTouchTarget,
-    borderRadius: Radii.sm,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.two,
-    justifyContent: 'center',
-  },
+  modeRow: { gap: Spacing.two, flexDirection: 'row', flexWrap: 'wrap' },
 });

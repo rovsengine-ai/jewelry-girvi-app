@@ -15,7 +15,6 @@ describe('<Card />', () => {
     getByText('Loan summary');
     expect(flatStyle(getByTestId('card'))).toMatchObject({
       backgroundColor: Colors.light.elevated,
-      borderColor: Colors.light.border,
     });
   });
 });

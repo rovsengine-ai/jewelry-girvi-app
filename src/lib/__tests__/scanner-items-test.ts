@@ -86,6 +86,23 @@ describe('scannerItemsReducer', () => {
     const state = [emptyScannerItem('item-1')];
     expect(scannerItemsReducer(state, { type: 'remove', key: 'item-1' })).toHaveLength(1);
   });
+
+  test('resets to a single empty item', () => {
+    let state = [emptyScannerItem('item-1')];
+    state = scannerItemsReducer(state, { type: 'add' });
+    expect(scannerItemsReducer(state, { type: 'reset' })).toEqual([emptyScannerItem('item-1')]);
+  });
+
+  test('seedFromOcr can set metal when clear', () => {
+    const seeded = scannerItemsReducer([emptyScannerItem('item-1')], {
+      type: 'seedFromOcr',
+      ornamentType: 'सोना पेठा',
+      grossGrams: '25.8',
+      metal: 'gold',
+    });
+    expect(seeded[0]?.metal).toBe('gold');
+    expect(seeded[0]?.ornament_type).toBe('सोना पेठा');
+  });
 });
 
 describe('convertScannerItem', () => {

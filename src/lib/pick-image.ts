@@ -7,13 +7,23 @@ import * as ImagePicker from 'expo-image-picker';
  *
  * mediaTypes uses the v57 array form (`['images']`), not deprecated MediaTypeOptions.
  */
+export class PermissionDeniedError extends Error {
+  readonly kind: 'camera' | 'library';
+
+  constructor(kind: 'camera' | 'library') {
+    super(kind);
+    this.name = 'PermissionDeniedError';
+    this.kind = kind;
+  }
+}
+
 export async function pickStillImage(
   source: 'camera' | 'library',
 ): Promise<string | null> {
   if (source === 'camera') {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      throw new Error('Camera permission is required to photograph the item or ID.');
+      throw new PermissionDeniedError('camera');
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
@@ -27,7 +37,7 @@ export async function pickStillImage(
 
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
-    throw new Error('Photo library permission is required to attach an existing picture.');
+    throw new PermissionDeniedError('library');
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],

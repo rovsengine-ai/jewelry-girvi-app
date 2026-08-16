@@ -44,14 +44,17 @@ describe('Pixel 4a 200% font / dark mode', () => {
   });
 
   test('primary control stays a 44pt hit target in dark mode', async () => {
-    const { getByRole } = await render(
+    const { getByRole, getByTestId } = await render(
       <ThemePaletteProvider palette={Colors.dark}>
-        <Button label="Save Girvi Loan" />
+        <Button testID="pixel4a-primary" label="Save Girvi Loan" />
       </ThemePaletteProvider>,
     );
     expect(flatStyle(getByRole('button'))).toMatchObject({
       minHeight: MinTouchTarget,
+    });
+    expect(flatStyle(getByTestId('pixel4a-primary-surface'))).toMatchObject({
       backgroundColor: Colors.dark.primary,
+      minHeight: MinTouchTarget,
     });
   });
 

@@ -25,7 +25,7 @@ export function SearchField({
       style={[
         styles.wrap,
         {
-          backgroundColor: colors.surfaceSunken,
+          backgroundColor: colors.elevated,
         },
       ]}>
       <AppIcon

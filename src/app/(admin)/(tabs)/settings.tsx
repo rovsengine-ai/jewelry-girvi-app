@@ -4,9 +4,9 @@
  *
  * Expo Router (SDK 57): https://docs.expo.dev/versions/v57.0.0/sdk/router/
  */
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 
 import { AppIcon, TintedIconWell } from '@/components/app-icon';
 import { Button } from '@/components/button';
@@ -31,7 +31,57 @@ import { ADMIN_ARCHIVE_HREF, isShopOwner } from '@/lib/shop-tab-access';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
 import { fetchShopDefaults, updateShopDefaults } from '@/services/loanService';
-import type { PartialPeriodMode } from '@/types/database';
+import type { PartialPeriodMode, Profile, UserRole } from '@/types/database';
+
+function shopRoleLabel(
+  role: UserRole | undefined,
+  t: (key: string, options?: Record<string, string | number>) => string,
+): string {
+  switch (role) {
+    case 'owner':
+      return t('settings.roleOwner');
+    case 'staff':
+      return t('settings.roleStaff');
+    case 'retail_customer':
+      return t('common.customer');
+    case 'merchant':
+      return t('loans.interestModel.merchant');
+    case undefined:
+      return '';
+    default: {
+      const _exhaustive: never = role;
+      return _exhaustive;
+    }
+  }
+}
+
+function AccountCard({ profile }: { profile: Profile | null }) {
+  const colors = useTheme();
+  const { t } = useLanguage();
+
+  return (
+    <Card style={styles.accountCard}>
+      <View style={styles.accountRow}>
+        <TintedIconWell tint={colors.tintPrimary}>
+          <AppIcon ios="storefront" android="storefront" color={colors.primary} />
+        </TintedIconWell>
+        <View style={styles.accountCopy}>
+          <ThemedText type="bodyLarge">
+            {profile?.full_name ?? t('common.unknown')}
+          </ThemedText>
+          {profile?.phone_number ? (
+            <ThemedText type="label" style={{ color: colors.accentWarning }}>
+              {profile.phone_number}
+            </ThemedText>
+          ) : null}
+          <ThemedText type="caption" themeColor="textSecondary">
+            {shopRoleLabel(profile?.role, t)}
+          </ThemedText>
+        </View>
+      </View>
+    </Card>
+  );
+}
 
 const MODE_KEYS: Record<PartialPeriodMode, string> = {
   min_month_then_pro_rata: 'loans.terms.minMonthThenProRata',
@@ -163,6 +213,7 @@ export default function ShopSettingsScreen() {
       <ThemedView style={styles.container} type="surfaceSunken">
         <ScreenHeader title={t('settings.title')} />
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
+          <AccountCard profile={profile} />
           <ThemedText type="small" style={styles.hint}>
             {t('settings.staffHint')}
           </ThemedText>
@@ -179,7 +230,7 @@ export default function ShopSettingsScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.container} type="surfaceSunken">
-        <ScreenHeader title={t('settings.shopDefaults')} />
+        <ScreenHeader title={t('settings.title')} />
         <ListSkeleton rows={6} />
       </ThemedView>
     );
@@ -197,8 +248,10 @@ export default function ShopSettingsScreen() {
 
   return (
     <ThemedView style={styles.container} type="surfaceSunken">
-      <ScreenHeader title={t('settings.shopDefaults')} />
+      <ScreenHeader title={t('settings.title')} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
+        <AccountCard profile={profile} />
+
         <SectionLabel>{t('settings.groupPreferences')}</SectionLabel>
         <SettingsGroup>
           <LanguageSettingsRow />
@@ -277,7 +330,7 @@ export default function ShopSettingsScreen() {
                   styles.modeChip,
                   {
                     backgroundColor:
-                      partialPeriodMode === id ? colors.tintPrimary : colors.elevated,
+                      partialPeriodMode === id ? colors.tintPrimary : colors.backgroundElement,
                   },
                 ]}>
                 <ThemedText type="label">{t(MODE_KEYS[id])}</ThemedText>
@@ -290,6 +343,7 @@ export default function ShopSettingsScreen() {
           testID="save-shop-defaults"
           label={t('settings.saveDefaults')}
           loading={isSaving}
+          style={styles.saveButton}
           onPress={() => {
             setIsSaving(true);
             void handleSave();
@@ -305,6 +359,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingBottom: Spacing.five, gap: Spacing.three },
   hint: { paddingHorizontal: Spacing.four, paddingTop: Spacing.three },
+  accountCard: { marginHorizontal: Spacing.four, marginTop: Spacing.three },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  accountCopy: { flex: 1, minWidth: 0, gap: Spacing.half },
   modeRow: { gap: Spacing.two },
   modeChip: {
     minHeight: MinTouchTarget,
@@ -312,4 +369,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     justifyContent: 'center',
   },
+  saveButton: { marginHorizontal: Spacing.four },
 });

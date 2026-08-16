@@ -11,8 +11,6 @@ export function Card({ style, ...rest }: ViewProps) {
       style={[
         {
           backgroundColor: colors.elevated,
-          borderColor: colors.border,
-          borderWidth: 1,
           borderRadius: Radii.md,
           padding: Spacing.three,
           gap: Spacing.two,

@@ -32,6 +32,13 @@ jest.mock('expo-blur', () => {
       children?: React.ReactNode;
       [key: string]: unknown;
     }) => React.createElement(RNView, { ...rest, testID: 'blur-view' }, children),
+    BlurTargetView: ({
+      children,
+      ...rest
+    }: {
+      children?: React.ReactNode;
+      [key: string]: unknown;
+    }) => React.createElement(RNView, { ...rest, testID: 'blur-target' }, children),
   };
 });
 
@@ -110,11 +117,42 @@ describe('<GlassSurface />', () => {
     });
   });
 
-  test('Android blur flag uses BlurView and still renders children', async () => {
+  test('Android blur flag without blurTarget stays tinted (no dimezis warning)', async () => {
     setOs('android');
     process.env.EXPO_PUBLIC_ENABLE_ANDROID_BLUR = 'true';
+    const { getByText, getByTestId, queryByTestId } = await render(
+      <GlassSurface testID="glass-surface">
+        <Text>Chrome</Text>
+      </GlassSurface>,
+    );
+    getByText('Chrome');
+    expect(queryByTestId('blur-view')).toBeNull();
+    expect(flatStyle(getByTestId('glass-surface'))).toMatchObject({
+      backgroundColor: Colors.light.glassTintStrong,
+    });
+  });
+
+  test('Android androidBlur without blurTarget stays tinted', async () => {
+    setOs('android');
+    process.env.EXPO_PUBLIC_ENABLE_ANDROID_BLUR = undefined;
+    const { getByText, getByTestId, queryByTestId } = await render(
+      <GlassSurface androidBlur testID="glass-surface">
+        <Text>Chrome</Text>
+      </GlassSurface>,
+    );
+    getByText('Chrome');
+    expect(queryByTestId('blur-view')).toBeNull();
+    expect(flatStyle(getByTestId('glass-surface'))).toMatchObject({
+      backgroundColor: Colors.light.glassTintStrong,
+    });
+  });
+
+  test('Android androidBlur with blurTarget uses BlurView', async () => {
+    setOs('android');
+    process.env.EXPO_PUBLIC_ENABLE_ANDROID_BLUR = undefined;
+    const blurTarget = { current: null };
     const { getByText, getByTestId } = await render(
-      <GlassSurface>
+      <GlassSurface androidBlur blurTarget={blurTarget}>
         <Text>Chrome</Text>
       </GlassSurface>,
     );

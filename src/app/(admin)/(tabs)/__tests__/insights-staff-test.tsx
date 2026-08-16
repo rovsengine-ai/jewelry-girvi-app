@@ -65,7 +65,7 @@ describe('Admin Insights URL gate', () => {
     const { getByText } = await renderInsights();
 
     await waitFor(() => {
-      getByText('Insights');
+      getByText('Girvi');
     });
     expect(mockReplace).not.toHaveBeenCalled();
   });

@@ -1,41 +1,43 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import SignatureCanvas from 'react-native-signature-canvas';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ScrollView,
+    StyleSheet,
+    View,
+} from 'react-native';
 
 import { Button } from '@/components/button';
+import { ArchiveConfirm } from '@/components/archive-confirm';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
 import { ItemReleaseChecklist } from '@/components/item-release-checklist';
+import { ListSkeleton } from '@/components/list-row-skeleton';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
 import { ScreenHeader } from '@/components/screen-header';
+import { SignaturePad, type SignaturePadRef } from '@/components/signature-pad';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radii, Spacing } from '@/constants/theme';
+import { Sizes, Spacing } from '@/constants/theme';
 import {
-  asPaise,
-  formatPaiseAsInr,
-  paiseToRupeesInput,
-  rupeesInputToPaise,
-  todayInKolkata,
+    asPaise,
+    formatPaiseAsInr,
+    paiseToRupeesInput,
+    rupeesInputToPaise,
+    todayInKolkata,
 } from '@/lib/money';
 import { canSubmitRedemption, loanStatusLabel, parseOwnerOnlyError, redeemGate } from '@/lib/redemption';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
 import {
-  fetchLoanBalances,
-  fetchLoanItems,
-  redeemLoan,
-  uploadSignatureDataUrl,
+    archiveLoan,
+    fetchLoanBalances,
+    fetchLoanItems,
+    redeemLoan,
+    uploadSignatureDataUrl,
 } from '@/services/loanService';
 import type { LoanBalances, LoanItem, LoanWithCustomer } from '@/types/database';
 
@@ -44,7 +46,10 @@ export default function RedeemLoanScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const { t, language } = useLanguage();
-  const signatureRef = useRef<ComponentRef<typeof SignatureCanvas> | null>(null);
+  const isOwner = profile?.role === 'owner';
+  const scrollRef = useRef<ScrollView>(null);
+  const signaturePadRef = useRef<SignaturePadRef>(null);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const [loan, setLoan] = useState<LoanWithCustomer | null>(null);
   const [items, setItems] = useState<LoanItem[]>([]);
@@ -53,12 +58,16 @@ export default function RedeemLoanScreen() {
   const [releasedToName, setReleasedToName] = useState('');
   const [releaseNote, setReleaseNote] = useState('');
   const [amountRupees, setAmountRupees] = useState('');
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [doneNotice, setDoneNotice] = useState<string | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveSaving, setArchiveSaving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archivedNotice, setArchivedNotice] = useState<string | null>(null);
 
   const gate = redeemGate(profile?.role, loan?.status);
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
@@ -155,6 +164,7 @@ export default function RedeemLoanScreen() {
 
     setIsSaving(true);
     try {
+      const signatureDataUrl = (await signaturePadRef.current?.readSignature()) ?? null;
       let signaturePath: string | null = null;
       if (signatureDataUrl) {
         signaturePath = await uploadSignatureDataUrl(signatureDataUrl, loan.customer_id);
@@ -188,10 +198,30 @@ export default function RedeemLoanScreen() {
     }
   };
 
+  const handleArchive = async () => {
+    if (!id) return;
+    const trimmed = archiveReason.trim();
+    if (trimmed === '') return;
+    setArchiveError(null);
+    setArchiveSaving(true);
+    try {
+      await archiveLoan({ loanId: id, reason: trimmed });
+      setArchiveOpen(false);
+      setArchiveReason('');
+      setArchivedNotice(t('archive.notice'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('errors.unknown');
+      setArchiveError(parseOwnerOnlyError(message) ? t('archive.ownerOnly') : message);
+    } finally {
+      setArchiveSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+      <ThemedView style={styles.container} type="surfaceSunken">
+        <ScreenHeader showBack title={t('loans.detail.redeem')} />
+        <ListSkeleton rows={6} />
       </ThemedView>
     );
   }
@@ -199,7 +229,7 @@ export default function RedeemLoanScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.redeem')} />
+        <ScreenHeader showBack title={t('loans.detail.redeem')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.loadErrorTitle')} body={loadError} />
@@ -211,7 +241,7 @@ export default function RedeemLoanScreen() {
   if (doneNotice) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('redeem.successTitle')} />
+        <ScreenHeader showBack title={t('redeem.successTitle')} />
         <View style={styles.body}>
           <EmptyState
             title={t('redeem.successTitle')}
@@ -219,7 +249,45 @@ export default function RedeemLoanScreen() {
             actionLabel={t('common.backToLoan')}
             onAction={() => router.replace(`/(admin)/loan/${id}`)}
           />
+          <FormNotice notice={archivedNotice} />
+          {archivedNotice ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('archive.alreadyArchived')}
+            </ThemedText>
+          ) : (
+            <>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.archiveHint}>
+                {t('redeem.successArchiveHint')}
+              </ThemedText>
+              {isOwner ? (
+                <Button
+                  testID="open-archive-after-redeem"
+                  label={t('redeem.archiveNow')}
+                  onPress={() => {
+                    setArchiveError(null);
+                    setArchiveReason('');
+                    setArchiveOpen(true);
+                  }}
+                />
+              ) : null}
+            </>
+          )}
         </View>
+        {archiveOpen && loan ? (
+          <ArchiveConfirm
+            serial={loan.serial_number}
+            reason={archiveReason}
+            onChangeReason={setArchiveReason}
+            onCancel={() => {
+              setArchiveOpen(false);
+              setArchiveReason('');
+              setArchiveError(null);
+            }}
+            onConfirm={() => void handleArchive()}
+            loading={archiveSaving}
+            error={archiveError}
+          />
+        ) : null}
       </ThemedView>
     );
   }
@@ -227,7 +295,7 @@ export default function RedeemLoanScreen() {
   if (gate.kind === 'owner_only') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('redeem.ownerOnlyTitle')} />
+        <ScreenHeader showBack title={t('redeem.ownerOnlyTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('redeem.ownerOnlyTitle')} body={t('redeem.ownerOnlyBody')} />
@@ -239,7 +307,7 @@ export default function RedeemLoanScreen() {
   if (!loan || !balances) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.redeem')} />
+        <ScreenHeader showBack title={t('loans.detail.redeem')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.notFoundTitle')} body={t('loans.detail.notFoundBody')} />
@@ -251,7 +319,7 @@ export default function RedeemLoanScreen() {
   if (gate.kind === 'already_redeemed') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('redeem.alreadyTitle')} />
+        <ScreenHeader showBack title={t('redeem.alreadyTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <ThemedText>
@@ -271,7 +339,7 @@ export default function RedeemLoanScreen() {
   if (gate.kind === 'not_active') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('redeem.cannotTitle')} />
+        <ScreenHeader showBack title={t('redeem.cannotTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <ThemedText>
@@ -284,8 +352,12 @@ export default function RedeemLoanScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={headerTitle} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScreenHeader showBack title={headerTitle} />
+      <ScrollView
+        ref={scrollRef}
+        scrollEnabled={scrollEnabled}
+        contentContainerStyle={styles.scroll}
+      >
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         <ThemedText type="small">{loan.profiles?.full_name ?? t('common.unknownCustomer')}</ThemedText>
         <FormNotice error={formError} />
@@ -337,16 +409,14 @@ export default function RedeemLoanScreen() {
 
         <Card>
           <ThemedText type="smallBold">{t('redeem.signatureTitle')}</ThemedText>
-          <View style={styles.signatureBox}>
-            <SignatureCanvas
-              ref={signatureRef}
-              onOK={(sig) => setSignatureDataUrl(sig)}
-              onEmpty={() => setSignatureDataUrl(null)}
-              autoClear={false}
-              webStyle={`.m-signature-pad { box-shadow: none; border: none; }`}
-              style={styles.signatureCanvas}
-            />
-          </View>
+          <SignaturePad
+            ref={signaturePadRef}
+            scrollRef={scrollRef}
+            onDrawingChange={(active) => setScrollEnabled(!active)}
+            height={Sizes.signaturePadHeightCompact}
+            autoClear={false}
+            testID="redeem-signature-pad"
+          />
         </Card>
 
         <Button
@@ -363,8 +433,6 @@ export default function RedeemLoanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
-  signatureBox: { height: 180, borderRadius: Radii.md, overflow: 'hidden' },
-  signatureCanvas: { flex: 1 },
+  archiveHint: { marginTop: Spacing.two },
 });

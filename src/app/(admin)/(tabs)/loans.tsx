@@ -3,16 +3,18 @@ import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { AdminLoanRow } from '@/components/admin-loan-row';
+import { AppIcon } from '@/components/app-icon';
 import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
 import { FilterChip, FilterChipRow } from '@/components/filter-chip';
 import { FormNotice } from '@/components/form-notice';
 import { ListSkeleton } from '@/components/list-row-skeleton';
+import { PressableScale } from '@/components/pressable-scale';
 import { ScreenHeader } from '@/components/screen-header';
 import { SearchField } from '@/components/search-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing, Sizes } from '@/constants/theme';
+import { MinTouchTarget, Spacing, Sizes } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
@@ -122,12 +124,23 @@ export default function AdminLoansScreen() {
 
   const isOwner = isShopOwner(profile?.role);
   const listBottom = tabBarPadding + Sizes.fab + Spacing.four;
+  const openAddGirvi = () => router.push('/(admin)/scanner');
 
   return (
-    <ThemedView style={styles.container} type="surface">
+    <ThemedView style={styles.container} type="surfaceSunken">
       <ScreenHeader
         title={isOwner ? t('loans.ownerTitle') : t('loans.staffTitle')}
         collapsed={collapsed}
+        trailing={
+          <PressableScale
+            testID="loans-add-header"
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.scanPledge')}
+            onPress={openAddGirvi}
+            style={styles.headerAdd}>
+            <AppIcon ios="plus.circle.fill" android="add_circle" color={colors.onChrome} />
+          </PressableScale>
+        }
       />
 
       {loadError ? <EmptyState title={t('loans.loadErrorTitle')} body={loadError} /> : null}
@@ -200,13 +213,13 @@ export default function AdminLoansScreen() {
               title={t('loans.emptyTitle')}
               body={t('loans.emptyBody')}
               actionLabel={t('loans.scanReceipt')}
-              onAction={() => router.push('/(admin)/scanner')}
+              onAction={openAddGirvi}
               iconIos="tray"
               iconAndroid="inbox"
             />
           }
           renderSectionHeader={({ section }) => (
-            <View style={[styles.sectionHeader, { backgroundColor: colors.surface }]}>
+            <View style={[styles.sectionHeader, { backgroundColor: colors.backgroundElement }]}>
               <ThemedText type="overline" themeColor="textSecondary">
                 {section.title}
               </ThemedText>
@@ -242,9 +255,10 @@ export default function AdminLoansScreen() {
       )}
 
       <Fab
+        testID="loans-add-fab"
         accessibilityLabel={t('a11y.scanPledge')}
         bottom={tabBarPadding + Spacing.three}
-        onPress={() => router.push('/(admin)/scanner')}
+        onPress={openAddGirvi}
       />
     </ThemedView>
   );
@@ -252,6 +266,12 @@ export default function AdminLoansScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerAdd: {
+    minWidth: MinTouchTarget,
+    minHeight: MinTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   searchWrap: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,

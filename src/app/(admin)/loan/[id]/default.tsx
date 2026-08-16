@@ -5,15 +5,16 @@
  * Expo Router nested stack (SDK 57):
  * https://docs.expo.dev/versions/v57.0.0/sdk/router/
  */
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
+import { ListSkeleton } from '@/components/list-row-skeleton';
 import { MoneyText } from '@/components/money-text';
 import { Row } from '@/components/row';
 import { ScreenHeader } from '@/components/screen-header';
@@ -113,8 +114,9 @@ export default function DefaultLoanScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.centered}>
-        <ActivityIndicator />
+      <ThemedView style={styles.container} type="surfaceSunken">
+        <ScreenHeader showBack title={t('loans.detail.defaultLoan')} />
+        <ListSkeleton rows={6} />
       </ThemedView>
     );
   }
@@ -122,7 +124,7 @@ export default function DefaultLoanScreen() {
   if (loadError) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.defaultLoan')} />
+        <ScreenHeader showBack title={t('loans.detail.defaultLoan')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.loadErrorTitle')} body={loadError} />
@@ -134,7 +136,7 @@ export default function DefaultLoanScreen() {
   if (doneNotice) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.default.successTitle')} />
+        <ScreenHeader showBack title={t('loans.default.successTitle')} />
         <View style={styles.body}>
           <EmptyState
             title={t('loans.default.successTitle')}
@@ -150,7 +152,7 @@ export default function DefaultLoanScreen() {
   if (gate.kind === 'owner_only') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.default.ownerOnlyTitle')} />
+        <ScreenHeader showBack title={t('loans.default.ownerOnlyTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState
@@ -165,7 +167,7 @@ export default function DefaultLoanScreen() {
   if (!loan || !balances) {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.detail.defaultLoan')} />
+        <ScreenHeader showBack title={t('loans.detail.defaultLoan')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <EmptyState title={t('loans.detail.notFoundTitle')} body={t('loans.detail.notFoundBody')} />
@@ -177,7 +179,7 @@ export default function DefaultLoanScreen() {
   if (loan.status === 'defaulted') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.default.alreadyTitle')} />
+        <ScreenHeader showBack title={t('loans.default.alreadyTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <ThemedText type="small">
@@ -194,7 +196,7 @@ export default function DefaultLoanScreen() {
   if (gate.kind === 'not_active' || gate.kind === 'already_redeemed') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('loans.default.cannotTitle')} />
+        <ScreenHeader showBack title={t('loans.default.cannotTitle')} />
         <View style={styles.body}>
           <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
           <ThemedText>
@@ -207,7 +209,7 @@ export default function DefaultLoanScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={headerTitle} />
+      <ScreenHeader showBack title={headerTitle} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         <ThemedText type="small">{loan.profiles?.full_name ?? t('common.unknownCustomer')}</ThemedText>
@@ -249,6 +251,5 @@ export default function DefaultLoanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.five, gap: Spacing.three },
 });

@@ -2,6 +2,7 @@ import {
   addCalendarDays,
   allItemsReleased,
   canSubmitRedemption,
+  customerLoanStatusLabel,
   defaultNewMaturityOn,
   isRenewalEligible,
   loanStatusLabel,
@@ -15,6 +16,13 @@ describe('loanStatusLabel', () => {
     expect(loanStatusLabel('redeemed')).toBe('Redeemed');
     expect(loanStatusLabel('closed')).toBe('Closed');
     expect(loanStatusLabel('defaulted')).toBe('Defaulted');
+  });
+});
+
+describe('customerLoanStatusLabel', () => {
+  test('redeemed loans tell the customer to collect items', () => {
+    expect(customerLoanStatusLabel('redeemed')).toBe('Paid — collect items');
+    expect(customerLoanStatusLabel('active')).toBe('Active');
   });
 });
 

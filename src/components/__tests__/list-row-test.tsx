@@ -34,10 +34,11 @@ describe('<ListRow />', () => {
     const { getByTestId } = await render(
       <ListRow testID="row" onPress={() => undefined} content={<Text>Press</Text>} />,
     );
-    expect(flatStyle(getByTestId('row')).backgroundColor).toBe(
-      listRowFill(false, Colors.light.surface, Colors.light.backgroundSelected),
+    const row = getByTestId('row');
+    expect(flatStyle(row).backgroundColor).toBe(
+      listRowFill(false, Colors.light.elevated, Colors.light.backgroundSelected),
     );
-    expect(listRowFill(true, Colors.light.surface, Colors.light.backgroundSelected)).toBe(
+    expect(listRowFill(true, Colors.light.elevated, Colors.light.backgroundSelected)).toBe(
       Colors.light.backgroundSelected,
     );
   });

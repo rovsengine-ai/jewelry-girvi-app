@@ -1,4 +1,8 @@
 export const hi = {
+  app: {
+    name: 'गिरवी',
+    nameSecondary: 'Girvi',
+  },
   common: {
     langEn: 'EN',
     langHi: 'हिं',
@@ -22,6 +26,10 @@ export const hi = {
     notIbja: 'IBJA नहीं',
     per10g: '/ 10ग्रा',
   },
+  signaturePad: {
+    captured: 'हस्ताक्षर लिया गया',
+    notSignedYet: 'अभी हस्ताक्षर नहीं',
+  },
   a11y: {
     language: 'भाषा',
     search: 'खोज',
@@ -30,6 +38,11 @@ export const hi = {
     person: 'ग्राहक',
     chevron: 'खोलता है',
     empty: 'यहाँ कुछ नहीं',
+    info: 'इस आँकड़े के बारे में',
+    call: 'कॉल',
+    expand: 'विवरण दिखाएँ',
+    collapse: 'विवरण छिपाएँ',
+    print: 'छापें',
   },
   tabs: {
     loans: 'गिरवी',
@@ -85,6 +98,10 @@ export const hi = {
       emptyTitle: 'अभी कोई रसीद नहीं',
       emptyBody: 'आपके खाते से अभी कोई गिरवी रसीद जुड़ी नहीं है।',
       noReceiptImage: 'रसीद की तस्वीर नहीं',
+      collectItemsStatus: 'भुगतान हो गया — सामान लें',
+      collectItemsTitle: 'भुगतान हो गया — अपना सामान लें',
+      collectItemsBody:
+        'गिरवी वस्तुएँ लेने के लिए दुकान पर आएँ। दुकान रिकॉर्ड बंद करने तक यह रसीद यहाँ रहेगी।',
     },
     detail: {
       loadErrorTitle: 'गिरवी नहीं खुल सकी',
@@ -121,6 +138,9 @@ export const hi = {
       editTerms: 'शर्तें बदलें',
       printPledge: 'गिरवी छापें',
       printReceipt: 'रसीद छापें',
+      redeemedAwaitingArchive:
+        'छुड़ाई हो गई — सामान लौटाया। ग्राहक सामान लेने के बाद इस गिरवी को संग्रहित करें ताकि उनके ऐप से हट जाए।',
+      redeemedLive: 'यह गिरवी छुड़ाई गई है। सामान काउंटर पर लौटाया गया।',
       recordPaymentTitle: 'भुगतान दर्ज करें',
       recordPaymentHint: 'सर्वर पहले बकाया ब्याज, फिर मूलधन पर लगाता है।',
       amountInRupees: 'राशि ₹ में',
@@ -136,6 +156,13 @@ export const hi = {
       shareRedemption: 'छुड़ाना %{serial}',
       sectionCustomer: 'ग्राहक',
       sectionActions: 'कार्रवाई',
+      totalItems: 'कुल वस्तुएँ : %{count}',
+      addTransaction: '+ लेन-देन जोड़ें',
+      marketValue: 'बाज़ार मूल्य',
+      marketValueEmpty: 'इन वस्तुओं पर आकलित मूल्य नहीं।',
+      marketValueCaption: 'जमी हुई वस्तु कीमत (%{notIbja})',
+      tenureDays: '%{days} दिन',
+      dateRange: '%{from} – %{to}',
     },
     terms: {
       editTitle: 'शर्तें %{serial}',
@@ -159,6 +186,13 @@ export const hi = {
     },
     scanner: {
       cameraTitle: 'गिरवी रसीद स्कैन',
+      choiceTitle: 'गिरवी जोड़ें',
+      choiceSubtitle: 'रसीद स्कैन करें या काउंटर पर विवरण भरें।',
+      scanReceipt: 'रसीद स्कैन करें',
+      enterManually: 'खुद भरें',
+      pickFromGallery: 'गैलरी से चुनें',
+      retake: 'फिर से लें',
+      attachReceipt: 'रसीद की फ़ोटो लगाएँ',
       captureExtract: 'फ़ोटो लें और निकालें',
       reviewTitle: 'जाँचें और सहेजें',
       serialNumber: 'क्रमांक',
@@ -178,10 +212,34 @@ export const hi = {
       goToLoans: 'गिरवी',
       cameraNeededTitle: 'कैमरा चाहिए',
       cameraNeededBody: 'रसीद स्कैन करने के लिए कैमरा अनुमति चाहिए।',
-      captureBeforeSave: 'सहेजने से पहले रसीद की तस्वीर लें।',
+      captureBeforeSave: 'स्कैन वाली गिरवी सहेजने से पहले रसीद की तस्वीर लें।',
+      ocrPartialNotice:
+        'कुछ खेत स्पष्ट नहीं पढ़े गए। सहेजने से पहले राशि, वजन, दर और तारीख जाँच लें।',
+      ocrUnavailable:
+        'रसीद स्कैन बंद है। लोकल Edge Runtime चालू करें (supabase start), फिर फिर कोशिश करें।',
+      ocrUnauthorized: 'फिर साइन इन करें, फिर रसीद स्कैन करें।',
+      ocrForbidden: 'केवल दुकान मालिक या स्टाफ़ रसीद स्कैन कर सकते हैं।',
+      ocrMisconfigured: 'OCR सेट नहीं है (सर्वर पर Moonshot कुंजी नहीं)।',
+      ocrUpstream: 'मॉडल ने यह फ़ोटो नहीं पढ़ी। साफ़ फ़ोटो लें या खुद भरें।',
+      ocrProviderRejected: 'OCR प्रदाता ने अनुरोध अस्वीकार किया। सर्वर कुंजी जाँचें और फिर कोशिश करें।',
+      ocrImageTooLarge: 'यह फ़ोटो स्कैन के लिए बहुत बड़ी है। छोटी फ़ोटो लें या खुद भरें।',
+      ocrEmpty: 'स्कैनर से कोई डेटा नहीं आया। फिर कोशिश करें या खुद भरें।',
+      ocrFailed: 'रसीद नहीं पढ़ी गई। फिर कोशिश करें या खुद भरें।',
+      ocrWorking: 'रसीद पढ़ी जा रही है…',
+      bilingualHint: 'एक ही पर्ची पर हिंदी और अंग्रेज़ी दोनों चलेंगी। सहेजने से पहले हर खेत जाँचें।',
       createdSuccess: 'गिरवी बन गई।',
+      kycSectionTitle: 'पहचान और KYC',
+      kycSaveFailed:
+        'गिरवी सहेजी गई। KYC सहेज नहीं सका — गिरवी स्क्रीन से KYC पूरा करें या नीचे KYC खोलें।',
+      openKyc: 'KYC कैप्चर खोलें',
       photosAttached: 'वस्तु फ़ोटो लग गईं।',
       cameraNoImage: 'कैमरा ने तस्वीर नहीं दी।',
+      galleryPermission: 'रसीद लगाने के लिए गैलरी अनुमति चाहिए।',
+      cameraPreviewHint: 'आंकलन पर्ची पर फ़ोकस करें, या गैलरी से फ़ोटो चुनें।',
+      cameraUnavailableTitle: 'इस डिवाइस पर कैमरा नहीं',
+      cameraUnavailableBody:
+        'iOS सिम्युलेटर में कैमरा नहीं होता। गैलरी से फ़ोटो चुनें, या गिरवी खुद भरें।',
+      cameraMountFailed: 'कैमरा चालू नहीं हुआ। गैलरी इस्तेमाल करें या खुद भरें।',
     },
     insights: {
       // REVIEW: shop analytics jargon
@@ -195,6 +253,8 @@ export const hi = {
       yieldEmptyTitle: 'अभी उपज नहीं',
       yieldEmptyBody: 'अनुमान के लिए कोई चालू गिरवी नहीं।',
       yieldRow: '%{rate}% · %{count} %{loans}',
+      activeLoans: 'चालू गिरवी',
+      loanCount: '%{count}',
     },
     default: {
       title: 'ज़ब्ती %{serial}',
@@ -272,6 +332,10 @@ export const hi = {
     photographId: 'पहचान की फ़ोटो',
     choosePhoto: 'फ़ोटो चुनें',
     photoPending: 'सहेजने पर फ़ोटो अपलोड होगी',
+    customerPhoto: 'ग्राहक की फ़ोटो',
+    photographCustomer: 'फ़ोटो लें',
+    chooseCustomerPhoto: 'गैलरी से चुनें',
+    customerPhotoPending: 'सहेजने पर ग्राहक फ़ोटो अपलोड होगी',
     save: 'KYC सहेजें',
     markVerified: 'सत्यापित चिह्नित करें',
     saved: 'KYC सहेजा गया।',
@@ -283,6 +347,9 @@ export const hi = {
     title: 'छुड़ाना %{serial}',
     successTitle: 'छुड़ाई गई',
     successBody: '%{date} को %{amount} वसूले।',
+    successArchiveHint:
+      'ग्राहक सामान लेने के बाद, गिरवी खोलकर संग्रहित करें ताकि उनके ऐप से हट जाए।',
+    archiveNow: 'अभी संग्रहित करें',
     ownerOnlyTitle: 'केवल मालिक',
     ownerOnlyBody:
       'केवल दुकान मालिक गिरवी छुड़ा सकता है और वस्तुएँ लौटा सकता है। काउंटर पर मालिक से करवाएँ।',
@@ -395,6 +462,8 @@ export const hi = {
     groupPreferences: 'पसंद',
     groupShop: 'दुकान',
     groupSession: 'सत्र',
+    roleOwner: 'मालिक',
+    roleStaff: 'कर्मचारी',
   },
   errors: {
     unknown: 'अज्ञात त्रुटि',
@@ -404,6 +473,7 @@ export const hi = {
   archive: {
     call: 'कॉल',
     archive: 'संग्रह',
+    archiveAfterPickup: 'सामान लेने के बाद संग्रह',
     confirmTitle: '%{serial} संग्रह करें?',
     confirmBody:
       'यह गिरवी ग्राहक और कर्मचारी दोनों से छिप जाएगी। दुकान का अभिलेख रखा जाएगा।',

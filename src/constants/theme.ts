@@ -1,12 +1,15 @@
 /**
  * Design tokens. Palette hex lives only here.
  *
- * `Colors` is the live set (Warm paper). Hex lives only in this file.
+ * `Colors` is the live set (Girvi shopfront). Hex lives only in this file.
  *
- * `PaletteDirections` stay as the three complete proposals for reference.
+ * `PaletteDirections` keep warmPaper / coolLedger / shopfrontContrast as
+ * complete reference proposals, plus girviShopfront (live).
  * Do not edit screens to hard-code a favourite.
  *
  * Type: system fonts only (Devanagari on print later). No custom display face.
+ * Chrome is SOLID primary on iOS and Android — not glass. Glass tokens remain
+ * for any leftover GlassSurface uses; headers and the tab bar do not blur.
  */
 
 import '@/global.css';
@@ -59,9 +62,27 @@ export type Palette = {
   glassTintStrong: string;
   glassBorder: string;
   glassHighlight: string;
+  /** Hero pill / selected chip / tab indicator. */
+  gold: string;
+  /** Text on `gold`. */
+  onGold: string;
+  /** Solid header and tab fill. Same hue as `primary`. */
+  chrome: string;
+  /** Title and active tab on chrome. Same as `onPrimary`. */
+  onChrome: string;
+  /** Inactive tab / header meta. `onChrome` at 0.70 alpha. */
+  onChromeMuted: string;
+  /** Language-chip track on chrome. `onChrome` at 0.16 alpha. */
+  chromeWell: string;
+  /** Loan-id chip and phone accent. Same hue as `warning`. */
+  accentWarning: string;
 };
 
-export type PaletteDirectionId = 'warmPaper' | 'coolLedger' | 'shopfrontContrast';
+export type PaletteDirectionId =
+  | 'warmPaper'
+  | 'coolLedger'
+  | 'shopfrontContrast'
+  | 'girviShopfront';
 
 export type PaletteDirection = {
   id: PaletteDirectionId;
@@ -159,13 +180,47 @@ function inkWashes(
   };
 }
 
+/**
+ * Solid chrome + gold shopfront tokens. `chrome` tracks `primary` so a
+ * direction never gets a second brand hue for the header.
+ *
+ * onChromeMuted 0.70 — inactive tab icon/label on solid chrome.
+ * chromeWell 0.16 — language segmented track sitting on chrome.
+ */
+function chromeFrom(
+  primary: string,
+  onPrimary: string,
+  warning: string,
+  gold: string,
+  onGold: string,
+): Pick<
+  Palette,
+  | 'gold'
+  | 'onGold'
+  | 'chrome'
+  | 'onChrome'
+  | 'onChromeMuted'
+  | 'chromeWell'
+  | 'accentWarning'
+> {
+  return {
+    gold,
+    onGold,
+    chrome: primary,
+    onChrome: onPrimary,
+    onChromeMuted: hexToRgba(onPrimary, 0.7),
+    chromeWell: hexToRgba(onPrimary, 0.16),
+    accentWarning: warning,
+  };
+}
+
 const warmPaper: PaletteDirection = {
   id: 'warmPaper',
   label: 'Warm paper',
   summary:
     'Cream ledger, ink-brown type, maroon seal. Shop feels like a passbook; customer feels like a stamp, not an app.',
   contrast:
-    'Light body ~12.8:1 (#1F1B16 on #E8DCC8). Elevated #FFFBF3 vs page #E8DCC8 is a real paper lift, not a 3% cream-on-cream delta. Target WCAG AA 4.5:1 body, 3:1 large / pills.',
+    'Measured WCAG: light body 12.64:1 (#1F1B16 on #E8DCC8), secondary 5.56:1, pills 3.50–6.15:1. Dark body 15.14:1 (#F0E6D8 on #141210), secondary 8.07:1, pills 3.44–5.26:1. Elevated #FFFBF3 vs page #E8DCC8 is a paper lift, not a 3% cream-on-cream delta.',
   light: {
     text: '#1F1B16',
     background: '#E8DCC8',
@@ -202,6 +257,7 @@ const warmPaper: PaletteDirection = {
       dark: false,
     }),
     ...glassFrom('#E8DCC8', '#FFFBF3', '#D4CBBA'),
+    ...chromeFrom('#6B2E2E', '#FFFBF3', '#8A5A12', '#C9A227', '#1F1B16'),
   },
   dark: {
     text: '#F0E6D8',
@@ -239,6 +295,7 @@ const warmPaper: PaletteDirection = {
       dark: true,
     }),
     ...glassFrom('#141210', '#322B24', '#4A4036'),
+    ...chromeFrom('#C98989', '#141210', '#E0B36A', '#E0B36A', '#141210'),
   },
 };
 
@@ -248,7 +305,7 @@ const coolLedger: PaletteDirection = {
   summary:
     'Slate passbook. Institutional, not playful. Dense shop list stays cool-grey; customer receipt reads like a bank slip.',
   contrast:
-    'Light body ~12:1 (#1A2332 on #E4E9F0). Elevated #FFFFFF vs page #E4E9F0 is a paper lift without a border. Target WCAG AA 4.5:1 body, 3:1 large / pills.',
+    'Measured WCAG: light body 12.94:1, secondary 4.71:1, pills 3.82–5.69:1. Dark body 15.96:1, secondary 7.68:1, pills 3.75–5.92:1. Elevated #FFFFFF vs page #E4E9F0 is a paper lift without a border.',
   light: {
     text: '#1A2332',
     background: '#E4E9F0',
@@ -285,6 +342,7 @@ const coolLedger: PaletteDirection = {
       dark: false,
     }),
     ...glassFrom('#E4E9F0', '#FFFFFF', '#C5CDD8'),
+    ...chromeFrom('#1E4A73', '#F3F5F8', '#8A5A00', '#C9A227', '#1A2332'),
   },
   dark: {
     text: '#E8EDF4',
@@ -322,6 +380,7 @@ const coolLedger: PaletteDirection = {
       dark: true,
     }),
     ...glassFrom('#0E1218', '#222A35', '#3A4554'),
+    ...chromeFrom('#8BB4D9', '#0E1218', '#E0C07A', '#E0C07A', '#0E1218'),
   },
 };
 
@@ -331,7 +390,7 @@ const shopfrontContrast: PaletteDirection = {
   summary:
     'Built for sun through a glass shopfront. Off-white / charcoal, not #000 on #fff. Thick status colours. Same product, louder edges.',
   contrast:
-    'Light body ~13:1 (#171717 on #E2E1DB). Elevated #F7F6F1 vs page #E2E1DB is a paper lift without a border. Target WCAG AA 4.5:1 body, 3:1 large / pills.',
+    'Measured WCAG: light body 13.68:1, secondary 6.79:1, pills 4.04–6.36:1. Dark body 17.30:1, secondary 9.39:1, pills 4.23–6.81:1. Elevated #F7F6F1 vs page #E2E1DB is a paper lift without a border.',
   light: {
     text: '#171717',
     background: '#E2E1DB',
@@ -368,6 +427,7 @@ const shopfrontContrast: PaletteDirection = {
       dark: false,
     }),
     ...glassFrom('#E2E1DB', '#F7F6F1', '#B8B7B1'),
+    ...chromeFrom('#0D3B2E', '#F7F6F1', '#7A4A00', '#C9A227', '#171717'),
   },
   dark: {
     text: '#F2F1EC',
@@ -405,6 +465,116 @@ const shopfrontContrast: PaletteDirection = {
       dark: true,
     }),
     ...glassFrom('#0C0C0C', '#222222', '#3A3A3A'),
+    ...chromeFrom('#8FCBB3', '#0C0C0C', '#E8C36A', '#E8C36A', '#0C0C0C'),
+  },
+};
+
+/**
+ * Live shopfront. Royal purple chrome, gold hero, cool off-white page.
+ *
+ * Light WCAG (measured):
+ *   body 16.59:1 (#1A1228 on #F4F5F8), secondary 6.38:1 (#5C5670 on #F4F5F8)
+ *   onChrome 11.86:1 (#FFFFFF on #4A148C)
+ *   onGold 11.01:1 (#1A1228 on #F5C400)
+ *   gold-on-purple 7.22:1 (#F5C400 on #4A148C)
+ *   success 4.52:1 on white (#188757; mock #1B8A5A was 4.35:1)
+ *   danger 4.54:1 on white (#D34242; mock #D64545 was 4.38:1)
+ *   warning tweaked #C05612 (4.58:1) — mock #E67E22 was 2.85:1 on white
+ * Dark WCAG (measured):
+ *   body 16.54:1 (#F3EEF8 on #160C24), secondary 8.79:1 (#B5ADC8 on #160C24)
+ *   onChrome 8.20:1 (#FFFFFF on #7B1FA2)
+ *   success 7.82:1 / danger 6.22:1 / warning 7.60:1 on elevated #2A1840
+ *
+ * Android chrome: the same solid `chrome` fill as iOS. No dimezis blur.
+ */
+const girviShopfront: PaletteDirection = {
+  id: 'girviShopfront',
+  label: 'Girvi shopfront',
+  summary:
+    'Solid royal-purple chrome, gold hero pill, cool off-white page, white cards.',
+  contrast:
+    'Light body 16.59:1, secondary 6.38:1, onChrome 11.86:1, onGold 11.01:1, gold-on-purple 7.22:1, success 4.52:1 / danger 4.54:1 on white, warning 4.58:1. Dark body 16.54:1, secondary 8.79:1, onChrome 8.20:1, success 7.82:1 / danger 6.22:1 on elevated.',
+  light: {
+    // Ink on cool off-white page.
+    text: '#1A1228',
+    background: '#F4F5F8',
+    backgroundElement: '#E2E3EA',
+    backgroundSelected: '#D8D9E2',
+    textSecondary: '#5C5670',
+    surface: '#F4F5F8',
+    elevated: '#FFFFFF',
+    surfaceSunken: '#E8E9EE',
+    border: '#D5D6DE',
+    // Royal purple chrome / FAB / primary buttons.
+    primary: '#4A148C',
+    onPrimary: '#FFFFFF',
+    statusActive: '#188757',
+    statusRedeemed: '#3D5A8A',
+    statusClosed: '#6B6578',
+    statusDefaulted: '#D34242',
+    onStatus: '#FFFFFF',
+    // Money on white: mock #1B8A5A was 4.35:1; #188757 is 4.52:1 body.
+    success: '#188757',
+    // Phone / loan-id: mock #E67E22 was 2.85:1 on white; darkened to body 4.5:1.
+    warning: '#C05612',
+    danger: '#D34242',
+    onDanger: '#FFFFFF',
+    overlay: '#F4F5F8',
+    overlayShadow: '#1A1228',
+    link: '#4A148C',
+    shadow: '#1A1228',
+    ...inkWashes({
+      text: '#1A1228',
+      primary: '#4A148C',
+      danger: '#D34242',
+      warning: '#C05612',
+      success: '#188757',
+      statusRedeemed: '#3D5A8A',
+      statusClosed: '#6B6578',
+      dark: false,
+    }),
+    ...glassFrom('#F4F5F8', '#FFFFFF', '#D5D6DE'),
+    ...chromeFrom('#4A148C', '#FFFFFF', '#C05612', '#F5C400', '#1A1228'),
+  },
+  dark: {
+    // Deep purple-ink page.
+    text: '#F3EEF8',
+    background: '#160C24',
+    backgroundElement: '#241536',
+    backgroundSelected: '#3A2258',
+    textSecondary: '#B5ADC8',
+    surface: '#160C24',
+    elevated: '#2A1840',
+    surfaceSunken: '#10081A',
+    border: '#4A3560',
+    // Lightened purple so white type still contrasts (8.20:1).
+    primary: '#7B1FA2',
+    onPrimary: '#FFFFFF',
+    statusActive: '#3DCC88',
+    statusRedeemed: '#8EB6E0',
+    statusClosed: '#C4BDD4',
+    statusDefaulted: '#F08080',
+    onStatus: '#160C24',
+    success: '#3DCC88',
+    warning: '#F0A14A',
+    danger: '#F08080',
+    onDanger: '#160C24',
+    overlay: '#F3EEF8',
+    overlayShadow: '#0A0612',
+    link: '#D4B3F0',
+    shadow: '#0A0612',
+    ...inkWashes({
+      text: '#F3EEF8',
+      primary: '#7B1FA2',
+      danger: '#F08080',
+      warning: '#F0A14A',
+      success: '#3DCC88',
+      statusRedeemed: '#8EB6E0',
+      statusClosed: '#C4BDD4',
+      dark: true,
+    }),
+    ...glassFrom('#160C24', '#2A1840', '#4A3560'),
+    ...chromeFrom('#7B1FA2', '#FFFFFF', '#F0A14A', '#F5C400', '#1A1228'),
   },
 };
 
@@ -412,15 +582,16 @@ export const PaletteDirections: Record<PaletteDirectionId, PaletteDirection> = {
   warmPaper,
   coolLedger,
   shopfrontContrast,
+  girviShopfront,
 };
 
 /**
- * Live tokens: Warm paper. The three PaletteDirections stay below for
+ * Live tokens: Girvi shopfront. The other PaletteDirections stay for
  * reference; screens must keep reading Colors, never a direction id.
  */
 export const Colors = {
-  light: PaletteDirections.warmPaper.light,
-  dark: PaletteDirections.warmPaper.dark,
+  light: PaletteDirections.girviShopfront.light,
+  dark: PaletteDirections.girviShopfront.dark,
 } as const satisfies { light: Palette; dark: Palette };
 
 export type ThemeColor = keyof Palette;
@@ -473,12 +644,15 @@ export const TypeScale = {
   /** Emphasis inside a body stack (running totals). */
   bodyBold: { fontSize: 16, lineHeight: 24, fontWeight: '700' },
   /** Screen titles in chrome. Not ThemedText type="title" (that stays display-sized). */
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '600' },
+  title: { fontSize: 20, lineHeight: 26, fontWeight: '600' },
   /** Rare hero words and large empty-state titles. */
   display: { fontSize: 32, lineHeight: 40, fontWeight: '600' },
   /** Inline money in rows. Pair with tabular-nums. */
-  money: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
-  /** Section labels above grouped lists. Uppercase Latin; Devanagari is unchanged. */
+  money: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
+  /**
+   * Section labels above grouped lists. Uppercase Latin only.
+   * Do not rely on textTransform for Devanagari — it is unchanged.
+   */
   overline: {
     fontSize: 11,
     lineHeight: 16,
@@ -488,13 +662,23 @@ export const TypeScale = {
   },
   /** Metadata, timestamps, serial · item. */
   label: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  /** Secondary body one step below default (form hints, compact rows). */
+  small: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  /** Tappable inline links. */
+  link: { fontSize: 14, lineHeight: 30, fontWeight: '500' },
+  /** Login / marketing hero only — not ScreenHeader title. */
+  heroTitle: { fontSize: 48, lineHeight: 52, fontWeight: '600' },
+  heroSubtitle: { fontSize: 32, lineHeight: 44, fontWeight: '600' },
+  /** Monospace snippets; pair with Fonts.mono in ThemedText. */
+  codeSize: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   /** Primary row title (customer name). */
-  bodyLarge: { fontSize: 17, lineHeight: 22, fontWeight: '500' },
+  bodyLarge: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
   /** Hero figure on detail screens. Pair with tabular-nums. */
   moneyLarge: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
 } as const satisfies Record<string, TextStyle>;
 
 export const Radii = {
+  xs: 4,
   sm: 8,
   md: 12,
   pill: 999,
@@ -507,6 +691,22 @@ export const Sizes = {
   fab: 56,
   leadingIcon: 22,
   hairline: 1,
+  /** Release checklist and similar checkbox glyphs (row hit target stays MinTouchTarget). */
+  checkbox: 18,
+  /** Customer receipt card image on My Receipts. */
+  receiptImageHeight: 220,
+  /** Placeholder well when no receipt image is stored. */
+  receiptPlaceholderHeight: 160,
+  /** Scanner OCR preview and similar still previews. */
+  imagePreviewHeight: 200,
+  /** Loan detail receipt thumbnail. */
+  receiptThumbHeight: 180,
+  /** Signature pad on create-loan review (taller canvas). */
+  signaturePadHeight: 220,
+  /** Signature pad on redeem (compact canvas). */
+  signaturePadHeightCompact: 180,
+  /** Gold bar on the top edge of the active tab item. */
+  tabIndicator: 3,
 } as const;
 
 /**
@@ -515,7 +715,9 @@ export const Sizes = {
  * https://docs.expo.dev/versions/v57.0.0/sdk/glass-effect/
  */
 export const Glass = {
-  blurIntensity: Platform.select({ ios: 40, android: 24, default: 24 }) ?? 24,
+  blurIntensity: Platform.select({ ios: 40, android: 28, default: 28 }) ?? 28,
+  /** Stronger soft blur for floating docks / choice sheets. */
+  blurIntensityStrong: Platform.select({ ios: 64, android: 42, default: 42 }) ?? 42,
   tabBarHeight: Platform.select({ ios: 50, android: 56, default: 56 }) ?? 56,
   headerHeight: 56,
   get supportsNativeGlass(): boolean {
