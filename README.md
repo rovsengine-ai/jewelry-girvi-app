@@ -81,9 +81,6 @@ npx supabase secrets set GEMINI_API_KEY=...
 # or: npx supabase secrets set MOONSHOT_API_KEY=sk-...
 ```
 
-There is no live gold feed. Pledge valuation freezes from manual `gold_rates`
-rows (seed / `set_manual_gold_rate`); figures stay labelled not IBJA.
-
 Copy `.env.example` to `.env` and fill the **anon** URL and key from
 `npx supabase status`.
 

@@ -1,12 +1,14 @@
 /**
  * Settings tab: sign out for owner and staff. Shop defaults stay owner-only.
- * RLS + update_shop_defaults are the security boundary; hiding the tab is not.
+ * RLS + update_shop_defaults / set_loans_concealed are the security boundary.
  *
  * Expo Router (SDK 57): https://docs.expo.dev/versions/v57.0.0/sdk/router/
+ * Haptics (SDK 57): https://docs.expo.dev/versions/v57.0.0/sdk/haptics/
  */
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { AppIcon, TintedIconWell } from '@/components/app-icon';
 import { Button } from '@/components/button';
@@ -30,7 +32,12 @@ import { parseOwnerOnlyError } from '@/lib/redemption';
 import { ADMIN_ARCHIVE_HREF, isShopOwner } from '@/lib/shop-tab-access';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
-import { fetchShopDefaults, updateShopDefaults } from '@/services/loanService';
+import {
+  fetchLoansConcealed,
+  fetchShopDefaults,
+  setLoansConcealed,
+  updateShopDefaults,
+} from '@/services/loanService';
 import type { PartialPeriodMode, Profile, UserRole } from '@/types/database';
 
 function shopRoleLabel(
@@ -116,8 +123,19 @@ export default function ShopSettingsScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formNotice, setFormNotice] = useState<string | null>(null);
+  const [loansConcealed, setLoansConcealedState] = useState(false);
+  const [concealBusy, setConcealBusy] = useState(false);
 
   const isOwner = isShopOwner(profile?.role);
+
+  useEffect(() => {
+    if (isOwner) return;
+    void fetchLoansConcealed()
+      .then(setLoansConcealedState)
+      .catch(() => {
+        setLoansConcealedState(false);
+      });
+  }, [isOwner]);
 
   useEffect(() => {
     if (!isOwner) return;
@@ -132,6 +150,7 @@ export default function ShopSettingsScreen() {
         setGraceDays(String(defaults.grace_days));
         setRoundUpThresholdDays(String(defaults.round_up_threshold_days));
         setPartialPeriodMode(defaults.partial_period_mode);
+        setLoansConcealedState(defaults.loans_concealed);
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : t('settings.loadErrorBody'));
       } finally {
@@ -139,6 +158,25 @@ export default function ShopSettingsScreen() {
       }
     })();
   }, [isOwner, t]);
+
+  const handleConcealToggle = async (next: boolean) => {
+    setFormError(null);
+    setFormNotice(null);
+    setLoansConcealedState(next);
+    setConcealBusy(true);
+    void Haptics.selectionAsync();
+    try {
+      const stored = await setLoansConcealed(next);
+      setLoansConcealedState(stored);
+      setFormNotice(stored ? t('settings.concealOn') : t('settings.concealOff'));
+    } catch (error) {
+      setLoansConcealedState(!next);
+      const message = error instanceof Error ? error.message : t('errors.unknown');
+      setFormError(parseOwnerOnlyError(message) ? t('settings.ownerOnly') : message);
+    } finally {
+      setConcealBusy(false);
+    }
+  };
 
   const handleSave = async () => {
     setFormError(null);
@@ -217,6 +255,11 @@ export default function ShopSettingsScreen() {
           <ThemedText type="small" style={styles.hint}>
             {t('settings.staffHint')}
           </ThemedText>
+          {loansConcealed ? (
+            <View style={{ paddingHorizontal: Spacing.four }}>
+              <FormNotice info={t('settings.staffConcealed')} />
+            </View>
+          ) : null}
           <SectionLabel>{t('settings.groupPreferences')}</SectionLabel>
           <SettingsGroup>
             <LanguageSettingsRow />
@@ -259,6 +302,35 @@ export default function ShopSettingsScreen() {
 
         <SectionLabel>{t('settings.groupShop')}</SectionLabel>
         <SettingsGroup>
+          <ListRow
+            testID="conceal-loans-row"
+            tone="elevated"
+            leading={
+              <TintedIconWell tint={colors.tintDanger}>
+                <AppIcon ios="eye.slash" android="lock" color={colors.onTintDanger} />
+              </TintedIconWell>
+            }
+            content={
+              <View>
+                <ThemedText type="bodyLarge">{t('settings.concealLoans')}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {t('settings.concealLoansHint')}
+                </ThemedText>
+              </View>
+            }
+            trailing={
+              <Switch
+                testID="conceal-loans-switch"
+                value={loansConcealed}
+                disabled={concealBusy}
+                onValueChange={(value) => void handleConcealToggle(value)}
+                trackColor={{ false: colors.backgroundElement, true: colors.primary }}
+                thumbColor={colors.elevated}
+                accessibilityLabel={t('settings.concealLoans')}
+                accessibilityState={{ checked: loansConcealed, disabled: concealBusy }}
+              />
+            }
+          />
           <ListRow
             testID="open-archive-list"
             tone="elevated"

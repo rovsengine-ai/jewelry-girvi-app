@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/**
+ * Shop loan book. Owner always sees rows; staff see none while concealed
+ * (RLS, not a client filter). Refetch on tab focus after the owner reveals.
+ *
+ * Expo Router (SDK 57): https://docs.expo.dev/versions/v57.0.0/sdk/router/
+ */
+import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { AdminLoanRow } from '@/components/admin-loan-row';
 import { AppIcon } from '@/components/app-icon';
@@ -24,7 +30,7 @@ import { isShopOwner } from '@/lib/shop-tab-access';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
-import { archiveLoan } from '@/services/loanService';
+import { archiveLoan, fetchLoansConcealed } from '@/services/loanService';
 import type { LoanStatus, LoanWithCustomer } from '@/types/database';
 
 type CustomerTab = 'retail_customer' | 'merchant';
@@ -56,8 +62,18 @@ export default function AdminLoansScreen() {
   const [archiveNotice, setArchiveNotice] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [loansConcealed, setLoansConcealed] = useState(false);
+
+  const isOwner = isShopOwner(profile?.role);
 
   const loadLoans = useCallback(async () => {
+    const concealed = await fetchLoansConcealed();
+    setLoansConcealed(concealed);
+    if (concealed && !isOwner) {
+      setLoans([]);
+      return;
+    }
+
     // Owner RLS still SELECTs archived rows; this filter is UX so they live
     // on the Archive screen, not the live book. Staff never see them via RLS.
     const { data, error } = await supabase
@@ -76,21 +92,29 @@ export default function AdminLoansScreen() {
     }
 
     setLoans((data ?? []) as LoanWithCustomer[]);
-  }, []);
+  }, [isOwner]);
 
-  useEffect(() => {
-    void (async () => {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        await loadLoans();
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : t('loans.loadErrorBody'));
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [loadLoans, t]);
+  useFocusEffect(
+    useCallback(() => {
+      // https://docs.expo.dev/versions/v57.0.0/sdk/router/#usefocuseffecteffect-do_not_pass_a_second_prop
+      let active = true;
+      void (async () => {
+        setLoadError(null);
+        try {
+          await loadLoans();
+        } catch (error) {
+          if (active) {
+            setLoadError(error instanceof Error ? error.message : t('loans.loadErrorBody'));
+          }
+        } finally {
+          if (active) setIsLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [loadLoans, t]),
+  );
 
   const filteredLoans = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -122,7 +146,7 @@ export default function AdminLoansScreen() {
     })).filter((section) => section.data.length > 0);
   }, [filteredLoans, language]);
 
-  const isOwner = isShopOwner(profile?.role);
+  const canAddGirvi = isOwner || !loansConcealed;
   const listBottom = tabBarPadding + Sizes.fab + Spacing.four;
   const openAddGirvi = () => router.push('/(admin)/scanner');
 
@@ -132,14 +156,16 @@ export default function AdminLoansScreen() {
         title={isOwner ? t('loans.ownerTitle') : t('loans.staffTitle')}
         collapsed={collapsed}
         trailing={
-          <PressableScale
-            testID="loans-add-header"
-            accessibilityRole="button"
-            accessibilityLabel={t('a11y.scanPledge')}
-            onPress={openAddGirvi}
-            style={styles.headerAdd}>
-            <AppIcon ios="plus.circle.fill" android="add_circle" color={colors.onChrome} />
-          </PressableScale>
+          canAddGirvi ? (
+            <PressableScale
+              testID="loans-add-header"
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.scanPledge')}
+              onPress={openAddGirvi}
+              style={styles.headerAdd}>
+              <AppIcon ios="plus.circle.fill" android="add_circle" color={colors.onChrome} />
+            </PressableScale>
+          ) : undefined
         }
       />
 
@@ -209,14 +235,23 @@ export default function AdminLoansScreen() {
           }
           contentContainerStyle={[styles.listContent, { paddingBottom: listBottom }]}
           ListEmptyComponent={
-            <EmptyState
-              title={t('loans.emptyTitle')}
-              body={t('loans.emptyBody')}
-              actionLabel={t('loans.scanReceipt')}
-              onAction={openAddGirvi}
-              iconIos="tray"
-              iconAndroid="inbox"
-            />
+            loansConcealed && !isOwner ? (
+              <EmptyState
+                title={t('loans.concealedTitle')}
+                body={t('loans.concealedBody')}
+                iconIos="eye.slash"
+                iconAndroid="lock"
+              />
+            ) : (
+              <EmptyState
+                title={t('loans.emptyTitle')}
+                body={t('loans.emptyBody')}
+                actionLabel={t('loans.scanReceipt')}
+                onAction={openAddGirvi}
+                iconIos="tray"
+                iconAndroid="inbox"
+              />
+            )
           }
           renderSectionHeader={({ section }) => (
             <View style={[styles.sectionHeader, { backgroundColor: colors.backgroundElement }]}>
@@ -254,12 +289,14 @@ export default function AdminLoansScreen() {
         />
       )}
 
-      <Fab
-        testID="loans-add-fab"
-        accessibilityLabel={t('a11y.scanPledge')}
-        bottom={tabBarPadding + Spacing.three}
-        onPress={openAddGirvi}
-      />
+      {canAddGirvi ? (
+        <Fab
+          testID="loans-add-fab"
+          accessibilityLabel={t('a11y.scanPledge')}
+          bottom={tabBarPadding + Spacing.three}
+          onPress={openAddGirvi}
+        />
+      ) : null}
     </ThemedView>
   );
 }

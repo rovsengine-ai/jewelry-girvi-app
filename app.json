@@ -10,7 +10,13 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.anonymous.jewelry-girvi-app",
-      "appleTeamId": "U5RDM8MM7T"
+      "appleTeamId": "U5RDM8MM7T",
+      "infoPlist": {
+        "CFBundleLocalizations": [
+          "en",
+          "hi"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -65,13 +71,22 @@
       [
         "expo-localization",
         {
-          "supportedLocales": ["en", "hi"]
+          "supportedLocales": [
+            "en",
+            "hi"
+          ]
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "03e59023-9a4a-468c-8054-76a65237f8f7"
+      }
     }
   }
 }

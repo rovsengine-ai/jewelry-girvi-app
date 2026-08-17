@@ -23,6 +23,7 @@ import type {
   LoanBalances,
   LoanFormData,
   LoanItem,
+  LoanStatus,
   LoanItemPhoto,
   LoanNotice,
   OverdueLoan,
@@ -228,6 +229,26 @@ export async function fetchShopDefaults(): Promise<ShopDefaults> {
   return loadShopDefaults();
 }
 
+/** RLS-safe: customers cannot SELECT shop_defaults, so this is a DEFINER RPC. */
+export async function fetchLoansConcealed(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('loans_are_concealed');
+  if (error) {
+    throw new Error(error.message);
+  }
+  return Boolean(data);
+}
+
+/** Owner-only. Staff/customers are refused in SQL, not in the client. */
+export async function setLoansConcealed(concealed: boolean): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_loans_concealed', {
+    p_concealed: concealed,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return Boolean(data);
+}
+
 /**
  * Loan row exists; item photos did not all land. Retry with
  * attachItemPhotos — do not call createLoanWithCustomer again (serial UNIQUE).
@@ -249,6 +270,90 @@ export class LoanPhotosIncompleteError extends Error {
     );
     this.name = 'LoanPhotosIncompleteError';
   }
+}
+
+export type FindLoanBySerialRow = {
+  loanId: string;
+  serialNumber: string;
+  status: LoanStatus;
+  isArchived: boolean;
+  customerName: string | null;
+};
+
+/**
+ * Serial is already on the book (unique index). Retry is findLoanBySerial
+ * / open the existing loan — do not create_loan again.
+ */
+export class SerialExistsError extends Error {
+  readonly code = 'SERIAL_EXISTS' as const;
+
+  constructor(
+    readonly serialNumber: string,
+    readonly existing: FindLoanBySerialRow | null = null,
+    cause?: unknown,
+  ) {
+    super(`serial_exists: ${serialNumber}`, cause instanceof Error ? { cause } : undefined);
+    this.name = 'SerialExistsError';
+  }
+}
+
+function parseSerialExistsMessage(message: string): string | null {
+  const prefix = 'serial_exists:';
+  if (!message.startsWith(prefix)) {
+    return null;
+  }
+  const serial = message.slice(prefix.length).trim();
+  return serial.length > 0 ? serial : null;
+}
+
+function parseFindLoanBySerialRow(data: unknown): FindLoanBySerialRow | null {
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    loan_id?: unknown;
+    serial_number?: unknown;
+    status?: unknown;
+    is_archived?: unknown;
+    customer_name?: unknown;
+  } | null;
+  if (!row || typeof row.loan_id !== 'string' || row.loan_id.length === 0) {
+    return null;
+  }
+  if (typeof row.serial_number !== 'string') {
+    return null;
+  }
+  if (
+    row.status !== 'active' &&
+    row.status !== 'redeemed' &&
+    row.status !== 'closed' &&
+    row.status !== 'defaulted'
+  ) {
+    return null;
+  }
+  if (typeof row.is_archived !== 'boolean') {
+    return null;
+  }
+  if (row.customer_name != null && typeof row.customer_name !== 'string') {
+    return null;
+  }
+  return {
+    loanId: row.loan_id,
+    serialNumber: row.serial_number,
+    status: row.status,
+    isArchived: row.is_archived,
+    customerName: row.customer_name ?? null,
+  };
+}
+
+/** Shop-only. Exact trimmed serial; includes archived and ended loans. */
+export async function findLoanBySerial(serial: string): Promise<FindLoanBySerialRow | null> {
+  const trimmed = serial.trim();
+  if (trimmed === '') {
+    return null;
+  }
+  const { data, error } = await supabase.rpc('find_loan_by_serial', { p_serial: trimmed });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return parseFindLoanBySerialRow(data);
 }
 
 type CreateLoanRow = { loan_id: string; item_ids: string[] };
@@ -420,6 +525,10 @@ export async function createLoanWithCustomer(
   });
 
   if (error) {
+    const taken = parseSerialExistsMessage(error.message);
+    if (taken) {
+      throw new SerialExistsError(taken);
+    }
     throw new Error(error.message);
   }
 

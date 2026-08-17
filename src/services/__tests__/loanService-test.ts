@@ -6,14 +6,18 @@ import {
   editLoanTerms,
   fetchArchivedLoans,
   fetchCustomerLoanReminders,
+  fetchLoansConcealed,
   fetchOverdueLoans,
   fetchRateYield,
   findCustomerIdByPhone,
+  findLoanBySerial,
   generateLoanNotices,
   LoanPhotosIncompleteError,
+  SerialExistsError,
   redeemLoan,
   renewLoan,
   resolveReceiptDisplayUrl,
+  setLoansConcealed,
   unarchiveLoan,
   unredeemLoan,
   updateShopDefaults,
@@ -362,6 +366,7 @@ describe('createLoanWithCustomer', () => {
     grace_days: 0,
     partial_period_mode: 'min_month_then_pro_rata',
     round_up_threshold_days: 24,
+    loans_concealed: false,
     updated_at: '2024-01-01T00:00:00Z',
   };
 
@@ -513,6 +518,25 @@ describe('createLoanWithCustomer', () => {
     });
     await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).rejects.toThrow(
       'items_required: create_loan needs at least one pledged item',
+    );
+  });
+
+  test('maps serial_exists: to SerialExistsError with the serial', async () => {
+    rpc.mockImplementation(async (fn: string) => {
+      if (fn === 'find_profile_by_phone') {
+        return { data: CUSTOMER, error: null };
+      }
+      return {
+        data: null,
+        error: { message: 'serial_exists: T-1' },
+      };
+    });
+    await expect(createLoanWithCustomer(form, items, 'file:///tmp/a.jpg', null)).rejects.toEqual(
+      expect.objectContaining({
+        name: 'SerialExistsError',
+        serialNumber: 'T-1',
+        code: 'SERIAL_EXISTS',
+      }),
     );
   });
 
@@ -925,6 +949,20 @@ describe('updateShopDefaults', () => {
   });
 });
 
+describe('loans concealment RPCs', () => {
+  test('fetchLoansConcealed reads the DEFINER flag', async () => {
+    rpc.mockResolvedValue({ data: true, error: null });
+    await expect(fetchLoansConcealed()).resolves.toBe(true);
+    expect(rpc).toHaveBeenCalledWith('loans_are_concealed');
+  });
+
+  test('setLoansConcealed calls the owner-only RPC', async () => {
+    rpc.mockResolvedValue({ data: true, error: null });
+    await expect(setLoansConcealed(true)).resolves.toBe(true);
+    expect(rpc).toHaveBeenCalledWith('set_loans_concealed', { p_concealed: true });
+  });
+});
+
 describe('editLoanTerms', () => {
   test('calls the RPC with parsed terms and a reason', async () => {
     rpc.mockResolvedValue({
@@ -1079,6 +1117,36 @@ describe('fetchCustomerLoanReminders', () => {
     expect(rpc).toHaveBeenCalledWith('customer_loan_reminder_schedule', {
       p_as_of: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
+  });
+});
+
+describe('findLoanBySerial', () => {
+  test('returns a typed row for an exact serial', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          loan_id: 'loan-1',
+          serial_number: 'T-1',
+          status: 'active',
+          is_archived: false,
+          customer_name: 'Asha Patil',
+        },
+      ],
+      error: null,
+    });
+    await expect(findLoanBySerial(' T-1 ')).resolves.toEqual({
+      loanId: 'loan-1',
+      serialNumber: 'T-1',
+      status: 'active',
+      isArchived: false,
+      customerName: 'Asha Patil',
+    });
+    expect(rpc).toHaveBeenCalledWith('find_loan_by_serial', { p_serial: 'T-1' });
+  });
+
+  test('returns null when the serial is empty', async () => {
+    await expect(findLoanBySerial('   ')).resolves.toBeNull();
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 

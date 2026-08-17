@@ -50,8 +50,11 @@ import { useLanguage } from '@/providers/language-provider';
 import {
   attachItemPhotos,
   createLoanWithCustomer,
+  findLoanBySerial,
   LoanPhotosIncompleteError,
+  SerialExistsError,
   type CounterCustomerRole,
+  type FindLoanBySerialRow,
 } from '@/services/loanService';
 import { extractReceiptData, ocrErrorDisplayMessage } from '@/services/ocrService';
 import type { LoanFormData, OcrExtractionResult } from '@/types/database';
@@ -281,6 +284,7 @@ export default function AdminScannerScreen() {
   const [kycPendingCustomerId, setKycPendingCustomerId] = useState<string | null>(null);
   const [kycDraft, setKycDraft] = useState<KycDraft>(() => emptyKycDraft());
   const [photoGap, setPhotoGap] = useState<LoanPhotosIncompleteError | null>(null);
+  const [existingLoan, setExistingLoan] = useState<FindLoanBySerialRow | null>(null);
   const [customerRole, setCustomerRole] = useState<CounterCustomerRole>('retail_customer');
   // CameraView.isAvailableAsync is web-only; use Device.isDevice for simulators.
   // https://docs.expo.dev/versions/v57.0.0/sdk/device/
@@ -289,7 +293,29 @@ export default function AdminScannerScreen() {
 
   const updateForm = useCallback((key: keyof LoanFormData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key === 'serial_number') {
+      setExistingLoan(null);
+    }
   }, []);
+
+  const checkSerialOnBlur = async () => {
+    const serial = form.serial_number.trim();
+    if (serial === '') {
+      setExistingLoan(null);
+      return;
+    }
+    try {
+      const row = await findLoanBySerial(serial);
+      if (row) {
+        setExistingLoan(row);
+        setFormError(t('loans.scanner.serialExists', { serial: row.serialNumber }));
+        return;
+      }
+      setExistingLoan(null);
+    } catch {
+      setExistingLoan(null);
+    }
+  };
 
   const resetDraft = useCallback(() => {
     setForm({ ...emptyForm, disbursed_on: todayInKolkata() });
@@ -302,6 +328,7 @@ export default function AdminScannerScreen() {
     setKycPendingCustomerId(null);
     setKycDraft(emptyKycDraft());
     setPhotoGap(null);
+    setExistingLoan(null);
     setCustomerRole('retail_customer');
     setCameraMountError(null);
   }, []);
@@ -478,6 +505,16 @@ export default function AdminScannerScreen() {
         setPhotoGap(error);
         setSavedLoanId(error.loanId);
         setFormError(error.message);
+        return;
+      }
+      if (error instanceof SerialExistsError) {
+        setFormError(t('loans.scanner.serialExists', { serial: error.serialNumber }));
+        try {
+          const row = error.existing ?? (await findLoanBySerial(error.serialNumber));
+          setExistingLoan(row);
+        } catch {
+          setExistingLoan(null);
+        }
         return;
       }
       setFormError(
@@ -672,6 +709,14 @@ export default function AdminScannerScreen() {
           error={formError}
           notice={formNotice}
         />
+        {existingLoan ? (
+          <Button
+            testID="scanner-open-existing-loan"
+            label={t('loans.scanner.openExistingLoan')}
+            variant="secondary"
+            onPress={() => router.push(`/(admin)/loan/${existingLoan.loanId}`)}
+          />
+        ) : null}
 
         <Card>
           <ThemedText type="smallBold">{t('loans.scanner.customerType')}</ThemedText>
@@ -694,6 +739,8 @@ export default function AdminScannerScreen() {
             label={t('loans.scanner.serialNumber')}
             value={form.serial_number}
             onChangeText={(v) => updateForm('serial_number', v)}
+            onBlur={() => void checkSerialOnBlur()}
+            testID="scanner-serial"
           />
           <Field
             label={t('loans.scanner.customerName')}
@@ -781,6 +828,7 @@ export default function AdminScannerScreen() {
           testID="scanner-save"
           label={t('loans.scanner.saveGirviLoan')}
           loading={isBusy}
+          disabled={Boolean(existingLoan)}
           onPress={() => void handleSave()}
         />
         {entryMode === 'scan' ? (

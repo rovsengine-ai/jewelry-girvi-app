@@ -22,9 +22,6 @@ export const hi = {
     backToLoan: 'गिरवी पर वापस',
     grantPermission: 'अनुमति दें',
     generating: 'बना रहे हैं…',
-    loadingRate: 'दर लोड हो रही है…',
-    notIbja: 'IBJA नहीं',
-    per10g: '/ 10ग्रा',
   },
   signaturePad: {
     captured: 'हस्ताक्षर लिया गया',
@@ -79,8 +76,10 @@ export const hi = {
     searchPlaceholder: 'नाम, फ़ोन, या क्रमांक',
     emptyTitle: 'कोई गिरवी नहीं',
     emptyBody: 'इस टैब में कोई गिरवी नहीं।',
+    concealedTitle: 'अस्थायी तकनीकी समस्या',
+    concealedBody:
+      'अभी गिरवी रिकॉर्ड नहीं खुल पा रहे। घबराएँ नहीं — तकनीकी टीम जल्द ठीक करेगी।',
     scanReceipt: 'रसीद स्कैन',
-    notIbja: 'IBJA नहीं',
     status: {
       active: 'चालू',
       redeemed: 'छुड़ाई गई',
@@ -97,6 +96,9 @@ export const hi = {
       loadError: 'रसीदें नहीं खुल सकीं।',
       emptyTitle: 'अभी कोई रसीद नहीं',
       emptyBody: 'आपके खाते से अभी कोई गिरवी रसीद जुड़ी नहीं है।',
+      concealedTitle: 'अस्थायी तकनीकी समस्या',
+      concealedBody:
+        'अभी रसीदें नहीं खुल पा रही। घबराएँ नहीं — तकनीकी टीम जल्द ठीक करेगी।',
       noReceiptImage: 'रसीद की तस्वीर नहीं',
       collectItemsStatus: 'भुगतान हो गया — सामान लें',
       collectItemsTitle: 'भुगतान हो गया — अपना सामान लें',
@@ -127,11 +129,10 @@ export const hi = {
       itemsEmptyTitle: 'कोई वस्तु नहीं',
       itemsEmptyBody: 'इस गिरवी पर कोई वस्तु पंक्ति नहीं।',
       metalUnknown: 'धातु अज्ञात',
-      itemMeta: '%{metal} · %{ornament} · %{grams}ग्रा शुद्ध · %{purity}%{qty}%{assessed}',
+      itemMeta: '%{metal} · %{ornament} · %{grams}ग्रा शुद्ध · %{purity}%{qty}',
       purityNotAssessed: 'शुद्धता आकलित नहीं',
       purityKarat: '%{karat}K',
       quantitySuffix: ' · ×%{qty}',
-      assessedNotIbja: ' · आकलित (IBJA नहीं)',
       redeem: 'छुड़ाना',
       renew: 'नवीनीकरण',
       defaultLoan: 'ज़ब्ती',
@@ -158,9 +159,6 @@ export const hi = {
       sectionActions: 'कार्रवाई',
       totalItems: 'कुल वस्तुएँ : %{count}',
       addTransaction: '+ लेन-देन जोड़ें',
-      marketValue: 'बाज़ार मूल्य',
-      marketValueEmpty: 'इन वस्तुओं पर आकलित मूल्य नहीं।',
-      marketValueCaption: 'जमी हुई वस्तु कीमत (%{notIbja})',
       tenureDays: '%{days} दिन',
       dateRange: '%{from} – %{to}',
       asOfDate: '%{date} तक का हिसाब',
@@ -256,6 +254,8 @@ export const hi = {
       cameraUnavailableBody:
         'iOS सिम्युलेटर में कैमरा नहीं होता। गैलरी से फ़ोटो चुनें, या गिरवी खुद भरें।',
       cameraMountFailed: 'कैमरा चालू नहीं हुआ। गैलरी इस्तेमाल करें या खुद भरें।',
+      serialExists: 'क्रमांक %{serial} पहले से बही में है।',
+      openExistingLoan: 'मौजूदा गिरवी खोलें',
     },
     insights: {
       // REVIEW: shop analytics jargon
@@ -466,6 +466,13 @@ export const hi = {
     language: 'भाषा',
     languageHint: 'तुरंत लागू होती है। इस डिवाइस पर सहेजी जाती है।',
     staffHint: 'दुकान डिफ़ॉल्ट केवल मालिक के लिए। RLS कर्मचारी लिखने से मना करता है।',
+    staffConcealed:
+      'अभी गिरवी रिकॉर्ड नहीं खुल पा रहे। घबराएँ नहीं — तकनीकी टीम जल्द ठीक करेगी।',
+    concealLoans: 'सभी गिरवी छिपाएँ',
+    concealLoansHint:
+      'कर्मचारी, खुदरा ग्राहक और व्यापारी कोई गिरवी डेटा नहीं देखेंगे जब तक आप यह बंद न करें। आपकी किताब दिखती रहेगी।',
+    concealOn: 'गिरवी कर्मचारी और ग्राहकों से छिपी हैं।',
+    concealOff: 'गिरवी फिर दिख रही हैं। कर्मचारी और ग्राहक ताज़ा करके देखेंगे।',
     shopDefaults: 'दुकान डिफ़ॉल्ट',
     shopDefaultsInfo:
       'दुकान डिफ़ॉल्ट बदलने से केवल नई गिरवी प्रभावित होती है। पुरानी नहीं (जब तक मालिक उस गिरवी को अलग से न बदले)।',

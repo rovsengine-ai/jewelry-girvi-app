@@ -339,11 +339,6 @@ export default function LoanDetailScreen() {
   };
 
   const phoneHref = telHref(loan.profiles?.phone_number);
-  const valuedItems = items.filter((item) => item.valuation_paise != null);
-  const marketPaise = valuedItems.reduce(
-    (sum, item) => sum + (item.valuation_paise ?? 0),
-    0,
-  );
 
   return (
     <ThemedView style={styles.container} type="surfaceSunken">
@@ -563,24 +558,6 @@ export default function LoanDetailScreen() {
           </View>
         </Card>
 
-        <View style={[styles.marketBar, { backgroundColor: colors.tintSuccess }]}>
-          <ThemedText type="overline" style={{ color: colors.onTintSuccess }}>
-            {t('loans.detail.marketValue')}
-          </ThemedText>
-          {valuedItems.length > 0 ? (
-            <>
-              <MoneyText paise={asPaise(marketPaise)} style={{ color: colors.onTintSuccess }} />
-              <ThemedText type="caption" style={{ color: colors.onTintSuccess }}>
-                {t('loans.detail.marketValueCaption', { notIbja: t('common.notIbja') })}
-              </ThemedText>
-            </>
-          ) : (
-            <ThemedText type="caption" style={{ color: colors.onTintSuccess }}>
-              {t('loans.detail.marketValueEmpty')}
-            </ThemedText>
-          )}
-        </View>
-
         <Card style={styles.block}>
           <View style={styles.threeUp}>
             <View style={styles.stat}>
@@ -727,14 +704,8 @@ export default function LoanDetailScreen() {
                             ? t('loans.detail.purityKarat', { karat: item.purity_karat })
                             : t('loans.detail.purityNotAssessed'),
                         qty: item.quantity > 1 ? t('loans.detail.quantitySuffix', { qty: item.quantity }) : '',
-                        assessed: item.valuation_paise != null ? t('loans.detail.assessedNotIbja') : '',
                       })}
                     </ThemedText>
-                  }
-                  trailing={
-                    item.valuation_paise != null ? (
-                      <MoneyText paise={asPaise(item.valuation_paise)} />
-                    ) : undefined
                   }
                 />
               ))}
@@ -986,12 +957,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: Spacing.half,
-  },
-  marketBar: {
-    marginHorizontal: Spacing.four,
-    borderRadius: Radii.md,
-    padding: Spacing.three,
-    gap: Spacing.one,
   },
   heroName: { flex: 1, minWidth: 0 },
   receipt: {

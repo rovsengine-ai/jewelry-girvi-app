@@ -354,10 +354,11 @@ async function callGemini(
           ],
         },
       ],
+      // gemini-3.6-flash rejects temperature/top_p/top_k with HTTP 400.
+      // https://ai.google.dev/gemini-api/docs/generate-content/latest-model
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: GEMINI_RECEIPT_SCHEMA,
-        temperature: 0.1,
       },
     }),
   });

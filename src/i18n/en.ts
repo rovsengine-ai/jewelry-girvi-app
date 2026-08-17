@@ -22,9 +22,6 @@ export const en = {
     backToLoan: 'Back to loan',
     grantPermission: 'Grant permission',
     generating: 'Generating…',
-    loadingRate: 'Loading rate…',
-    notIbja: 'not IBJA',
-    per10g: '/ 10g',
   },
   signaturePad: {
     captured: 'Signature captured',
@@ -79,8 +76,10 @@ export const en = {
     searchPlaceholder: 'Name, phone, or serial number',
     emptyTitle: 'No girvis',
     emptyBody: 'No girvis in this tab.',
+    concealedTitle: 'Temporary technical issue',
+    concealedBody:
+      'Loan records cannot be loaded right now. Do not panic — the technical team will resolve this soon.',
     scanReceipt: 'Scan Receipt',
-    notIbja: 'not IBJA',
     status: {
       active: 'Active',
       redeemed: 'Redeemed',
@@ -97,6 +96,9 @@ export const en = {
       loadError: 'Could not load receipts.',
       emptyTitle: 'No receipts yet',
       emptyBody: 'No girvi receipts linked to your account yet.',
+      concealedTitle: 'Temporary technical issue',
+      concealedBody:
+        'Receipts cannot be loaded right now. Do not panic — the technical team will resolve this soon.',
       noReceiptImage: 'No receipt image',
       collectItemsStatus: 'Paid — collect items',
       collectItemsTitle: 'Paid — collect your items',
@@ -127,11 +129,10 @@ export const en = {
       itemsEmptyTitle: 'No items',
       itemsEmptyBody: 'No item rows on this loan.',
       metalUnknown: 'metal unknown',
-      itemMeta: '%{metal} · %{ornament} · %{grams}g net · %{purity}%{qty}%{assessed}',
+      itemMeta: '%{metal} · %{ornament} · %{grams}g net · %{purity}%{qty}',
       purityNotAssessed: 'purity not assessed',
       purityKarat: '%{karat}K',
       quantitySuffix: ' · ×%{qty}',
-      assessedNotIbja: ' · assessed (not IBJA)',
       redeem: 'Redeem',
       renew: 'Renew',
       defaultLoan: 'Default loan',
@@ -158,9 +159,6 @@ export const en = {
       sectionActions: 'Actions',
       totalItems: 'Total items : %{count}',
       addTransaction: '+ Add Transaction',
-      marketValue: 'Market value',
-      marketValueEmpty: 'No assessed value on these items.',
-      marketValueCaption: 'Frozen item valuations (%{notIbja})',
       tenureDays: '%{days} days',
       dateRange: '%{from} – %{to}',
       asOfDate: 'Calculated as of %{date}',
@@ -254,6 +252,8 @@ export const en = {
       cameraUnavailableBody:
         'The iOS Simulator has no camera. Choose a photo from the gallery, or enter the girvi manually.',
       cameraMountFailed: 'Camera preview failed to start. Use the gallery or enter manually.',
+      serialExists: 'Serial %{serial} is already on the book.',
+      openExistingLoan: 'Open existing girvi',
     },
     insights: {
       title: 'Insights',
@@ -463,6 +463,13 @@ export const en = {
     language: 'Language',
     languageHint: 'Applies immediately. Saved on this device.',
     staffHint: 'Shop defaults are owner-only. RLS still refuses staff writes.',
+    staffConcealed:
+      'Loan records cannot be loaded right now. Do not panic — the technical team will resolve this soon.',
+    concealLoans: 'Hide all girvis',
+    concealLoansHint:
+      'Staff, retail customers, and merchants see no loan data until you turn this off. Your own book stays visible.',
+    concealOn: 'Girvis are hidden from staff and customers.',
+    concealOff: 'Girvis are visible again. Staff and customers refresh to see them.',
     shopDefaults: 'Shop defaults',
     shopDefaultsInfo:
       'Changing shop defaults affects NEW loans only. Never existing ones (unless an owner edits that loan individually).',

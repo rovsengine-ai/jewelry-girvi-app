@@ -28,19 +28,3 @@ export function goldPurityLabel(karat: number | null, language?: AppLanguage): s
   if (karat === 18) return translate('items.purity.k18', undefined, language);
   return translate('items.purity.karatMillesimal', { karat, millesimal }, language);
 }
-
-export interface GoldRatePick {
-  id: string;
-  purity_millesimal: number;
-  source: 'goldapi' | 'metals_dev' | 'manual';
-}
-
-/** Prefer a manual row for the millesimal, else the first remaining row. */
-export function pickRateForMillesimal<T extends GoldRatePick>(
-  rates: T[],
-  millesimal: number,
-): T | null {
-  const matches = rates.filter((row) => row.purity_millesimal === millesimal);
-  const manual = matches.find((row) => row.source === 'manual');
-  return manual ?? matches[0] ?? null;
-}

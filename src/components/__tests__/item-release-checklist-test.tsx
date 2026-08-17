@@ -21,8 +21,6 @@ const ITEMS: LoanItem[] = [
     purity_karat: null,
     stone_deduction_mg: 0,
     quantity: 1,
-    valuation_paise: null,
-    gold_rate_id: null,
     created_at: '2024-01-01T00:00:00Z',
   },
   {
@@ -37,8 +35,6 @@ const ITEMS: LoanItem[] = [
     purity_karat: null,
     stone_deduction_mg: 500,
     quantity: 1,
-    valuation_paise: null,
-    gold_rate_id: null,
     created_at: '2024-01-01T00:00:00Z',
   },
 ];
