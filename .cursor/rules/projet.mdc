@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+---
+
+# jewelry-girvi-app
+
+## Non-negotiable: verify APIs before writing code
+This project runs Expo SDK 57, React Native 0.86.2, React 19.2.3,
+TypeScript 6.0.3. These are newer than your training data. Before using
+ANY Expo or React Native API, fetch the versioned doc page at
+https://docs.expo.dev/versions/v57.0.0/ and cite the URL you read.
+If you cannot fetch it, say so and stop. Do not write from memory.
+
+## Stack — as installed, not as imagined
+- Router: expo-router 57, typedRoutes enabled
+- UI: @expo/ui (native primitives) + expo-glass-effect. 
+  DO NOT install react-native-paper, nativewind, tailwind, or any other
+  UI framework. If you believe one is needed, ask first.
+- Backend: @supabase/supabase-js 2.112.3
+- Session storage: expo-secure-store
+- React Compiler is ON — do not hand-write useMemo/useCallback unless
+  profiling justifies it.
+
+## Security rules (these are the ones that matter)
+- Data isolation is enforced by Postgres RLS using auth.uid(), never by
+  client-side .eq() filters. A client filter is UX, not a boundary.
+- Admin (shop owner) vs customer (borrower) privilege is decided
+  server-side in an RLS policy. Never by a boolean in client state.
+- Every new table ships with its migration file AND its RLS policies in
+  the same change. A table without RLS is not done.
+- Storage buckets are private. Access via signed URLs only. Object paths
+  are namespaced by user id.
+- service_role key never appears in app code.
+
+## TypeScript
+- strict is on. No `any` on Supabase responses. No @ts-ignore.
+- DB types must be generated, not hand-written.
+
+## Platform
+- iOS and Android both ship. @expo/ui and expo-glass-effect components
+  need an explicit Android fallback path — state it when you use one.

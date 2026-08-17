@@ -1,0 +1,53 @@
+appId: com.anonymous.jewelrygirviapp
+---
+# Owner archives SEED-OVERDUE → customer no longer lists it.
+# Uses SEED-OVERDUE so SEED-ACTIVE remains for other flows.
+- runFlow:
+    file: subflows/login.yaml
+    env:
+      PHONE: "9000000001"
+- extendedWaitUntil:
+    visible: "SEED-OVERDUE"
+    timeout: 20000
+- tapOn:
+    id: loan-row-SEED-OVERDUE
+- extendedWaitUntil:
+    visible:
+      id: open-archive
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: open-archive
+    direction: DOWN
+- tapOn:
+    id: open-archive
+- extendedWaitUntil:
+    visible:
+      id: archive-reason
+    timeout: 10000
+- tapOn:
+    id: archive-reason
+- eraseText
+- inputText: "E2E archive hide from customer"
+- tapOn:
+    id: archive-confirm-button
+- extendedWaitUntil:
+    visible: "Archived"
+    timeout: 15000
+- tapOn: "Settings"
+- tapOn:
+    id: sign-out
+- extendedWaitUntil:
+    visible:
+      id: login-phone
+    timeout: 20000
+- runFlow:
+    file: subflows/login.yaml
+    env:
+      PHONE: "9000000003"
+- extendedWaitUntil:
+    visible:
+      id: customer-loan-SEED-ACTIVE
+    timeout: 20000
+- assertNotVisible:
+    id: customer-loan-SEED-OVERDUE

@@ -1,0 +1,27 @@
+appId: com.anonymous.jewelrygirviapp
+---
+# Customer: loan list → Settings → Hindi → tabs still render.
+# Prompt 6 declined: no loan detail / balance assertions.
+- runFlow:
+    file: subflows/login.yaml
+    env:
+      PHONE: "9000000003"
+- extendedWaitUntil:
+    visible:
+      id: customer-loan-SEED-ACTIVE
+    timeout: 20000
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible:
+      id: language-hi
+    timeout: 10000
+- tapOn:
+    id: language-hi
+- assertVisible: "सेटिंग"
+- tapOn: "मेरी गिरवी"
+- assertVisible:
+    id: customer-loan-SEED-ACTIVE
+- tapOn: "सूचनाएँ"
+- assertVisible: "सूचनाएँ"
+- tapOn: "सेटिंग"
+- assertVisible: "सेटिंग"

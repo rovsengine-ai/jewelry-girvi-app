@@ -1,0 +1,25 @@
+appId: com.anonymous.jewelrygirviapp
+---
+# Shared login. Pass PHONE via env (e.g. -e PHONE=9000000001). OTP is always 123456 locally.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: login-phone
+    timeout: 30000
+- tapOn:
+    id: login-phone
+- eraseText
+- inputText: ${PHONE}
+- tapOn:
+    id: login-send-otp
+- extendedWaitUntil:
+    visible:
+      id: login-otp
+    timeout: 15000
+- tapOn:
+    id: login-otp
+- eraseText
+- inputText: "123456"
+- tapOn:
+    id: login-verify

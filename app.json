@@ -1,0 +1,100 @@
+{
+  "expo": {
+    "name": "Girvi Shop",
+    "slug": "jewelry-girvi-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/03e59023-9a4a-468c-8054-76a65237f8f7"
+    },
+    "icon": "./assets/images/icon.png",
+    "scheme": "jewelrygirviapp",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.anonymous.jewelry-girvi-app",
+      "appleTeamId": "U5RDM8MM7T",
+      "infoPlist": {
+        "CFBundleLocalizations": [
+          "en",
+          "hi"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.anonymous.jewelrygirviapp"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#208AEF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Girvi Shop to scan handwritten receipt pads."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#208AEF",
+          "defaultChannel": "loan-reminders"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Girvi Shop to attach pledged-item and KYC photos.",
+          "cameraPermission": "Allow Girvi Shop to photograph pledged items and ID documents.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      "expo-updates",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": [
+            "en",
+            "hi"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "03e59023-9a4a-468c-8054-76a65237f8f7"
+      }
+    }
+  }
+}

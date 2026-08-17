@@ -1,0 +1,24 @@
+appId: com.anonymous.jewelrygirviapp
+---
+# Staff: Insights tab and owner-only loan actions must be absent.
+- runFlow:
+    file: subflows/login.yaml
+    env:
+      PHONE: "9000000002"
+- extendedWaitUntil:
+    visible: "SEED-ACTIVE"
+    timeout: 20000
+- assertNotVisible: "Insights"
+- tapOn:
+    id: loan-row-SEED-ACTIVE
+- extendedWaitUntil:
+    visible: "SEED-ACTIVE"
+    timeout: 15000
+- assertNotVisible:
+    id: open-redeem
+- assertNotVisible:
+    id: open-renew
+- assertNotVisible:
+    id: open-archive
+- assertNotVisible:
+    id: loan-row-archive
