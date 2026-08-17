@@ -20,6 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Sizes, Spacing } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useRefreshOnForeground } from '@/hooks/use-refresh-on-foreground';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { customerLoanStatusLabel } from '@/lib/redemption';
 import { rowEntering } from '@/lib/motion';
@@ -79,6 +80,8 @@ export default function CustomerLoansScreen() {
     );
     setLoans(withUrls);
   }, [session?.user.id]);
+
+  useRefreshOnForeground(loadLoans);
 
   const refresh = useCallback(async () => {
     setIsRefreshing(true);

@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MinTouchTarget, Spacing, Sizes } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useRefreshOnForeground } from '@/hooks/use-refresh-on-foreground';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
 import { unknownMessage } from '@/i18n';
@@ -93,6 +94,8 @@ export default function AdminLoansScreen() {
 
     setLoans((data ?? []) as LoanWithCustomer[]);
   }, [isOwner]);
+
+  useRefreshOnForeground(loadLoans);
 
   useFocusEffect(
     useCallback(() => {

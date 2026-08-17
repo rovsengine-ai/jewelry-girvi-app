@@ -1,9 +1,15 @@
 {
   "expo": {
-    "name": "jewelry-girvi-app",
+    "name": "Girvi Shop",
     "slug": "jewelry-girvi-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/03e59023-9a4a-468c-8054-76a65237f8f7"
+    },
     "icon": "./assets/images/icon.png",
     "scheme": "jewelrygirviapp",
     "userInterfaceStyle": "automatic",
@@ -15,7 +21,8 @@
         "CFBundleLocalizations": [
           "en",
           "hi"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -68,6 +75,7 @@
         }
       ],
       "expo-sharing",
+      "expo-updates",
       [
         "expo-localization",
         {

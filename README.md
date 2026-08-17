@@ -151,6 +151,12 @@ Customer detail and balance are **not** covered here (Prompt 6 declined). Jest
 snapshots catch Hindi string layout drift in the component tree; Maestro is the
 pass for “no clipped text” on device.
 
+## Play Store and App Store
+
+Store builds must use **hosted** Supabase (live OTP, shared data). Follow
+[`docs/STORE-RELEASE.md`](docs/STORE-RELEASE.md). Do not ship the local
+`9000000001` / `123456` test map.
+
 ## Admin vs customer
 
 | Role | App |
