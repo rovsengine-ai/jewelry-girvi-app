@@ -112,6 +112,35 @@ describe('scannerItemsReducer', () => {
     expect(seeded[0]?.metal).toBe('gold');
     expect(seeded[0]?.ornament_type).toBe('सोना पेठा');
   });
+
+  test('seedFromOcr on an empty list still creates item-1', () => {
+    const seeded = scannerItemsReducer([], {
+      type: 'seedFromOcr',
+      ornamentType: 'Payal',
+      grossGrams: '47',
+    });
+    expect(seeded[0]?.key).toBe('item-1');
+    expect(seeded[0]?.ornament_type).toBe('Payal');
+  });
+
+  test('removing the middle of three keeps the other keys', () => {
+    let state = [emptyScannerItem('item-1')];
+    state = scannerItemsReducer(state, { type: 'add' });
+    state = scannerItemsReducer(state, { type: 'add' });
+    expect(state.map((item) => item.key)).toEqual(['item-1', 'item-2', 'item-3']);
+    state = scannerItemsReducer(state, { type: 'remove', key: 'item-2' });
+    expect(state.map((item) => item.key)).toEqual(['item-1', 'item-3']);
+  });
+
+  test('invalid gross while auto-tracking net clears net', () => {
+    let state = [emptyScannerItem('item-1')];
+    state = scannerItemsReducer(state, {
+      type: 'patch',
+      key: 'item-1',
+      patch: { gross_grams: 'abc' },
+    });
+    expect(state[0]?.net_grams).toBe('');
+  });
 });
 
 describe('convertScannerItem', () => {
@@ -142,5 +171,34 @@ describe('convertScannerItem', () => {
     expect(
       convertScannerItem(goldDraft({ metal: 'silver', purity_karat: 22 })).purity_karat,
     ).toBeNull();
+  });
+
+  test('stores assessed gold karat and trims description', () => {
+    expect(
+      convertScannerItem(
+        goldDraft({ purity_karat: 22, description: '  heavy  ', stone_grams: '' }),
+      ),
+    ).toMatchObject({
+      purity_karat: 22,
+      description: 'heavy',
+      stone_deduction_mg: 0,
+    });
+    expect(convertScannerItem(goldDraft({ description: '   ' })).description).toBeNull();
+  });
+
+  test.each([
+    [{ ornament_type: '  ' }, 'Each pledged item needs an ornament type.'],
+    [{ gross_grams: '0', net_grams: '0' }, 'Gross weight must be greater than zero.'],
+    [{ net_grams: '0' }, 'Net weight must be greater than zero.'],
+    [{ quantity: '0' }, 'Quantity must be a whole number of at least 1.'],
+    [{ quantity: 'abc' }, 'Quantity must be a whole number of at least 1.'],
+    [{ purity_karat: 25 }, 'Gold purity must be between 1 and 24 karat, or not assessed.'],
+    [{ purity_karat: 0 }, 'Gold purity must be between 1 and 24 karat, or not assessed.'],
+  ] as const)('refuses invalid draft %j', (patch, message) => {
+    expect(() => convertScannerItem(goldDraft({ ...patch }))).toThrow(message);
+  });
+
+  test('FLAGGED: parseInt truncates quantity 1.5 to 1 instead of rejecting', () => {
+    expect(convertScannerItem(goldDraft({ quantity: '1.5' })).quantity).toBe(1);
   });
 });

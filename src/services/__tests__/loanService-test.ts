@@ -6,6 +6,7 @@ import {
   editLoanTerms,
   fetchArchivedLoans,
   fetchCustomerLoanReminders,
+  fetchLoanBalances,
   fetchLoansConcealed,
   fetchOverdueLoans,
   fetchRateYield,
@@ -13,6 +14,7 @@ import {
   findLoanBySerial,
   generateLoanNotices,
   LoanPhotosIncompleteError,
+  logPayment,
   SerialExistsError,
   redeemLoan,
   renewLoan,
@@ -1147,6 +1149,58 @@ describe('findLoanBySerial', () => {
   test('returns null when the serial is empty', async () => {
     await expect(findLoanBySerial('   ')).resolves.toBeNull();
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetchLoanBalances', () => {
+  test('coerces PostgREST string paise columns', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          accrued_interest_paise: '150000',
+          outstanding_principal_paise: '5000000',
+          total_due_paise: '5150000',
+          interest_paid_paise: '0',
+          principal_paid_paise: '0',
+          overpayment_refunded_paise: '0',
+        },
+      ],
+      error: null,
+    });
+    await expect(fetchLoanBalances('loan-1', '2024-01-06')).resolves.toEqual({
+      accruedInterestPaise: 150000,
+      outstandingPrincipalPaise: 5000000,
+      totalDuePaise: 5150000,
+      interestPaidPaise: 0,
+      principalPaidPaise: 0,
+      overpaymentRefundedPaise: 0,
+    });
+    expect(rpc).toHaveBeenCalledWith('loan_balances_as_of', {
+      p_loan_id: 'loan-1',
+      p_as_of: '2024-01-06',
+    });
+  });
+});
+
+describe('logPayment', () => {
+  test('inserts a positive paise payment', async () => {
+    const insert = jest.fn(async () => ({ error: null }));
+    const { supabase } = jest.requireMock('@/lib/supabase') as { supabase: { from: jest.Mock } };
+    supabase.from.mockReturnValue({ insert });
+
+    await logPayment('loan-1', 150000, '2024-01-08');
+    expect(supabase.from).toHaveBeenCalledWith('payments');
+    expect(insert).toHaveBeenCalledWith({
+      loan_id: 'loan-1',
+      amount_paid_paise: 150000,
+      paid_on: '2024-01-08',
+    });
+  });
+
+  test.each([0, -1] as const)('refuses non-positive amount %p', async (amount) => {
+    await expect(logPayment('loan-1', amount)).rejects.toThrow(
+      'Payment amount must be greater than zero paise.',
+    );
   });
 });
 

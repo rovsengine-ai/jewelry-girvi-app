@@ -103,4 +103,16 @@ describe('telHref', () => {
     expect(telHref('')).toBeNull();
     expect(telHref('   ')).toBeNull();
   });
+
+  test('FLAGGED: a leading-zero number still builds a tel: URL', () => {
+    expect(telHref('09876543210')).toBe('tel:+09876543210');
+  });
+
+  test('punctuation-only input has no digits to dial', () => {
+    expect(telHref('+++')).toBeNull();
+  });
+
+  test('strips surrounding spaces on a 10-digit mobile', () => {
+    expect(toE164India('  9876543210  ')).toBe('+919876543210');
+  });
 });

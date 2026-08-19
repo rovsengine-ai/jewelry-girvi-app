@@ -64,6 +64,20 @@ describe('paiseToRupeesInput', () => {
   test('allows zero so a fully-paid loan can prefill an empty payment', () => {
     expect(paiseToRupeesInput(0)).toBe('0');
   });
+
+  test('rejects negative and non-integer paise', () => {
+    expect(() => paiseToRupeesInput(-1)).toThrow('Amount cannot be negative.');
+    expect(() => paiseToRupeesInput(1.5)).toThrow('paise must be an integer, got 1.5');
+  });
+
+  test.each(['1250', '1250.50', '0.07'] as const)('round-trips rupee input %p', (rupees) => {
+    expect(paiseToRupeesInput(rupeesInputToPaise(rupees))).toBe(rupees);
+  });
+
+  test('one paisa is the smallest typed amount', () => {
+    expect(rupeesInputToPaise('0.01')).toBe(1);
+    expect(formatPaiseAsInr(1)).toBe('₹0.01');
+  });
 });
 
 describe('percentInputToBps', () => {
@@ -73,7 +87,13 @@ describe('percentInputToBps', () => {
 
   test('converts fractional percents', () => {
     expect(percentInputToBps('1.5')).toBe(150);
+    expect(percentInputToBps('  1.5  ')).toBe(150);
     expect(percentInputToBps('0.01')).toBe(1);
+  });
+
+  test('rejects a percent sign or comma in the rate field', () => {
+    expect(() => percentInputToBps('1.5%')).toThrow('Enter a valid monthly percent rate.');
+    expect(() => percentInputToBps('1,5')).toThrow('Enter a valid monthly percent rate.');
   });
 
   test('accepts the 100% ceiling', () => {
@@ -152,6 +172,10 @@ describe('formatBpsAsPercent', () => {
   test('rejects a non-integer rate', () => {
     expect(() => formatBpsAsPercent(1.5)).toThrow('rate_bps must be an integer, got 1.5');
   });
+
+  test('keeps the sign on a negative rate display', () => {
+    expect(formatBpsAsPercent(-150)).toBe('-1.5');
+  });
 });
 
 describe('asPaise / asBps', () => {
@@ -177,6 +201,7 @@ describe('asPaise / asBps', () => {
     // '1250.5' becomes 1250 because parseInt stops at the '.', so a malformed
     // string silently loses value where the numeric form would throw.
     expect(asPaise('1250.5')).toBe(1250);
+    expect(asBps('300.5')).toBe(300);
   });
 });
 

@@ -29,6 +29,14 @@ describe('acceptLast4Draft', () => {
       error: 'Store only the last 4 characters of the ID, not the full number.',
     });
   });
+
+  test('empty draft is kept; five characters are refused, not sliced', () => {
+    expect(acceptLast4Draft('')).toEqual({ ok: true, value: '' });
+    expect(acceptLast4Draft('12345')).toEqual({
+      ok: false,
+      error: 'Store only the last 4 characters of the ID, not the full number.',
+    });
+  });
 });
 
 describe('assertKycPhotoAllowed', () => {
@@ -46,6 +54,12 @@ describe('assertKycPhotoAllowed', () => {
     expect(() =>
       assertKycPhotoAllowed('pan', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/pan.jpg'),
     ).not.toThrow();
+    expect(() =>
+      assertKycPhotoAllowed('voter_id', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/voter.jpg'),
+    ).not.toThrow();
+    expect(() =>
+      assertKycPhotoAllowed('passport', 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee/pp.jpg'),
+    ).not.toThrow();
   });
 });
 
@@ -53,5 +67,7 @@ describe('kycStatusLabel', () => {
   test('distinguishes verified from not', () => {
     expect(kycStatusLabel(null)).toBe('Not verified');
     expect(kycStatusLabel('2024-06-01')).toBe('Verified 2024-06-01');
+    expect(kycStatusLabel(null, 'hi')).toBe('असत्यापित');
+    expect(kycStatusLabel('2024-06-01', 'hi')).toBe('2024-06-01 को सत्यापित');
   });
 });
