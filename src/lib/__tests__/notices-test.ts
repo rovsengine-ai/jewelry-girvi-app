@@ -63,6 +63,6 @@ describe('buildOverdueCallListCsv', () => {
   test('null name and phone become empty CSV fields', () => {
     const csv = buildOverdueCallListCsv([{ ...row, customer_name: null, phone_number: null }]);
     const data = csv.split('\n')[1];
-    expect(data).toBe('T070-A,,2024-06-29,1,1030000,"₹10,300"');
+    expect(data).toBe('T070-A,,,2024-06-29,1,1030000,"₹10,300"');
   });
 });

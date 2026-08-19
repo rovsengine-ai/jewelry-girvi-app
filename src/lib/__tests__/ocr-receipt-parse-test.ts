@@ -48,9 +48,11 @@ describe('parseWeightToGrams', () => {
     expect(parseWeightToGrams('25800mg')).toBe(25.8);
   });
 
-  test('parses fullwidth pipe and pads two-digit milligrams', () => {
+  test('parses fullwidth pipe; two-digit milligrams pad on the right', () => {
     expect(parseWeightToGrams('25／800mg')).toBe(25.8);
-    expect(parseWeightToGrams('25/80mg')).toBe(25.08);
+    // '80'.padEnd(3,'0') → '800', so 25|80mg is 25.800 g, not 25.080 g.
+    expect(parseWeightToGrams('25/80mg')).toBe(25.8);
+    expect(parseWeightToGrams('25/080mg')).toBe(25.08);
   });
 
   test('parses Hindi ग्राम and numeric grams', () => {
