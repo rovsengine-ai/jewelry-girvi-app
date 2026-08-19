@@ -14,10 +14,23 @@ describe('parseLoanAmountRupees', () => {
     expect(parseLoanAmountRupees('5,000/-')).toBe(5000);
   });
 
-  test('rejects empty or non-numeric', () => {
-    expect(parseLoanAmountRupees('')).toBeNull();
-    expect(parseLoanAmountRupees('एक हजार')).toBeNull();
+  test.each([
+    ['₹5,000/-', 5000],
+    ['Rs.1000', 1000],
+    ['rs 2500', 2500],
+    ['1000.50', 1001],
+    [5000.4, 5000],
+    [5000, 5000],
+  ] as const)('parses %p → %p', (input, expected) => {
+    expect(parseLoanAmountRupees(input)).toBe(expected);
   });
+
+  test.each([0, -5, null, undefined, Number.NaN, '', 'एक हजार'] as const)(
+    'rejects %p',
+    (input) => {
+      expect(parseLoanAmountRupees(input)).toBeNull();
+    },
+  );
 });
 
 describe('parseWeightToGrams', () => {
@@ -34,6 +47,22 @@ describe('parseWeightToGrams', () => {
   test('parses milligrams only', () => {
     expect(parseWeightToGrams('25800mg')).toBe(25.8);
   });
+
+  test('parses fullwidth pipe; two-digit milligrams pad on the right', () => {
+    expect(parseWeightToGrams('25／800mg')).toBe(25.8);
+    // '80'.padEnd(3,'0') → '800', so 25|80mg is 25.800 g, not 25.080 g.
+    expect(parseWeightToGrams('25/80mg')).toBe(25.8);
+    expect(parseWeightToGrams('25/080mg')).toBe(25.08);
+  });
+
+  test('parses Hindi ग्राम and numeric grams', () => {
+    expect(parseWeightToGrams('47 ग्राम')).toBe(47);
+    expect(parseWeightToGrams(12.5)).toBe(12.5);
+  });
+
+  test.each(['', '0', '0g', 0, null, undefined] as const)('rejects empty/zero %p', (input) => {
+    expect(parseWeightToGrams(input)).toBeNull();
+  });
 });
 
 describe('parseReceiptDate', () => {
@@ -49,6 +78,16 @@ describe('parseReceiptDate', () => {
 
   test('rejects impossible days', () => {
     expect(parseReceiptDate('32/1/25')).toBeNull();
+    expect(parseReceiptDate('2023-02-29')).toBeNull();
+    expect(parseReceiptDate('2025-13-01')).toBeNull();
+    expect(parseReceiptDate('')).toBeNull();
+    expect(parseReceiptDate(null)).toBeNull();
+  });
+
+  test('keeps a real leap day and splits 2-digit years at 70', () => {
+    expect(parseReceiptDate('2024-02-29')).toBe('2024-02-29');
+    expect(parseReceiptDate('01/01/70')).toBe('1970-01-01');
+    expect(parseReceiptDate('01/01/69')).toBe('2069-01-01');
   });
 });
 
@@ -58,6 +97,12 @@ describe('inferMetalFromItemName', () => {
     expect(inferMetalFromItemName('Gold chain')).toBe('gold');
     expect(inferMetalFromItemName('चांदी कड़ा')).toBe('silver');
     expect(inferMetalFromItemName('पायल')).toBeNull();
+    expect(inferMetalFromItemName('swarna ring')).toBe('gold');
+    expect(inferMetalFromItemName('  AU bar  ')).toBe('gold');
+    expect(inferMetalFromItemName('chandi payal')).toBe('silver');
+    expect(inferMetalFromItemName('AG coin')).toBe('silver');
+    expect(inferMetalFromItemName('स्वर्ण')).toBe('gold');
+    expect(inferMetalFromItemName('   ')).toBeNull();
   });
 });
 
@@ -83,6 +128,23 @@ describe('normalizeOcrExtraction', () => {
 
   test('keeps a clear percent interest', () => {
     expect(normalizeOcrExtraction({ interest_rate: 3 }).interest_rate).toBe(3);
+  });
+
+  test('clamps 21% as a mistaken rupee figure and ignores non-number rates', () => {
+    expect(normalizeOcrExtraction({ interest_rate: 20 }).interest_rate).toBe(20);
+    expect(normalizeOcrExtraction({ interest_rate: 21 }).interest_rate).toBe(0);
+    expect(normalizeOcrExtraction({ interest_rate: '3' as unknown as number }).interest_rate).toBe(
+      0,
+    );
+  });
+
+  test('reads loan_amount_rupees and weight aliases', () => {
+    const result = normalizeOcrExtraction({
+      loan_amount_rupees: '5,000/-',
+      weight: '47g',
+    });
+    expect(result.loan_amount).toBe(5000);
+    expect(result.weight_grams).toBe(47);
   });
 });
 
@@ -115,5 +177,21 @@ describe('isOcrExtractionPartial', () => {
         interest_rate: 0,
       }),
     ).toBe(false);
+  });
+
+  test('a single missing key field is not partial; two missing fields are', () => {
+    const complete = {
+      serial_number: '7890',
+      date: '2025-01-21',
+      customer_name: 'संतोष',
+      phone_number: '',
+      address: '',
+      item_name: 'पायल',
+      weight_grams: 47,
+      loan_amount: 1000,
+      interest_rate: 0,
+    };
+    expect(isOcrExtractionPartial({ ...complete, date: '' })).toBe(false);
+    expect(isOcrExtractionPartial({ ...complete, date: '', customer_name: '' })).toBe(true);
   });
 });

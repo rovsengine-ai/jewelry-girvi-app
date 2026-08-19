@@ -7,6 +7,10 @@ describe('noticeTypeLabel', () => {
     expect(noticeTypeLabel('overdue')).toBe('Overdue');
     expect(noticeTypeLabel('renewal_offer')).toBe('Renewal offer');
     expect(noticeTypeLabel('forfeiture_warning')).toBe('Forfeiture warning');
+    expect(noticeTypeLabel('due_soon', 'hi')).toBe('जल्द देय');
+    expect(noticeTypeLabel('overdue', 'hi')).toBe('बकाया');
+    expect(noticeTypeLabel('renewal_offer', 'hi')).toBe('नवीनीकरण प्रस्ताव');
+    expect(noticeTypeLabel('forfeiture_warning', 'hi')).toBe('ज़ब्ती चेतावनी');
   });
 });
 
@@ -20,6 +24,7 @@ describe('csvEscape', () => {
     expect(csvEscape('Patil, Asha')).toBe('"Patil, Asha"');
     expect(csvEscape('say "hi"')).toBe('"say ""hi"""');
     expect(csvEscape('line1\nline2')).toBe('"line1\nline2"');
+    expect(csvEscape('a\rb')).toBe('"a\rb"');
   });
 });
 
@@ -53,5 +58,11 @@ describe('buildOverdueCallListCsv', () => {
     expect(buildOverdueCallListCsv([])).toBe(
       'serial_number,customer_name,phone_number,due_on,days_overdue,total_due_paise,total_due_inr',
     );
+  });
+
+  test('null name and phone become empty CSV fields', () => {
+    const csv = buildOverdueCallListCsv([{ ...row, customer_name: null, phone_number: null }]);
+    const data = csv.split('\n')[1];
+    expect(data).toBe('T070-A,,,2024-06-29,1,1030000,"₹10,300"');
   });
 });

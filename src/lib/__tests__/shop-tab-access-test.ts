@@ -14,6 +14,8 @@ describe('insights tab access', () => {
   test('customer roles are not shop owners', () => {
     expect(isShopOwner('retail_customer')).toBe(false);
     expect(insightsTabHref('retail_customer')).toBeNull();
+    expect(isShopOwner(undefined)).toBe(false);
+    expect(insightsTabHref(undefined)).toBeNull();
   });
 });
 
@@ -21,5 +23,7 @@ describe('archive route', () => {
   test('matches the owner-only archive stack screen', () => {
     expect(isArchiveRoute(['(admin)', 'archive'])).toBe(true);
     expect(isArchiveRoute(['(admin)', '(tabs)', 'settings'])).toBe(false);
+    expect(isArchiveRoute([])).toBe(false);
+    expect(isArchiveRoute(['archive'])).toBe(true);
   });
 });

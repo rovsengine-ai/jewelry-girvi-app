@@ -150,6 +150,45 @@ describe('extractReceiptData auth', () => {
     );
   });
 
+  test('normalizes pad-style OCR fields on a successful extract', async () => {
+    auth.getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'user-jwt',
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+        },
+      },
+      error: null,
+    });
+    invoke.mockResolvedValue({
+      data: {
+        serial_number: ' 7890 ',
+        date: '21|1|25',
+        customer_name: 'संतोष कुमार पाटिल',
+        phone_number: '',
+        address: '',
+        item_name: 'सोना पेठा',
+        weight_grams: '25|800mg',
+        loan_amount: '100000/-',
+        interest_rate: 3,
+      },
+      error: null,
+    });
+
+    await expect(extractReceiptData('file:///tmp/receipt.jpg')).resolves.toEqual({
+      preparedUri: 'file:///tmp/prepared.jpg',
+      extraction: expect.objectContaining({
+        serial_number: '7890',
+        date: '2025-01-21',
+        customer_name: 'संतोष कुमार पाटिल',
+        item_name: 'सोना पेठा',
+        weight_grams: 25.8,
+        loan_amount: 100000,
+        interest_rate: 3,
+      }),
+    });
+  });
+
   test('throws unauthorized when there is no session', async () => {
     auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
     auth.refreshSession.mockResolvedValue({ data: { session: null }, error: null });

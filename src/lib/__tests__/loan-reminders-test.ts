@@ -1,4 +1,6 @@
+import { setI18nLocale } from '@/i18n';
 import {
+  isReminderKind,
   reminderCopy,
   reminderIdentifier,
   remindersToSchedule,
@@ -20,6 +22,18 @@ describe('reminderCopy', () => {
     expect(reminderCopy('due_today', 'T080-A').body).toContain('T080-A');
     expect(reminderCopy('overdue', 'T080-A').body).toMatch(/past due/i);
     expect(reminderCopy('due_soon', 'T080-A').body).not.toMatch(/₹|paise/i);
+  });
+
+  test('Hindi lock-screen copy still names the serial and never a rupee amount', () => {
+    setI18nLocale('hi');
+    try {
+      const copy = reminderCopy('due_soon', 'T080-A');
+      expect(copy.title).toBe('गिरवी भुगतान याददिलाना');
+      expect(copy.body).toContain('T080-A');
+      expect(copy.body).not.toMatch(/₹/);
+    } finally {
+      setI18nLocale('en');
+    }
   });
 });
 
@@ -53,5 +67,30 @@ describe('remindersToSchedule', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]?.fire_at).toBe('2024-07-16T03:30:00.000Z');
+  });
+
+  test('skips unknown kinds, equal-now fire times, and empty input', () => {
+    expect(remindersToSchedule([], now)).toEqual([]);
+    expect(
+      remindersToSchedule(
+        [
+          slot({
+            reminder_kind: 'due_tomorrow' as LoanReminderSlot['reminder_kind'],
+            fire_at: '2024-06-29T03:30:00.000Z',
+          }),
+          slot({ reminder_kind: 'due_soon', fire_at: '2024-06-01T03:30:00.000Z' }),
+        ],
+        now,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('isReminderKind', () => {
+  test('accepts the three SQL kinds only', () => {
+    expect(isReminderKind('due_soon')).toBe(true);
+    expect(isReminderKind('due_today')).toBe(true);
+    expect(isReminderKind('overdue')).toBe(true);
+    expect(isReminderKind('due_tomorrow')).toBe(false);
   });
 });

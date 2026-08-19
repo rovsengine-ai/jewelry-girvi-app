@@ -18,12 +18,20 @@ describe('loanStatusLabel', () => {
     expect(loanStatusLabel('closed')).toBe('Closed');
     expect(loanStatusLabel('defaulted')).toBe('Defaulted');
   });
+
+  test('Hindi labels for every lifecycle status', () => {
+    expect(loanStatusLabel('active', 'hi')).toBe('चालू');
+    expect(loanStatusLabel('redeemed', 'hi')).toBe('छुड़ाई गई');
+    expect(loanStatusLabel('closed', 'hi')).toBe('बंद');
+    expect(loanStatusLabel('defaulted', 'hi')).toBe('ज़ब्त');
+  });
 });
 
 describe('customerLoanStatusLabel', () => {
   test('redeemed loans tell the customer to collect items', () => {
     expect(customerLoanStatusLabel('redeemed')).toBe('Paid — collect items');
     expect(customerLoanStatusLabel('active')).toBe('Active');
+    expect(customerLoanStatusLabel('redeemed', 'hi')).toBe('भुगतान हो गया — सामान लें');
   });
 });
 
@@ -44,6 +52,11 @@ describe('redeemGate', () => {
 
   test('an owner and an active loan may proceed', () => {
     expect(redeemGate('owner', 'active')).toEqual({ kind: 'ready' });
+  });
+
+  test('missing role is owner-only; missing status is treated as closed', () => {
+    expect(redeemGate(undefined, 'active')).toEqual({ kind: 'owner_only' });
+    expect(redeemGate('owner', undefined)).toEqual({ kind: 'not_active', status: 'closed' });
   });
 });
 
@@ -80,6 +93,16 @@ describe('allItemsReleased / canSubmitRedemption', () => {
       reason: 'redeem.validation.allItemsRequired',
     });
   });
+
+  test('same-size checklist with a wrong id is not a release', () => {
+    expect(allItemsReleased(['a', 'b'], ['a', 'x'])).toBe(false);
+  });
+
+  test('a named collector and a complete checklist may submit', () => {
+    expect(canSubmitRedemption({ releasedToName: 'Asha', itemIds: ids, checkedIds: ids })).toEqual({
+      ok: true,
+    });
+  });
 });
 
 describe('renewal eligibility', () => {
@@ -87,6 +110,8 @@ describe('renewal eligibility', () => {
     // 2024 is a leap year: 1 Jan + 180 = 29 Jun, not 30 Jun.
     expect(addCalendarDays('2024-01-01', 180)).toBe('2024-06-29');
     expect(addCalendarDays('2024-07-01', 180)).toBe('2024-12-28');
+    expect(addCalendarDays('2024-01-31', 1)).toBe('2024-02-01');
+    expect(addCalendarDays('2023-12-31', 1)).toBe('2024-01-01');
   });
 
   test('is offered only after the due date', () => {

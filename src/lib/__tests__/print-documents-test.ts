@@ -1,4 +1,5 @@
 import {
+  PRINT_A4,
   buildPledgeAgreementHtml,
   buildRedemptionReceiptHtml,
   escapeHtml,
@@ -51,6 +52,7 @@ function redemptionHtml(language: AppLanguage): string {
 describe('escapeHtml', () => {
   test('escapes markup so a name cannot inject HTML', () => {
     expect(escapeHtml('Asha <b>Patil</b> & co')).toBe('Asha &lt;b&gt;Patil&lt;/b&gt; &amp; co');
+    expect(escapeHtml('say "hi"')).toBe('say &quot;hi&quot;');
   });
 });
 
@@ -58,6 +60,8 @@ describe('formatMgAsGrams', () => {
   test('formats integer milligrams without a float', () => {
     expect(formatMgAsGrams(12345)).toBe('12.345 g (12345 mg)');
     expect(formatMgAsGrams(1000)).toBe('1.000 g (1000 mg)');
+    expect(formatMgAsGrams(0)).toBe('0.000 g (0 mg)');
+    expect(formatMgAsGrams(-500)).toBe('-0.500 g (-500 mg)');
   });
 });
 
@@ -101,5 +105,56 @@ describe('buildRedemptionReceiptHtml', () => {
     expect(html).toContain('closure_balance_paise');
     expect(html).toContain('वकील');
     expect(html).not.toContain('Have a lawyer review');
+  });
+
+  test('empty items, null customer fields, and merchant terms print placeholders', () => {
+    const html = buildPledgeAgreementHtml({
+      ...PLEDGE_BASE,
+      language: 'en',
+      customerName: null,
+      phoneNumber: null,
+      dueOn: null,
+      interestModel: 'merchant',
+      items: [],
+    });
+    expect(html).toContain('No pledged-item rows on this ticket.');
+    expect(html).toContain('Merchant');
+    expect(html).toContain('—');
+  });
+
+  test('Hindi merchant pledge names व्यापारी and assessed 22K', () => {
+    const html = buildPledgeAgreementHtml({
+      ...PLEDGE_BASE,
+      language: 'hi',
+      interestModel: 'merchant',
+      items: [
+        {
+          ornament_type: 'Chain',
+          gross_weight_mg: 10000,
+          net_weight_mg: 9800,
+          purity_karat: 22,
+          quantity: 1,
+        },
+      ],
+    });
+    expect(html).toContain('व्यापारी');
+    expect(html).toContain('22K (916)');
+  });
+
+  test('empty redemption items still include the frozen snapshot', () => {
+    const html = buildRedemptionReceiptHtml({
+      ...REDEMPTION_BASE,
+      language: 'en',
+      items: [],
+      releasedToName: null,
+    });
+    expect(html).toContain('No pledged-item rows on this ticket.');
+    expect(html).toContain('₹10,300');
+  });
+});
+
+describe('PRINT_A4', () => {
+  test('is Expo Print A4 at 72 PPI', () => {
+    expect(PRINT_A4).toEqual({ width: 595.28, height: 841.89 });
   });
 });
