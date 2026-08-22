@@ -2,6 +2,7 @@ import { render } from '@testing-library/react-native';
 
 import { MoneyText } from '@/components/money-text';
 import { LONGEST_MONEY_PAISE } from '@/components/palette-preview';
+import { TypeScale } from '@/constants/theme';
 import { formatPaiseAsInr } from '@/lib/money';
 import { flatStyle } from '@/test-utils/flat-style';
 
@@ -24,7 +25,7 @@ describe('<MoneyText />', () => {
     const { getByText } = await render(<MoneyText paise={LONGEST_MONEY_PAISE} size="large" />);
     const node = getByText(formatPaiseAsInr(LONGEST_MONEY_PAISE));
     expect(flatStyle(node).fontVariant).toEqual(['tabular-nums', 'lining-nums']);
-    expect(flatStyle(node).fontSize).toBe(28);
+    expect(flatStyle(node).fontSize).toBe(TypeScale.moneyLarge.fontSize);
   });
 
   test('proves the longest realistic Indian figure', async () => {

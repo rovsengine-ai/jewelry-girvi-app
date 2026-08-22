@@ -1,6 +1,8 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppIcon, TintedIconWell } from '@/components/app-icon';
+import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { ListRow } from '@/components/list-row';
 import { LanguageSettingsRow, ScreenHeader } from '@/components/screen-header';
@@ -19,6 +21,8 @@ export default function CustomerSettingsScreen() {
   const { profile, signOut } = useAuth();
   const { t } = useLanguage();
   const tabBarPadding = useTabBarScrollPadding();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState(false);
 
   return (
     <ThemedView style={styles.container} type="surfaceSunken">
@@ -47,6 +51,38 @@ export default function CustomerSettingsScreen() {
         <SettingsGroup>
           <LanguageSettingsRow />
         </SettingsGroup>
+        {Platform.OS === 'web' ? (
+          <>
+            <SectionLabel>{t('notices.customer.title')}</SectionLabel>
+            <Card style={styles.accountCard} testID="reminders-web-note">
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('settings.remindersWebNote')}
+              </ThemedText>
+            </Card>
+          </>
+        ) : null}
+        <SectionLabel>{t('settings.groupAccount')}</SectionLabel>
+        <SettingsGroup>
+          <ListRow
+            testID="delete-account"
+            tone="elevated"
+            isLast
+            onPress={() => {
+              setDeleteNotice(false);
+              setDeleteOpen(true);
+            }}
+            leading={
+              <TintedIconWell tint={colors.tintDanger}>
+                <AppIcon ios="trash" android="delete" color={colors.onTintDanger} />
+              </TintedIconWell>
+            }
+            content={
+              <ThemedText type="bodyLarge" style={{ color: colors.danger }}>
+                {t('settings.deleteAccount')}
+              </ThemedText>
+            }
+          />
+        </SettingsGroup>
         <SectionLabel>{t('settings.groupSession')}</SectionLabel>
         <SettingsGroup>
           <ListRow
@@ -71,6 +107,39 @@ export default function CustomerSettingsScreen() {
           />
         </SettingsGroup>
       </ScrollView>
+      {deleteOpen ? (
+        <View
+          testID="delete-account-confirm"
+          style={[styles.overlay, { backgroundColor: colors.overlay }]}
+        >
+          <Card style={styles.confirmCard}>
+            <ThemedText type="smallBold">{t('settings.deleteAccountTitle')}</ThemedText>
+            <ThemedText type="small">{t('settings.deleteAccountBody')}</ThemedText>
+            {deleteNotice ? (
+              <ThemedText type="small" themeColor="textSecondary" testID="delete-account-notice">
+                {t('settings.deleteAccountUnavailable')}
+              </ThemedText>
+            ) : null}
+            <Button
+              label={t('common.cancel')}
+              variant="secondary"
+              onPress={() => {
+                setDeleteOpen(false);
+                setDeleteNotice(false);
+              }}
+            />
+            <Button
+              testID="delete-account-confirm-button"
+              label={t('settings.deleteAccountConfirm')}
+              variant="danger"
+              onPress={() => {
+                // UI-only for Play listing; no RPC / anonymise / hard delete yet.
+                setDeleteNotice(true);
+              }}
+            />
+          </Card>
+        </View>
+      ) : null}
     </ThemedView>
   );
 }
@@ -84,4 +153,10 @@ const styles = StyleSheet.create({
   accountCard: { marginHorizontal: Spacing.four },
   accountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   accountCopy: { flex: 1, minWidth: 0, gap: Spacing.half },
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+  },
+  confirmCard: { gap: Spacing.three },
 });

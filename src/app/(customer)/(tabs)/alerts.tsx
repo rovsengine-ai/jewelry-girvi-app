@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { FormNotice } from '@/components/form-notice';
@@ -71,7 +71,7 @@ export default function CustomerAlertsScreen() {
         }
         contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
         <ThemedText type="small" themeColor="textSecondary" style={styles.lede}>
-          {t('notices.customer.subtitle')}
+          {Platform.OS === 'web' ? t('notices.customer.subtitleWeb') : t('notices.customer.subtitle')}
         </ThemedText>
         <View style={styles.lede}>
           <FormNotice error={loadError} />

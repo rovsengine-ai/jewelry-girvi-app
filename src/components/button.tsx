@@ -4,6 +4,8 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useLanguage } from '@/providers/language-provider';
+import { useNetworkOptional } from '@/providers/network-provider';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
@@ -11,6 +13,11 @@ export type ButtonProps = Omit<PressableProps, 'children'> & {
   label: string;
   variant?: ButtonVariant;
   loading?: boolean;
+  /**
+   * When true, disable the control while offline and surface a clear reason
+   * instead of letting the tap fail after the fact.
+   */
+  requiresNetwork?: boolean;
 };
 
 /**
@@ -23,11 +30,17 @@ export function Button({
   variant = 'primary',
   loading = false,
   disabled,
+  requiresNetwork = false,
   style,
+  accessibilityHint,
   ...rest
 }: ButtonProps) {
   const colors = useTheme();
-  const isDisabled = Boolean(disabled) || loading;
+  const { t } = useLanguage();
+  const { isOffline } = useNetworkOptional();
+  const offlineBlocked = requiresNetwork && isOffline;
+  const isDisabled = Boolean(disabled) || loading || offlineBlocked;
+  const displayLabel = offlineBlocked ? t('network.unavailableOffline') : label;
 
   const backgroundColor =
     variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : colors.elevated;
@@ -38,6 +51,9 @@ export function Button({
     <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityHint={
+        offlineBlocked ? t('network.unavailableOffline') : accessibilityHint
+      }
       disabled={isDisabled}
       style={(state) => [
         styles.pressable,
@@ -56,7 +72,7 @@ export function Button({
           <ActivityIndicator color={foreground} />
         ) : (
           <ThemedText type="smallBold" style={{ color: foreground }}>
-            {label}
+            {displayLabel}
           </ThemedText>
         )}
       </View>

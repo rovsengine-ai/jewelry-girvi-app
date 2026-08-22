@@ -17,6 +17,11 @@ const PLEDGE_BASE = {
   rateBps: 300,
   interestModel: 'retail' as const,
   simplePeriodDays: 180,
+  loanQrDataUri:
+    'data:image/svg+xml;charset=utf-8,' +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>',
+    ),
   items: [
     {
       ornament_type: 'Gold chain',
@@ -71,6 +76,8 @@ describe('buildPledgeAgreementHtml', () => {
     expect(html).toContain('Noto Sans Devanagari');
     expect(html).not.toMatch(/section 176|indian contract act|hypothecation deed/i);
     expect(html).toContain('Asha &lt;Patil&gt;');
+    expect(html).toContain('data:image/svg+xml');
+    expect(html).toContain('Scan to open this girvi on the customer site');
   });
 
   test('hindi uses गिरवी, Latin money, and the lawyer-review caveat in Hindi', () => {
@@ -82,6 +89,15 @@ describe('buildPledgeAgreementHtml', () => {
     expect(html).toContain('Noto Sans Devanagari');
     expect(html).not.toContain('Have a lawyer review');
     expect(html).not.toMatch(/section 176|indian contract act|hypothecation deed/i);
+    expect(html).toContain('data:image/svg+xml');
+    expect(html).toContain('स्कैन करें');
+  });
+
+  test('pledge QR image is an inline data-URI, not a remote http URL', () => {
+    const html = pledgeHtml('en');
+    const imgMatch = html.match(/<img src="([^"]+)"/);
+    expect(imgMatch?.[1]).toMatch(/^data:image\/svg\+xml/);
+    expect(imgMatch?.[1]).not.toMatch(/^https?:/);
   });
 });
 

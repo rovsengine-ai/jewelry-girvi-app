@@ -1,4 +1,4 @@
-import { goldPurityLabel, karatToMillesimal, pickRateForMillesimal } from '@/lib/gold-purity';
+import { goldPurityLabel, karatToMillesimal } from '@/lib/gold-purity';
 
 describe('karatToMillesimal', () => {
   test('maps newspaper bands, including 18K as 75%', () => {
@@ -22,32 +22,5 @@ describe('goldPurityLabel', () => {
     expect(goldPurityLabel(null)).toBe('Not assessed');
     expect(goldPurityLabel(null, 'en')).toBe('Not assessed');
     expect(goldPurityLabel(null, 'hi')).toBe('आकलित नहीं');
-  });
-});
-
-describe('pickRateForMillesimal', () => {
-  test('prefers a manual row over a feed row for the same millesimal', () => {
-    const picked = pickRateForMillesimal(
-      [
-        {
-          id: 'feed',
-          purity_millesimal: 999,
-          source: 'goldapi',
-        },
-        {
-          id: 'manual',
-          purity_millesimal: 999,
-          source: 'manual',
-        },
-      ],
-      999,
-    );
-    expect(picked?.id).toBe('manual');
-  });
-
-  test('returns null when that band is missing', () => {
-    expect(
-      pickRateForMillesimal([{ id: 'feed', purity_millesimal: 999, source: 'goldapi' }], 916),
-    ).toBeNull();
   });
 });

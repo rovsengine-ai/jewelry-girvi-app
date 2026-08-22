@@ -63,15 +63,25 @@ export async function clearLoanReminderNotifications(): Promise<void> {
 }
 
 /**
- * Schedule local DATE triggers from SQL fire_at values. Does not use Expo push
- * tokens: remote push is unavailable in Expo Go on Android from SDK 53.
+ * Schedule local DATE triggers from SQL fire_at values when this profile has
+ * no Expo push token. If a push token is registered, remote push (edge
+ * function) delivers notices — do not also fire local OS reminders for the
+ * same due/overdue events.
+ *
  * https://docs.expo.dev/versions/v57.0.0/sdk/notifications/
  */
 export async function syncLoanReminderNotifications(
   slots: LoanReminderSlot[],
   nowMs: number = Date.now(),
+  options?: { preferRemotePush?: boolean },
 ): Promise<number> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+    return 0;
+  }
+
+  const preferRemotePush = options?.preferRemotePush === true;
+  if (preferRemotePush) {
+    await cancelOurScheduledReminders();
     return 0;
   }
 

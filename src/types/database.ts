@@ -22,19 +22,6 @@ export type NoticeChannel = 'sms' | 'whatsapp' | 'in_app';
 
 export type NoticeDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'skipped';
 
-/** Live feed or owner override. Never IBJA. */
-export type GoldRateSource = 'goldapi' | 'metals_dev' | 'manual';
-
-export interface GoldRate {
-  id: string;
-  quoted_on: string;
-  purity_millesimal: number;
-  source: GoldRateSource;
-  price_per_10g_paise: number;
-  fetched_at: string;
-  created_by: string | null;
-}
-
 export interface Profile {
   id: string;
   full_name: string | null;
@@ -71,6 +58,8 @@ export interface ShopDefaults {
   partial_period_mode: PartialPeriodMode;
   /** Remainder days at or past this threshold round up to a whole month. */
   round_up_threshold_days: number;
+  /** Owner-only: hide loans from staff and customers until toggled off. */
+  loans_concealed: boolean;
   updated_at: string;
 }
 
@@ -112,6 +101,10 @@ export interface Loan {
   archived_by: string | null;
   archive_reason: string | null;
   archive_balance_paise: number | null;
+  /**
+   * Opaque non-enumerable id for customer URLs. Never put serial_number in a URL.
+   */
+  public_token: string;
   created_at: string;
   updated_at: string;
 }
@@ -217,9 +210,6 @@ export interface LoanItem {
   purity_karat: number | null;
   stone_deduction_mg: number;
   quantity: number;
-  valuation_paise: number | null;
-  /** Rate row frozen into valuation_paise. Null when unvalued. */
-  gold_rate_id: string | null;
   created_at: string;
 }
 
@@ -252,6 +242,9 @@ export interface LoanNotice {
   channel: NoticeChannel;
   delivery_status: NoticeDeliveryStatus;
   provider_message_id: string | null;
+  /** Set when claimed for Expo push — idempotency latch. */
+  push_sent_at: string | null;
+  push_ticket_id: string | null;
   payload: Record<string, unknown>;
   created_at: string;
 }

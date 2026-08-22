@@ -111,6 +111,7 @@ function sampleLoan(): LoanWithCustomer {
     archived_by: null,
     archive_reason: null,
     archive_balance_paise: null,
+    public_token: 'test-public-token',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     profiles: {

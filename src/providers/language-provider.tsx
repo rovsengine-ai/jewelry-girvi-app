@@ -1,16 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
 
 import {
   currentI18nLocale,
-  isAppLanguage,
   LANGUAGE_STORE_KEY,
   setI18nLocale,
   translate,
   type AppLanguage,
   type TranslateFn,
 } from '@/i18n';
+import { persistStoredLanguage, readStoredLanguage } from '@/lib/language-storage';
 
 type LanguageContextValue = {
   language: AppLanguage;
@@ -19,45 +17,6 @@ type LanguageContextValue = {
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
-
-function readWebLanguage(): AppLanguage | null {
-  if (typeof localStorage === 'undefined') {
-    return null;
-  }
-  try {
-    const stored = localStorage.getItem(LANGUAGE_STORE_KEY);
-    return isAppLanguage(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
-async function readStoredLanguage(): Promise<AppLanguage | null> {
-  try {
-    if (Platform.OS === 'web') {
-      return readWebLanguage();
-    }
-    // https://docs.expo.dev/versions/v57.0.0/sdk/securestore/
-    const stored = await SecureStore.getItemAsync(LANGUAGE_STORE_KEY);
-    return isAppLanguage(stored) ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
-async function persistLanguage(language: AppLanguage): Promise<void> {
-  try {
-    if (Platform.OS === 'web') {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(LANGUAGE_STORE_KEY, language);
-      }
-      return;
-    }
-    await SecureStore.setItemAsync(LANGUAGE_STORE_KEY, language);
-  } catch {
-    // Persistence is best-effort; the in-memory locale still updates.
-  }
-}
 
 const fallbackT: TranslateFn = (key, options) => translate(key, options);
 
@@ -77,13 +36,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    void readStoredLanguage().then((stored) => {
+    void readStoredLanguage(LANGUAGE_STORE_KEY).then((stored) => {
       if (!mounted) return;
       const next = stored ?? 'hi';
       setI18nLocale(next);
       setLanguageState(next);
       if (!stored) {
-        void persistLanguage('hi');
+        void persistStoredLanguage(LANGUAGE_STORE_KEY, 'hi');
       }
     });
     return () => {
@@ -94,7 +53,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLanguage = (next: AppLanguage) => {
     setI18nLocale(next);
     setLanguageState(next);
-    void persistLanguage(next);
+    void persistStoredLanguage(LANGUAGE_STORE_KEY, next);
   };
 
   const t: TranslateFn = (key, options) => translate(key, options, language);

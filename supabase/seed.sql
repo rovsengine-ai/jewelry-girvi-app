@@ -203,24 +203,6 @@ BEGIN
   VALUES (1)
   ON CONFLICT (id) DO NOTHING;
 
-  -- Manual 999 quote for today so create_loan can freeze valuation offline.
-  -- Not IBJA. Integer paise per 10 g.
-  INSERT INTO public.gold_rates (
-    quoted_on,
-    purity_millesimal,
-    source,
-    price_per_10g_paise,
-    created_by
-  )
-  VALUES (
-    v_today,
-    999,
-    'manual',
-    15149300,
-    v_owner_id
-  )
-  ON CONFLICT (quoted_on, purity_millesimal, source) DO NOTHING;
-
   -- Impersonate the owner so create_loan's is_shop_user() check passes.
   -- Still running as postgres (RLS bypassed); jwt claims are only for auth.uid().
   PERFORM set_config(

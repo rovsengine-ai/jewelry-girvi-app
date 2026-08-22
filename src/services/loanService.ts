@@ -6,6 +6,7 @@ import {
   requireUserAccessToken,
 } from '@/lib/edge-invoke';
 import { kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
+import { newIdempotencyKey } from '@/lib/idempotency';
 import { isReminderKind, type LoanReminderSlot } from '@/lib/loan-reminders';
 import { asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { toE164India } from '@/lib/phone';
@@ -23,6 +24,7 @@ import type {
   LoanBalances,
   LoanFormData,
   LoanItem,
+  LoanStatus,
   LoanItemPhoto,
   LoanNotice,
   OverdueLoan,
@@ -228,6 +230,26 @@ export async function fetchShopDefaults(): Promise<ShopDefaults> {
   return loadShopDefaults();
 }
 
+/** RLS-safe: customers cannot SELECT shop_defaults, so this is a DEFINER RPC. */
+export async function fetchLoansConcealed(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('loans_are_concealed');
+  if (error) {
+    throw new Error(error.message);
+  }
+  return Boolean(data);
+}
+
+/** Owner-only. Staff/customers are refused in SQL, not in the client. */
+export async function setLoansConcealed(concealed: boolean): Promise<boolean> {
+  const { data, error } = await supabase.rpc('set_loans_concealed', {
+    p_concealed: concealed,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return Boolean(data);
+}
+
 /**
  * Loan row exists; item photos did not all land. Retry with
  * attachItemPhotos — do not call createLoanWithCustomer again (serial UNIQUE).
@@ -249,6 +271,90 @@ export class LoanPhotosIncompleteError extends Error {
     );
     this.name = 'LoanPhotosIncompleteError';
   }
+}
+
+export type FindLoanBySerialRow = {
+  loanId: string;
+  serialNumber: string;
+  status: LoanStatus;
+  isArchived: boolean;
+  customerName: string | null;
+};
+
+/**
+ * Serial is already on the book (unique index). Retry is findLoanBySerial
+ * / open the existing loan — do not create_loan again.
+ */
+export class SerialExistsError extends Error {
+  readonly code = 'SERIAL_EXISTS' as const;
+
+  constructor(
+    readonly serialNumber: string,
+    readonly existing: FindLoanBySerialRow | null = null,
+    cause?: unknown,
+  ) {
+    super(`serial_exists: ${serialNumber}`, cause instanceof Error ? { cause } : undefined);
+    this.name = 'SerialExistsError';
+  }
+}
+
+function parseSerialExistsMessage(message: string): string | null {
+  const prefix = 'serial_exists:';
+  if (!message.startsWith(prefix)) {
+    return null;
+  }
+  const serial = message.slice(prefix.length).trim();
+  return serial.length > 0 ? serial : null;
+}
+
+function parseFindLoanBySerialRow(data: unknown): FindLoanBySerialRow | null {
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    loan_id?: unknown;
+    serial_number?: unknown;
+    status?: unknown;
+    is_archived?: unknown;
+    customer_name?: unknown;
+  } | null;
+  if (!row || typeof row.loan_id !== 'string' || row.loan_id.length === 0) {
+    return null;
+  }
+  if (typeof row.serial_number !== 'string') {
+    return null;
+  }
+  if (
+    row.status !== 'active' &&
+    row.status !== 'redeemed' &&
+    row.status !== 'closed' &&
+    row.status !== 'defaulted'
+  ) {
+    return null;
+  }
+  if (typeof row.is_archived !== 'boolean') {
+    return null;
+  }
+  if (row.customer_name != null && typeof row.customer_name !== 'string') {
+    return null;
+  }
+  return {
+    loanId: row.loan_id,
+    serialNumber: row.serial_number,
+    status: row.status,
+    isArchived: row.is_archived,
+    customerName: row.customer_name ?? null,
+  };
+}
+
+/** Shop-only. Exact trimmed serial; includes archived and ended loans. */
+export async function findLoanBySerial(serial: string): Promise<FindLoanBySerialRow | null> {
+  const trimmed = serial.trim();
+  if (trimmed === '') {
+    return null;
+  }
+  const { data, error } = await supabase.rpc('find_loan_by_serial', { p_serial: trimmed });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return parseFindLoanBySerialRow(data);
 }
 
 type CreateLoanRow = { loan_id: string; item_ids: string[] };
@@ -346,6 +452,7 @@ export async function createLoanWithCustomer(
   signatureDataUrl: string | null,
   kycDraft?: KycDraft | null,
   customerRole: CounterCustomerRole = 'retail_customer',
+  options?: { idempotencyKey?: string },
 ): Promise<CreateLoanOutcome> {
   const selectedRole: CounterCustomerRole =
     customerRole === 'merchant' ? 'merchant' : 'retail_customer';
@@ -417,9 +524,14 @@ export async function createLoanWithCustomer(
     p_interest_model: interestModel,
     p_digital_signature_url: signaturePath,
     p_items: converted as unknown as Json,
+    p_idempotency_key: options?.idempotencyKey ?? newIdempotencyKey(),
   });
 
   if (error) {
+    const taken = parseSerialExistsMessage(error.message);
+    if (taken) {
+      throw new SerialExistsError(taken);
+    }
     throw new Error(error.message);
   }
 
@@ -474,16 +586,18 @@ export async function logPayment(
   loanId: string,
   amountPaidPaise: number,
   paidOn: string = todayInKolkata(),
+  options?: { idempotencyKey?: string },
 ): Promise<void> {
   const paise = asPaise(amountPaidPaise);
   if (paise <= 0) {
     throw new Error('Payment amount must be greater than zero paise.');
   }
 
-  const { error } = await supabase.from('payments').insert({
-    loan_id: loanId,
-    amount_paid_paise: paise,
-    paid_on: paidOn,
+  const { error } = await supabase.rpc('log_payment', {
+    p_loan_id: loanId,
+    p_amount_paid_paise: paise,
+    p_paid_on: paidOn,
+    p_idempotency_key: options?.idempotencyKey ?? newIdempotencyKey(),
   });
 
   if (error) {
@@ -555,6 +669,7 @@ export async function redeemLoan(input: {
   finalPaymentPaise: number;
   releaseNote?: string | null;
   releaseSignatureUrl?: string | null;
+  idempotencyKey?: string;
 }): Promise<RedeemLoanResult> {
   const { data, error } = await supabase.rpc('redeem_loan', {
     p_loan_id: input.loanId,
@@ -564,6 +679,7 @@ export async function redeemLoan(input: {
     p_final_payment_paise: asPaise(input.finalPaymentPaise),
     p_release_note: input.releaseNote ?? null,
     p_release_signature_url: input.releaseSignatureUrl ?? null,
+    p_idempotency_key: input.idempotencyKey ?? newIdempotencyKey(),
   });
 
   if (error) {
@@ -845,6 +961,7 @@ export async function renewLoan(input: {
   interestPaidPaise: number;
   newMaturityOn: string;
   note?: string | null;
+  idempotencyKey?: string;
 }): Promise<RenewLoanResult> {
   const { data, error } = await supabase.rpc('renew_loan', {
     p_loan_id: input.loanId,
@@ -852,6 +969,7 @@ export async function renewLoan(input: {
     p_interest_paid_paise: asPaise(input.interestPaidPaise),
     p_new_maturity_on: input.newMaturityOn,
     p_note: input.note ?? null,
+    p_idempotency_key: input.idempotencyKey ?? newIdempotencyKey(),
   });
 
   if (error) {
@@ -964,4 +1082,44 @@ export async function fetchLoanCurrentDueOn(loanId: string): Promise<string | nu
     throw new Error(error.message);
   }
   return data ?? null;
+}
+
+/** Signed-out loan QR landing — last 4 of serial only (SECURITY DEFINER RPC). */
+export async function fetchLoanReceiptMaskByPublicToken(
+  publicToken: string,
+): Promise<string | null> {
+  const token = publicToken.trim();
+  if (!token) return null;
+
+  const { data, error } = await supabase.rpc('loan_receipt_mask_by_public_token', {
+    p_token: token,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = (data ?? []) as { serial_last4: string }[];
+  const last4 = rows[0]?.serial_last4;
+  return last4 && last4.length > 0 ? last4 : null;
+}
+
+/**
+ * Signed-in loan QR resolve. RLS is the boundary — empty means not yours / missing,
+ * never "belongs to someone else".
+ */
+export async function fetchOwnLoanIdByPublicToken(publicToken: string): Promise<string | null> {
+  const token = publicToken.trim();
+  if (!token) return null;
+
+  const { data, error } = await supabase
+    .from('loans')
+    .select('id')
+    .eq('public_token', token)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.id ?? null;
 }

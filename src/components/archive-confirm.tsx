@@ -73,6 +73,7 @@ export function ArchiveConfirm({
           variant={confirmVariant}
           disabled={!reasonReady}
           loading={loading}
+          requiresNetwork
           onPress={onConfirm}
         />
       </Card>

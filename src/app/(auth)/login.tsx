@@ -7,25 +7,41 @@ import { Card } from '@/components/card';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
 import { ScreenHeader } from '@/components/screen-header';
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { toE164India } from '@/lib/phone';
-import { supabase } from '@/lib/supabase';
 import { routeForRole, useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
 import type { Profile, UserRole } from '@/types/database';
+import { supabase } from '@/lib/supabase';
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '');
+}
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { refreshProfile } = useAuth();
+  const { authMode, refreshProfile, sendOtp, verifyOtp, signInWithPin } = useAuth();
   const { t } = useLanguage();
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [pin, setPin] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formNotice, setFormNotice] = useState<string | null>(null);
+
+  const phoneDigits = digitsOnly(phone);
+  let displayE164: string | null = null;
+  try {
+    if (phoneDigits.length === 10) {
+      displayE164 = toE164India(phoneDigits);
+    }
+  } catch {
+    displayE164 = null;
+  }
 
   const handleSendOtp = async () => {
     setFormError(null);
@@ -43,11 +59,11 @@ export default function LoginScreen() {
     }
 
     setIsSubmitting(true);
-    const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
+    const { error } = await sendOtp(normalized);
     setIsSubmitting(false);
 
     if (error) {
-      setFormError(error.message);
+      setFormError(error);
       return;
     }
 
@@ -71,39 +87,126 @@ export default function LoginScreen() {
     }
 
     setIsSubmitting(true);
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone: normalized,
-      token: otp.trim(),
-      type: 'sms',
-    });
+    const { error } = await verifyOtp(normalized, otp.trim());
     setIsSubmitting(false);
 
-    if (error) {
-      setFormError(error.message);
-      return;
-    }
-
-    if (!data.user) {
+    if (error === 'no_user') {
       setFormError(t('auth.noUserSession'));
       return;
     }
-
-    await supabase
-      .from('profiles')
-      .update({ phone_number: normalized })
-      .eq('id', data.user.id);
+    if (error) {
+      setFormError(error);
+      return;
+    }
 
     await refreshProfile();
 
     const { data: profileRow } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', data.user.id)
+      .eq('id', (await supabase.auth.getUser()).data.user?.id ?? '')
       .maybeSingle();
 
     const role = (profileRow as Profile | null)?.role as UserRole | undefined;
     router.replace(routeForRole(role));
   };
+
+  const handlePinSignIn = async () => {
+    setFormError(null);
+    setFormNotice(null);
+
+    if (phoneDigits.length !== 10) {
+      setFormError(t('auth.invalidMobile'));
+      return;
+    }
+    if (digitsOnly(pin).length !== 6) {
+      setFormError(t('auth.invalidPin'));
+      return;
+    }
+
+    setIsSubmitting(true);
+    // Pass digits as typed — SQL normalises. toE164India is display-only above.
+    const result = await signInWithPin(phoneDigits, digitsOnly(pin));
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      if (result.code === 'locked') {
+        setFormError(t('auth.accountLocked'));
+        return;
+      }
+      if (result.code === 'invalid') {
+        setFormError(t('auth.invalidPinOrPhone'));
+        return;
+      }
+      setFormError(result.message ?? t('auth.signInFailed'));
+      return;
+    }
+
+    await refreshProfile();
+
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      setFormError(t('auth.noUserSession'));
+      return;
+    }
+
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const role = (profileRow as Profile | null)?.role as UserRole | undefined;
+    router.replace(routeForRole(role));
+  };
+
+  if (authMode === 'pin') {
+    return (
+      <ThemedView style={styles.container}>
+        <ScreenHeader title={t('auth.title')} subtitle={t('auth.pinSubtitle')} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.form}>
+          <View style={styles.content}>
+            <Card>
+              <Field
+                label={t('auth.mobileNumber')}
+                value={phone}
+                onChangeText={(value) => setPhone(digitsOnly(value).slice(0, 10))}
+                placeholder={t('auth.mobilePlaceholder')}
+                keyboardType="phone-pad"
+                editable={!isSubmitting}
+                testID="login-phone"
+              />
+              {displayE164 ? (
+                <ThemedText type="small">{t('auth.phoneDisplay', { phone: displayE164 })}</ThemedText>
+              ) : null}
+              <Field
+                label={t('auth.pin')}
+                value={pin}
+                onChangeText={(value) => setPin(digitsOnly(value).slice(0, 6))}
+                placeholder={t('auth.pinPlaceholder')}
+                keyboardType="number-pad"
+                maxLength={6}
+                secureTextEntry
+                editable={!isSubmitting}
+                testID="login-pin"
+              />
+              <FormNotice error={formError} notice={formNotice} />
+              <Button
+                testID="login-pin-submit"
+                label={t('auth.signInWithPin')}
+                loading={isSubmitting}
+                requiresNetwork
+                onPress={() => void handlePinSignIn()}
+              />
+            </Card>
+          </View>
+        </KeyboardAvoidingView>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -142,6 +245,7 @@ export default function LoginScreen() {
               testID={step === 'phone' ? 'login-send-otp' : 'login-verify'}
               label={step === 'phone' ? t('auth.sendOtp') : t('auth.verifyAndSignIn')}
               loading={isSubmitting}
+              requiresNetwork
               onPress={() => void (step === 'phone' ? handleSendOtp() : handleVerifyOtp())}
             />
 

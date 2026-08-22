@@ -1,10 +1,13 @@
 /**
- * Local (on-device) notification APIs.
+ * Local (on-device) notification APIs — offline fallback when the customer has
+ * no Expo push token registered.
  *
  * Do not import the `expo-notifications` package barrel. That entry loads
  * DevicePushTokenAutoRegistration.fx, which calls addPushTokenListener at
- * module init and throws on Android Expo Go from SDK 53. This app only
- * schedules DATE local reminders and never uses Expo/FCM push tokens.
+ * module init and throws on Android Expo Go from SDK 53.
+ *
+ * Remote push uses src/lib/push-token.ts + profile_push_tokens. Web push is
+ * out of scope: on iOS, browser push requires Home Screen install first.
  * https://docs.expo.dev/versions/v57.0.0/sdk/notifications/
  */
 export { AndroidImportance } from 'expo-notifications/build/NotificationChannelManager.types';

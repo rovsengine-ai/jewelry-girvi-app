@@ -85,6 +85,11 @@
   always raises. Archived loans are excluded from `loans_overdue_as_of`,
   `generate_loan_notices`, `shop_rate_yield`, and
   `customer_loan_reminder_schedule`.
+- Concealment is not a status. `set_loans_concealed(true)` hides every loan
+  (and child rows via EXISTS) from staff, retail customers, and merchants.
+  The owner still SELECTs the live book. Turning the flag off restores the
+  same RLS; there is no second copy of the data. Staff cannot create loans
+  or record payments while concealed. Clients refetch on tab focus.
 - Only an OWNER may move a loan to `redeemed`, `closed` or `defaulted`, and only
   an owner may write the redemption fields. Enforced by `redeem_loan` (row lock
   + status check inside a transaction) and the mutation trigger, not the UI.
@@ -105,26 +110,12 @@
   rows may have NULL metal; never default missing metal to gold.
 - Weights are INTEGER MILLIGRAMS (`gross_weight_mg`, `net_weight_mg`), same
   discipline as paise and basis points. Never a decimal gram.
-- `purity_karat` NULL means NOT ASSESSED. Never assume 22: an invented purity
-  flows into valuation and misprices the pledge. Silver is weight-only: no
-  millesimal, no karat, no valuation.
-- Gold valuation is frozen onto `loan_items.valuation_paise` at insert, with
-  `gold_rate_id` pointing at the `gold_rates` row used. SQL only; half-up once.
-  Silver and unassessed gold stay NULL. A missing quote never blocks the
-  counter.
-- Karat maps to millesimal bands, not karat/24: 24K=999, 22K=916, 18K=750
-  (75%), 14K=585, 10K=417. Unmapped karat is not valued.
-- Formula when only a 999 quote exists:
-  `div_round_half_up(net_mg × millesimal × price_per_10g_999_paise, 10_000_000)`.
-  A matching-band row (manual 916, etc.) uses
-  `div_round_half_up(net_mg × price_per_10g_paise, 10_000)` with no extra
-  karat factor.
-- Wastage: none. LTV: none. Principal is whatever staff types; assessed value
-  is not a cap.
-- `gold_rates` quotes are NEVER IBJA. There is no live vendor feed in the app.
-  Quotes are `source=manual` (seed or `set_manual_gold_rate`). Every UI figure
-  for a frozen valuation is labelled “not IBJA”. A missing quote never blocks
-  the counter.
+- `purity_karat` NULL means NOT ASSESSED. Never assume 22. Silver is
+  weight-only: no millesimal, no karat.
+- There is no shop gold rate, live metal feed, or frozen market valuation.
+  Principal is whatever staff types. Wastage: none. LTV: none.
+- Karat maps to millesimal bands for labels only, not karat/24: 24K=999,
+  22K=916, 18K=750 (75%), 14K=585, 10K=417.
 - Item photos live in the private `receipts` bucket at
   `{customer_id}/items/...`, reachable only through a signed URL.
 ## KYC
@@ -172,14 +163,15 @@
 ## Permissions
 | Action | Owner | Staff |
 |---|---|---|
-| Create loan | yes | yes |
-| Record payment | yes | yes |
-| View all loans | yes (including archived) | yes (not archived) |
+| View all loans | yes (including archived) | yes (not archived; none while concealed) |
+| Create loan | yes | yes (not while concealed) |
+| Record payment | yes | yes (not while concealed) |
 | Close / redeem loan | yes | no|
 | Renew loan (interest only) | yes | no |
 | Edit a loan's terms | yes | no |
 | Edit shop defaults | yes | no |
 | Archive / unarchive a loan | yes | no |
+| Conceal / reveal all loans | yes | no |
 | View analytics / totals | yes | no |
 | Generate in-app notices | yes | yes |
 | Export overdue call list | yes | yes |

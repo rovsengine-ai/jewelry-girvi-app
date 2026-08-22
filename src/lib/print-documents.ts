@@ -68,6 +68,9 @@ const DOC_CSS = `
   th { background: #f3f3f3; }
   .disclaimer { font-size: 11px; color: #333; margin-top: 16px; }
   .meta { margin: 0 0 4px; }
+  .qr-block { margin: 16px 0; text-align: center; }
+  .qr-block img { width: 128px; height: 128px; }
+  .qr-caption { font-size: 11px; color: #444; margin-top: 6px; }
 `;
 
 export interface PledgePrintInput {
@@ -82,6 +85,8 @@ export interface PledgePrintInput {
   rateBps: number;
   interestModel: InterestModel;
   simplePeriodDays: number;
+  /** Inline SVG data-URI for /g/<public_token> — never a remote URL. */
+  loanQrDataUri: string;
   items: Pick<
     LoanItem,
     'ornament_type' | 'gross_weight_mg' | 'net_weight_mg' | 'purity_karat' | 'quantity'
@@ -138,6 +143,10 @@ export function buildPledgeAgreementHtml(input: PledgePrintInput): string {
       </thead>
       <tbody>${itemRows}</tbody>
     </table>
+    <div class="qr-block">
+      <img src="${escapeHtml(input.loanQrDataUri)}" width="128" height="128" alt="" />
+      <p class="qr-caption">${escapeHtml(tx(lang, 'print.loanQrCaption'))}</p>
+    </div>
     ${disclaimerHtml(lang)}
   </body>
 </html>`;

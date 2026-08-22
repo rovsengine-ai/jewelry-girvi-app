@@ -7,8 +7,11 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { EnvBanner } from '@/components/env-banner';
+import { OfflineBanner } from '@/components/offline-banner';
 import { AuthProvider, routeForRole, useAuth } from '@/providers/auth-provider';
 import { LanguageProvider } from '@/providers/language-provider';
+import { NetworkProvider } from '@/providers/network-provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,15 +24,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    // Typed routes may lag new screens; treat segments as strings for path checks.
+    const routeSegments = segments as readonly string[];
+    const onActivate = routeSegments.includes('activate');
+    // Public QR deep links — must work signed-out (App Links + web).
+    const onLoanQrLink = routeSegments.includes('g');
+    const onActivationAppLink = routeSegments[0] === 'a';
 
     if (!session) {
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !onLoanQrLink && !onActivationAppLink) {
         router.replace('/(auth)/login');
       }
       return;
     }
 
-    if (inAuthGroup) {
+    if (inAuthGroup && !onActivate) {
       router.replace(routeForRole(profile?.role));
     }
   }, [session, profile, isLoading, segments, router]);
@@ -44,17 +53,22 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <LanguageProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <AnimatedSplashOverlay />
-            <AuthGate>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(admin)" />
-                <Stack.Screen name="(customer)" />
-              </Stack>
-            </AuthGate>
-          </ThemeProvider>
+          <NetworkProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AnimatedSplashOverlay />
+              <AuthGate>
+                <EnvBanner />
+                <OfflineBanner />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(admin)" />
+                  <Stack.Screen name="(customer)" />
+                  <Stack.Screen name="a/[token]" />
+                </Stack>
+              </AuthGate>
+            </ThemeProvider>
+          </NetworkProvider>
         </LanguageProvider>
       </AuthProvider>
     </GestureHandlerRootView>

@@ -83,13 +83,11 @@ const ITEM: LoanItem = {
   description: 'Gold chain',
   metal: 'gold',
   gross_weight_mg: 10000,
-  net_weight_mg: 10000,
-  purity_karat: 22,
-  stone_deduction_mg: 0,
-  quantity: 1,
-  valuation_paise: 1000000,
-  gold_rate_id: null,
-  created_at: '2026-01-01T00:00:00Z',
+    net_weight_mg: 10000,
+    purity_karat: 22,
+    stone_deduction_mg: 0,
+    quantity: 1,
+    created_at: '2026-01-01T00:00:00Z',
 };
 
 function sampleLoan(): LoanWithCustomer {
@@ -125,6 +123,7 @@ function sampleLoan(): LoanWithCustomer {
     archived_by: null,
     archive_reason: null,
     archive_balance_paise: null,
+    public_token: 'test-public-token',
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     profiles: {

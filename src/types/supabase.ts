@@ -1,5 +1,4 @@
 import type {
-  GoldRateSource,
   IdDocumentType,
   InterestModel,
   LoanStatus,
@@ -79,6 +78,7 @@ export interface Database {
           grace_days: number;
           partial_period_mode: PartialPeriodMode;
           round_up_threshold_days: number;
+          loans_concealed: boolean;
           updated_at: string;
         };
         Insert: {
@@ -91,6 +91,7 @@ export interface Database {
           grace_days?: number;
           partial_period_mode?: PartialPeriodMode;
           round_up_threshold_days?: number;
+          loans_concealed?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -102,6 +103,7 @@ export interface Database {
           grace_days?: number;
           partial_period_mode?: PartialPeriodMode;
           round_up_threshold_days?: number;
+          loans_concealed?: boolean;
           updated_at?: string;
         };
         Relationships: [];
@@ -141,6 +143,7 @@ export interface Database {
           archive_balance_paise: number | null;
           created_at: string;
           updated_at: string;
+          public_token: string;
         };
         Insert: {
           id?: string;
@@ -176,6 +179,7 @@ export interface Database {
           archive_balance_paise?: number | null;
           created_at?: string;
           updated_at?: string;
+          public_token?: string;
         };
         Update: {
           customer_id?: string;
@@ -210,6 +214,7 @@ export interface Database {
           archive_balance_paise?: number | null;
           created_at?: string;
           updated_at?: string;
+          public_token?: string;
         };
         Relationships: [
           {
@@ -272,8 +277,6 @@ export interface Database {
           purity_karat: number | null;
           stone_deduction_mg: number;
           quantity: number;
-          valuation_paise: number | null;
-          gold_rate_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -288,8 +291,6 @@ export interface Database {
           purity_karat?: number | null;
           stone_deduction_mg?: number;
           quantity?: number;
-          valuation_paise?: number | null;
-          gold_rate_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -303,8 +304,6 @@ export interface Database {
           purity_karat?: number | null;
           stone_deduction_mg?: number;
           quantity?: number;
-          valuation_paise?: number | null;
-          gold_rate_id?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -313,13 +312,6 @@ export interface Database {
             columns: ['loan_id'];
             isOneToOne: false;
             referencedRelation: 'loans';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'loan_items_gold_rate_id_fkey';
-            columns: ['gold_rate_id'];
-            isOneToOne: false;
-            referencedRelation: 'gold_rates';
             referencedColumns: ['id'];
           },
         ];
@@ -405,6 +397,8 @@ export interface Database {
           channel: NoticeChannel;
           delivery_status: NoticeDeliveryStatus;
           provider_message_id: string | null;
+          push_sent_at: string | null;
+          push_ticket_id: string | null;
           payload: Json;
           created_at: string;
         };
@@ -417,6 +411,8 @@ export interface Database {
           channel?: NoticeChannel;
           delivery_status?: NoticeDeliveryStatus;
           provider_message_id?: string | null;
+          push_sent_at?: string | null;
+          push_ticket_id?: string | null;
           payload?: Json;
           created_at?: string;
         };
@@ -428,6 +424,8 @@ export interface Database {
           channel?: NoticeChannel;
           delivery_status?: NoticeDeliveryStatus;
           provider_message_id?: string | null;
+          push_sent_at?: string | null;
+          push_ticket_id?: string | null;
           payload?: Json;
           created_at?: string;
         };
@@ -437,6 +435,40 @@ export interface Database {
             columns: ['loan_id'];
             isOneToOne: false;
             referencedRelation: 'loans';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      profile_push_tokens: {
+        Row: {
+          id: string;
+          profile_id: string;
+          expo_push_token: string;
+          platform: 'ios' | 'android';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id: string;
+          expo_push_token: string;
+          platform: 'ios' | 'android';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          profile_id?: string;
+          expo_push_token?: string;
+          platform?: 'ios' | 'android';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'profile_push_tokens_profile_id_fkey';
+            columns: ['profile_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
             referencedColumns: ['id'];
           },
         ];
@@ -521,41 +553,22 @@ export interface Database {
           },
         ];
       };
-      gold_rates: {
-        Row: {
-          id: string;
-          quoted_on: string;
-          purity_millesimal: number;
-          source: GoldRateSource;
-          price_per_10g_paise: number;
-          fetched_at: string;
-          created_by: string | null;
-        };
-        Insert: {
-          id?: string;
-          quoted_on: string;
-          purity_millesimal: number;
-          source: GoldRateSource;
-          price_per_10g_paise: number;
-          fetched_at?: string;
-          created_by?: string | null;
-        };
-        Update: {
-          quoted_on?: string;
-          purity_millesimal?: number;
-          source?: GoldRateSource;
-          price_per_10g_paise?: number;
-          fetched_at?: string;
-          created_by?: string | null;
-        };
-        Relationships: [];
-      };
     };
     Views: Record<string, never>;
     Functions: {
       find_profile_by_phone: {
         Args: { p_phone: string };
         Returns: string | null;
+      };
+      find_loan_by_serial: {
+        Args: { p_serial: string };
+        Returns: {
+          loan_id: string;
+          serial_number: string;
+          status: LoanStatus;
+          is_archived: boolean;
+          customer_name: string | null;
+        }[];
       };
       is_shop_user: {
         Args: Record<string, never>;
@@ -607,6 +620,21 @@ export interface Database {
         Args: { p_as_of?: string };
         Returns: number;
       };
+      claim_pending_loan_notice_pushes: {
+        Args: { p_limit?: number };
+        Returns: {
+          notice_id: string;
+          loan_id: string;
+          customer_id: string;
+          notice_type: string;
+          serial_number: string;
+          expo_push_tokens: string[];
+        }[];
+      };
+      upsert_own_push_token: {
+        Args: { p_expo_push_token: string; p_platform: string };
+        Returns: string;
+      };
       loan_current_due_on: {
         Args: { p_loan_id: string };
         Returns: string | null;
@@ -621,41 +649,6 @@ export interface Database {
           fire_at: string;
         }[];
       };
-      gold_karat_to_millesimal: {
-        Args: { p_karat: number };
-        Returns: number | null;
-      };
-      resolve_gold_rate: {
-        Args: { p_quoted_on: string; p_millesimal: number };
-        Returns: {
-          id: string;
-          quoted_on: string;
-          purity_millesimal: number;
-          source: GoldRateSource;
-          price_per_10g_paise: number;
-          fetched_at: string;
-          created_by: string | null;
-        }[];
-      };
-      assess_gold_item_valuation: {
-        Args: {
-          p_net_weight_mg: number;
-          p_purity_karat: number;
-          p_as_of: string;
-        };
-        Returns: {
-          valuation_paise: number;
-          gold_rate_id: string;
-        }[];
-      };
-      set_manual_gold_rate: {
-        Args: {
-          p_quoted_on: string;
-          p_millesimal: number;
-          p_price_per_10g_paise: number;
-        };
-        Returns: string;
-      };
       create_loan: {
         Args: {
           p_customer_id: string;
@@ -667,6 +660,7 @@ export interface Database {
           p_interest_model: InterestModel;
           p_digital_signature_url: string | null;
           p_items: Json;
+          p_idempotency_key?: string | null;
         };
         Returns: {
           loan_id: string;
@@ -682,6 +676,7 @@ export interface Database {
           p_final_payment_paise?: number;
           p_release_note?: string | null;
           p_release_signature_url?: string | null;
+          p_idempotency_key?: string | null;
         };
         Returns: {
           loan_id: string;
@@ -707,6 +702,14 @@ export interface Database {
           already_defaulted: boolean;
         }[];
       };
+      loans_are_concealed: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      set_loans_concealed: {
+        Args: { p_concealed: boolean };
+        Returns: boolean;
+      };
       update_shop_defaults: {
         Args: {
           p_rate_bps: number;
@@ -726,6 +729,7 @@ export interface Database {
           grace_days: number;
           partial_period_mode: PartialPeriodMode;
           round_up_threshold_days: number;
+          loans_concealed: boolean;
           updated_at: string;
         };
       };
@@ -753,6 +757,7 @@ export interface Database {
           p_interest_paid_paise: number;
           p_new_maturity_on: string;
           p_note?: string | null;
+          p_idempotency_key?: string | null;
         };
         Returns: {
           renewal_id: string;
@@ -762,6 +767,15 @@ export interface Database {
           new_maturity_on: string;
           already_renewed: boolean;
         }[];
+      };
+      log_payment: {
+        Args: {
+          p_loan_id: string;
+          p_amount_paid_paise: number;
+          p_paid_on: string;
+          p_idempotency_key: string;
+        };
+        Returns: string;
       };
       archive_loan: {
         Args: {
@@ -794,6 +808,41 @@ export interface Database {
           status: LoanStatus;
           reversed_payment_id: string | null;
         }[];
+      };
+      issue_login_token: {
+        Args: {
+          p_profile_id: string;
+          p_loan_id?: string | null;
+        };
+        Returns: string;
+      };
+      redeem_login_token: {
+        Args: { p_token: string };
+        Returns: {
+          profile_id: string;
+          loan_id: string | null;
+        }[];
+      };
+      loan_receipt_mask_by_public_token: {
+        Args: { p_token: string };
+        Returns: {
+          serial_last4: string;
+        }[];
+      };
+      set_customer_pin: {
+        Args: { p_pin: string };
+        Returns: undefined;
+      };
+      verify_customer_pin: {
+        Args: { p_phone: string; p_pin: string };
+        Returns: {
+          ok: boolean;
+          profile_id: string | null;
+        }[];
+      };
+      generate_opaque_token: {
+        Args: { p_bytes?: number };
+        Returns: string;
       };
     };
     Enums: {

@@ -1,10 +1,10 @@
 /**
  * Design tokens. Palette hex lives only here.
  *
- * `Colors` is the live set (Girvi shopfront). Hex lives only in this file.
+ * `Colors` is the live set (maroon + gold). Hex lives only in this file.
  *
- * `PaletteDirections` keep warmPaper / coolLedger / shopfrontContrast as
- * complete reference proposals, plus girviShopfront (live).
+ * `PaletteDirections` keep warmPaper / coolLedger / shopfrontContrast /
+ * girviShopfront as complete reference proposals, plus maroonGold (live).
  * Do not edit screens to hard-code a favourite.
  *
  * Type: system fonts only (Devanagari on print later). No custom display face.
@@ -82,7 +82,8 @@ export type PaletteDirectionId =
   | 'warmPaper'
   | 'coolLedger'
   | 'shopfrontContrast'
-  | 'girviShopfront';
+  | 'girviShopfront'
+  | 'maroonGold';
 
 export type PaletteDirection = {
   id: PaletteDirectionId;
@@ -470,7 +471,7 @@ const shopfrontContrast: PaletteDirection = {
 };
 
 /**
- * Live shopfront. Royal purple chrome, gold hero, cool off-white page.
+ * Reference shopfront. Royal purple chrome, gold hero, cool off-white page.
  *
  * Light WCAG (measured):
  *   body 16.59:1 (#1A1228 on #F4F5F8), secondary 6.38:1 (#5C5670 on #F4F5F8)
@@ -578,20 +579,129 @@ const girviShopfront: PaletteDirection = {
   },
 };
 
+/**
+ * Live shopfront. Oxblood chrome, gold hero, warm off-white page, white cards.
+ *
+ * Light WCAG (measured, same sRGB formula as button-contrast-test):
+ *   body 16.99:1 (#1C1410 on #FAF7F2), secondary 5.87:1 (#6B5E52 on #FAF7F2)
+ *   onChrome 14.92:1 (#FFFFFF on #4E0F1A)
+ *   onGold 11.05:1 (#1C1410 on #F5C400)
+ *   gold-on-maroon 9.08:1 (#F5C400 on #4E0F1A)
+ *   success 6.03:1 on page (#146C45; girvi #188757 was 4.23:1 on this cream)
+ *   danger 4.52:1 on page (#DC2626; girvi #D34242 was 4.28:1 on this cream)
+ *   warning 4.55:1 on page (#9A6708 amber — not orange-red on oxblood)
+ * Dark WCAG (measured):
+ *   body 16.94:1 (#F6EDE8 on #16080C), secondary 9.90:1 (#C9B4B0 on #16080C)
+ *   onChrome 11.65:1 (#FFFFFF on #6A1B2A)
+ *   success 8.41:1 / danger 7.57:1 / warning 9.22:1 on elevated #2A1418
+ *
+ * Android chrome: the same solid `chrome` fill as iOS. No dimezis blur.
+ */
+const maroonGold: PaletteDirection = {
+  id: 'maroonGold',
+  label: 'Maroon gold',
+  summary:
+    'Solid oxblood chrome, gold hero pill, warm off-white page, white cards.',
+  contrast:
+    'Light body 16.99:1, secondary 5.87:1, onChrome 14.92:1, onGold 11.05:1, gold-on-maroon 9.08:1, success 6.03:1 / danger 4.52:1 / warning 4.55:1 on page. Dark body 16.94:1, secondary 9.90:1, onChrome 11.65:1, success 8.41:1 / danger 7.57:1 / warning 9.22:1 on elevated.',
+  light: {
+    // Warm ink on near-white cream page.
+    text: '#1C1410',
+    background: '#FAF7F2',
+    backgroundElement: '#EFE8DC',
+    backgroundSelected: '#E5DCCE',
+    textSecondary: '#6B5E52',
+    surface: '#FAF7F2',
+    elevated: '#FFFFFF',
+    surfaceSunken: '#F0E9DE',
+    border: '#E4D9CC',
+    // Oxblood chrome / FAB / primary — darker than #6A1B2A so vermillion danger separates by value.
+    primary: '#4E0F1A',
+    onPrimary: '#FFFFFF',
+    statusActive: '#146C45',
+    statusRedeemed: '#3D5A8A',
+    statusClosed: '#6B5E52',
+    statusDefaulted: '#DC2626',
+    onStatus: '#FFFFFF',
+    success: '#146C45',
+    // Amber, not orange-red: same hue family as maroon would collapse loan-id chips into chrome.
+    warning: '#9A6708',
+    danger: '#DC2626',
+    onDanger: '#FFFFFF',
+    overlay: '#FAF7F2',
+    overlayShadow: '#1C1410',
+    link: '#4E0F1A',
+    shadow: '#1C1410',
+    ...inkWashes({
+      text: '#1C1410',
+      primary: '#4E0F1A',
+      danger: '#DC2626',
+      warning: '#9A6708',
+      success: '#146C45',
+      statusRedeemed: '#3D5A8A',
+      statusClosed: '#6B5E52',
+      dark: false,
+    }),
+    ...glassFrom('#FAF7F2', '#FFFFFF', '#E4D9CC'),
+    ...chromeFrom('#4E0F1A', '#FFFFFF', '#9A6708', '#F5C400', '#1C1410'),
+  },
+  dark: {
+    // Warm oxblood-night page.
+    text: '#F6EDE8',
+    background: '#16080C',
+    backgroundElement: '#241418',
+    backgroundSelected: '#3A2228',
+    textSecondary: '#C9B4B0',
+    surface: '#16080C',
+    elevated: '#2A1418',
+    surfaceSunken: '#100608',
+    border: '#4A3036',
+    // Original maroon so dark chrome is wine, not a black bar.
+    primary: '#6A1B2A',
+    onPrimary: '#FFFFFF',
+    statusActive: '#3DCC88',
+    statusRedeemed: '#8EB6E0',
+    statusClosed: '#C4B8B4',
+    statusDefaulted: '#FF8A7A',
+    onStatus: '#16080C',
+    success: '#3DCC88',
+    warning: '#F0B24A',
+    danger: '#FF8A7A',
+    onDanger: '#16080C',
+    overlay: '#F6EDE8',
+    overlayShadow: '#0A0406',
+    link: '#E8B4B8',
+    shadow: '#0A0406',
+    ...inkWashes({
+      text: '#F6EDE8',
+      primary: '#6A1B2A',
+      danger: '#FF8A7A',
+      warning: '#F0B24A',
+      success: '#3DCC88',
+      statusRedeemed: '#8EB6E0',
+      statusClosed: '#C4B8B4',
+      dark: true,
+    }),
+    ...glassFrom('#16080C', '#2A1418', '#4A3036'),
+    ...chromeFrom('#6A1B2A', '#FFFFFF', '#F0B24A', '#F5C400', '#1C1410'),
+  },
+};
+
 export const PaletteDirections: Record<PaletteDirectionId, PaletteDirection> = {
   warmPaper,
   coolLedger,
   shopfrontContrast,
   girviShopfront,
+  maroonGold,
 };
 
 /**
- * Live tokens: Girvi shopfront. The other PaletteDirections stay for
+ * Live tokens: maroon + gold. The other PaletteDirections stay for
  * reference; screens must keep reading Colors, never a direction id.
  */
 export const Colors = {
-  light: PaletteDirections.girviShopfront.light,
-  dark: PaletteDirections.girviShopfront.dark,
+  light: PaletteDirections.maroonGold.light,
+  dark: PaletteDirections.maroonGold.dark,
 } as const satisfies { light: Palette; dark: Palette };
 
 export type ThemeColor = keyof Palette;
@@ -638,17 +748,17 @@ export const Spacing = {
  */
 export const TypeScale = {
   /** Fine print, legal asides, compact badge labels. Not a section header. */
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  caption: { fontSize: 12, lineHeight: 18, fontWeight: '500' },
   /** Default paragraph and form helper copy. */
   body: { fontSize: 16, lineHeight: 24, fontWeight: '500' },
   /** Emphasis inside a body stack (running totals). */
   bodyBold: { fontSize: 16, lineHeight: 24, fontWeight: '700' },
   /** Screen titles in chrome. Not ThemedText type="title" (that stays display-sized). */
-  title: { fontSize: 20, lineHeight: 26, fontWeight: '600' },
+  title: { fontSize: 22, lineHeight: 30, fontWeight: '600' },
   /** Rare hero words and large empty-state titles. */
-  display: { fontSize: 32, lineHeight: 40, fontWeight: '600' },
+  display: { fontSize: 32, lineHeight: 44, fontWeight: '600' },
   /** Inline money in rows. Pair with tabular-nums. */
-  money: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
+  money: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
   /**
    * Section labels above grouped lists. Uppercase Latin only.
    * Do not rely on textTransform for Devanagari — it is unchanged.
@@ -657,11 +767,11 @@ export const TypeScale = {
     fontSize: 11,
     lineHeight: 16,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   /** Metadata, timestamps, serial · item. */
-  label: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  label: { fontSize: 13, lineHeight: 20, fontWeight: '500' },
   /** Secondary body one step below default (form hints, compact rows). */
   small: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
   /** Tappable inline links. */
@@ -672,9 +782,9 @@ export const TypeScale = {
   /** Monospace snippets; pair with Fonts.mono in ThemedText. */
   codeSize: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   /** Primary row title (customer name). */
-  bodyLarge: { fontSize: 17, lineHeight: 22, fontWeight: '600' },
+  bodyLarge: { fontSize: 17, lineHeight: 24, fontWeight: '700' },
   /** Hero figure on detail screens. Pair with tabular-nums. */
-  moneyLarge: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
+  moneyLarge: { fontSize: 32, lineHeight: 40, fontWeight: '700' },
 } as const satisfies Record<string, TextStyle>;
 
 export const Radii = {
@@ -709,6 +819,12 @@ export const Sizes = {
   signaturePadHeight: 220,
   /** Signature pad on redeem (compact canvas). */
   signaturePadHeightCompact: 180,
+  /** Loan receipt QR on loan detail. */
+  qrCode: 160,
+  /** Full-screen counter activation QR. */
+  qrCodeLarge: 240,
+  /** Inline QR size inside printed pledge HTML (pixels). */
+  qrCodePrint: 128,
   /** Gold bar on the top edge of the active tab item. */
   tabIndicator: 3,
 } as const;
@@ -725,6 +841,10 @@ export const Glass = {
   tabBarHeight: Platform.select({ ios: 50, android: 56, default: 56 }) ?? 56,
   headerHeight: 56,
   get supportsNativeGlass(): boolean {
+    // Liquid Glass is iOS-only; never probe the native module on web/Android.
+    if (Platform.OS !== 'ios') {
+      return false;
+    }
     return isLiquidGlassAvailable() && isGlassEffectAPIAvailable();
   },
 };

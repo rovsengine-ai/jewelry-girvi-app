@@ -80,11 +80,20 @@ const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, push: mockPush, back: mockBack }),
-  useLocalSearchParams: () => ({ id: 'loan-1', customerId: 'cust-1' }),
-  useSegments: () => [],
-}));
+jest.mock('expo-router', () => {
+  const React = require('react');
+  return {
+    useRouter: () => ({ replace: mockReplace, push: mockPush, back: mockBack }),
+    useLocalSearchParams: () => ({ id: 'loan-1', customerId: 'cust-1' }),
+    useSegments: () => [],
+    useFocusEffect: (effect: () => void | (() => void)) => {
+      React.useEffect(() => {
+        const cleanup = effect();
+        return typeof cleanup === 'function' ? cleanup : undefined;
+      }, [effect]);
+    },
+  };
+});
 
 jest.mock('@/providers/auth-provider', () => ({
   useAuth: jest.fn(),
@@ -128,8 +137,11 @@ jest.mock('@/services/loanService', () => ({
     grace_days: 0,
     round_up_threshold_days: 24,
     partial_period_mode: 'min_month_then_pro_rata',
+    loans_concealed: false,
   })),
   updateShopDefaults: jest.fn(),
+  fetchLoansConcealed: jest.fn(async () => false),
+  setLoansConcealed: jest.fn(),
   fetchLoanNotices: jest.fn(async () => []),
   fetchOverdueLoans: jest.fn(async () => []),
   generateLoanNotices: jest.fn(async () => 0),
@@ -147,6 +159,16 @@ jest.mock('@/services/loanService', () => ({
   renewLoan: jest.fn(),
   defaultLoan: jest.fn(),
   updateLoanTerms: jest.fn(),
+}));
+
+jest.mock('@/services/pushTokenService', () => ({
+  generateLoanNoticesAndPush: jest.fn(async () => ({
+    inserted: 0,
+    claimed: 0,
+    pushMessages: 0,
+  })),
+  profileHasPushToken: jest.fn(async () => false),
+  registerOwnExpoPushToken: jest.fn(async () => false),
 }));
 
 jest.mock('@/services/printService', () => ({

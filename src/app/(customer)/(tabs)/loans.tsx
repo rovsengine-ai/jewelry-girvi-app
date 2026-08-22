@@ -1,5 +1,12 @@
+/**
+ * Customer receipts. RLS hides rows while the owner conceals the book.
+ * Pull-to-refresh / tab focus reloads after reveal.
+ *
+ * Expo Router (SDK 57): https://docs.expo.dev/versions/v57.0.0/sdk/router/
+ */
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -13,13 +20,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Sizes, Spacing } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useLoansPaymentsRealtime } from '@/hooks/use-loans-payments-realtime';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { customerLoanStatusLabel } from '@/lib/redemption';
 import { rowEntering } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
-import { resolveReceiptDisplayUrl } from '@/services/loanService';
+import { fetchLoansConcealed, resolveReceiptDisplayUrl } from '@/services/loanService';
 import type { Loan } from '@/types/database';
 
 type CustomerLoanView = Pick<
@@ -40,9 +48,17 @@ export default function CustomerLoansScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loansConcealed, setLoansConcealed] = useState(false);
 
   const loadLoans = useCallback(async () => {
     if (!session?.user.id) return;
+
+    const concealed = await fetchLoansConcealed();
+    setLoansConcealed(concealed);
+    if (concealed) {
+      setLoans([]);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('loans')
@@ -65,6 +81,13 @@ export default function CustomerLoansScreen() {
     setLoans(withUrls);
   }, [session?.user.id]);
 
+  // Re-fetch from SQL on Realtime events — never apply payload money fields.
+  useLoansPaymentsRealtime(() => {
+    void loadLoans().catch((error) => {
+      setLoadError(error instanceof Error ? error.message : t('loans.customer.loadError'));
+    });
+  });
+
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     setLoadError(null);
@@ -77,19 +100,29 @@ export default function CustomerLoansScreen() {
     }
   }, [loadLoans, t]);
 
-  useEffect(() => {
-    void (async () => {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        await loadLoans();
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : t('loans.customer.loadError'));
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [loadLoans, t]);
+  useFocusEffect(
+    useCallback(() => {
+      // https://docs.expo.dev/versions/v57.0.0/sdk/router/#usefocuseffecteffect-do_not_pass_a_second_prop
+      let active = true;
+      void (async () => {
+        setLoadError(null);
+        try {
+          await loadLoans();
+        } catch (error) {
+          if (active) {
+            setLoadError(
+              error instanceof Error ? error.message : t('loans.customer.loadError'),
+            );
+          }
+        } finally {
+          if (active) setIsLoading(false);
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [loadLoans, t]),
+  );
 
   return (
     <ThemedView style={styles.container} type="surfaceSunken">
@@ -113,8 +146,16 @@ export default function CustomerLoansScreen() {
             contentContainerStyle={[styles.listContent, { paddingBottom: tabBarPadding }]}
             ListEmptyComponent={
               <EmptyState
-                title={t('loans.customer.emptyTitle')}
-                body={t('loans.customer.emptyBody')}
+                title={
+                  loansConcealed
+                    ? t('loans.customer.concealedTitle')
+                    : t('loans.customer.emptyTitle')
+                }
+                body={
+                  loansConcealed
+                    ? t('loans.customer.concealedBody')
+                    : t('loans.customer.emptyBody')
+                }
               />
             }
             renderItem={({ item, index }) => (

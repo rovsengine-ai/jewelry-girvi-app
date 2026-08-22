@@ -106,13 +106,20 @@ export function KycCaptureForm({ customer }: Props) {
 
       <KycCaptureFields value={kycDraft} onChange={setKycDraft} testIdPrefix="kyc" />
 
-      <Button testID="kyc-save" label={t('kyc.save')} loading={isSaving} onPress={() => void handleSave()} />
+      <Button
+        testID="kyc-save"
+        label={t('kyc.save')}
+        loading={isSaving}
+        requiresNetwork
+        onPress={() => void handleSave()}
+      />
 
       <Button
         testID="kyc-verify"
         label={t('kyc.markVerified')}
         variant="secondary"
         loading={isVerifying}
+        requiresNetwork
         onPress={() => void handleVerify()}
       />
     </View>
