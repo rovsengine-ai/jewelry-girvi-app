@@ -26,7 +26,7 @@ exports[`bilingual screen snapshots admin settings: admin-settings-hi 1`] = `[]`
 
 exports[`bilingual screen snapshots auth login: login-en 1`] = `
 [
-  "Girvi Shop Login",
+  "Girvi Sewa Login",
   "Sign in with your mobile number to view receipts or manage loans.",
   "EN",
   "हिं",
@@ -37,7 +37,7 @@ exports[`bilingual screen snapshots auth login: login-en 1`] = `
 
 exports[`bilingual screen snapshots auth login: login-hi 1`] = `
 [
-  "गिरवी दुकान लॉगिन",
+  "गिरवी सेवा लॉगिन",
   "रसीदें देखने या गिरवी चलाने के लिए मोबाइल नंबर से साइन इन करें।",
   "EN",
   "हिं",

@@ -22,9 +22,10 @@ export const hi = {
     backToLoan: 'गिरवी पर वापस',
     grantPermission: 'अनुमति दें',
     generating: 'बना रहे हैं…',
-    loadingRate: 'दर लोड हो रही है…',
-    notIbja: 'IBJA नहीं',
-    per10g: '/ 10ग्रा',
+  },
+  network: {
+    offlineBanner: 'नेटवर्क नहीं — कनेक्ट होने तक बदलाव रुके हैं।',
+    unavailableOffline: 'ऑफ़लाइन उपलब्ध नहीं',
   },
   signaturePad: {
     captured: 'हस्ताक्षर लिया गया',
@@ -52,10 +53,12 @@ export const hi = {
     settings: 'सेटिंग',
   },
   auth: {
-    title: 'गिरवी दुकान लॉगिन',
+    title: 'गिरवी सेवा लॉगिन',
     subtitle: 'रसीदें देखने या गिरवी चलाने के लिए मोबाइल नंबर से साइन इन करें।',
+    pinSubtitle: 'अपनी रसीदें देखने के लिए मोबाइल नंबर और PIN दर्ज करें।',
     mobileNumber: 'मोबाइल नंबर',
     mobilePlaceholder: '10 अंकों का मोबाइल नंबर',
+    phoneDisplay: '%{phone} से साइन इन',
     verificationCode: 'सत्यापन कोड',
     otpPlaceholder: 'OTP दर्ज करें',
     sendOtp: 'OTP भेजें',
@@ -65,6 +68,35 @@ export const hi = {
     enterVerificationCode: 'SMS से सत्यापन कोड दर्ज करें।',
     noUserSession: 'कोई उपयोगकर्ता सत्र नहीं मिला।',
     otpSent: 'सत्यापन कोड %{phone} पर भेजा गया',
+    pin: 'PIN',
+    pinPlaceholder: '6 अंकों का PIN',
+    choosePin: '6 अंकों का PIN चुनें',
+    confirmPin: 'PIN दोबारा लिखें',
+    signInWithPin: 'साइन इन',
+    invalidPin: 'अपना 6 अंकों का PIN दर्ज करें।',
+    invalidPinOrPhone: 'मोबाइल नंबर या PIN सही नहीं है। फिर कोशिश करें।',
+    accountLocked:
+      'बहुत गलत PIN कोशिशों के बाद यह खाता कुछ समय के लिए बंद है। 15 मिनट बाद कोशिश करें, या दुकान से मदद लें।',
+    signInFailed: 'साइन इन नहीं हो सका। फिर कोशिश करें।',
+    pinMismatch: 'दोनों PIN एक जैसे नहीं हैं।',
+    weakPin: 'मज़बूत PIN चुनें — दोहराया या क्रम वाला नंबर न लिखें।',
+    activateTitle: 'अपना खाता चालू करें',
+    activateSubtitle: 'बाद में बिना SMS साइन इन करने के लिए PIN सेट करें।',
+    activateRedeeming: 'दुकान का कोड जाँचा जा रहा है…',
+    activateMissingToken: 'यह लिंक अधूरा है। दुकान से नया QR माँगें।',
+    activateInvalidToken:
+      'यह कोड मान्य नहीं है या समय समाप्त हो गया। दुकान से नया QR दिखाएँ।',
+    savePinAndContinue: 'PIN सेव करें और आगे बढ़ें',
+  },
+  loanQrLanding: {
+    title: 'गिरवी रसीद',
+    subtitle: 'यह गिरवी देखने के लिए साइन इन करें।',
+    signInPrompt: 'साइन इन करने से पहले यह लिंक गिरवी की जानकारी नहीं दिखाता।',
+    signIn: 'साइन इन',
+    missingToken: 'यह रसीद लिंक अधूरा है।',
+    maskedReference: 'गिरवी #…%{last4}',
+    notFoundTitle: 'रसीद नहीं मिली',
+    notFoundBody: 'यह रसीद लिंक उपलब्ध नहीं है। अपनी गिरवी देखने के लिए साइन इन करें।',
   },
   loans: {
     tab: 'गिरवी',
@@ -79,8 +111,10 @@ export const hi = {
     searchPlaceholder: 'नाम, फ़ोन, या क्रमांक',
     emptyTitle: 'कोई गिरवी नहीं',
     emptyBody: 'इस टैब में कोई गिरवी नहीं।',
+    concealedTitle: 'अस्थायी तकनीकी समस्या',
+    concealedBody:
+      'अभी गिरवी रिकॉर्ड नहीं खुल पा रहे। घबराएँ नहीं — तकनीकी टीम जल्द ठीक करेगी।',
     scanReceipt: 'रसीद स्कैन',
-    notIbja: 'IBJA नहीं',
     status: {
       active: 'चालू',
       redeemed: 'छुड़ाई गई',
@@ -97,6 +131,9 @@ export const hi = {
       loadError: 'रसीदें नहीं खुल सकीं।',
       emptyTitle: 'अभी कोई रसीद नहीं',
       emptyBody: 'आपके खाते से अभी कोई गिरवी रसीद जुड़ी नहीं है।',
+      concealedTitle: 'अस्थायी तकनीकी समस्या',
+      concealedBody:
+        'अभी रसीदें नहीं खुल पा रही। घबराएँ नहीं — तकनीकी टीम जल्द ठीक करेगी।',
       noReceiptImage: 'रसीद की तस्वीर नहीं',
       collectItemsStatus: 'भुगतान हो गया — सामान लें',
       collectItemsTitle: 'भुगतान हो गया — अपना सामान लें',
@@ -127,17 +164,29 @@ export const hi = {
       itemsEmptyTitle: 'कोई वस्तु नहीं',
       itemsEmptyBody: 'इस गिरवी पर कोई वस्तु पंक्ति नहीं।',
       metalUnknown: 'धातु अज्ञात',
-      itemMeta: '%{metal} · %{ornament} · %{grams}ग्रा शुद्ध · %{purity}%{qty}%{assessed}',
+      itemMeta: '%{metal} · %{ornament} · %{grams}ग्रा शुद्ध · %{purity}%{qty}',
       purityNotAssessed: 'शुद्धता आकलित नहीं',
       purityKarat: '%{karat}K',
       quantitySuffix: ' · ×%{qty}',
-      assessedNotIbja: ' · आकलित (IBJA नहीं)',
       redeem: 'छुड़ाना',
       renew: 'नवीनीकरण',
       defaultLoan: 'ज़ब्ती',
       editTerms: 'शर्तें बदलें',
       printPledge: 'गिरवी छापें',
       printReceipt: 'रसीद छापें',
+      showCustomerQr: 'ग्राहक QR दिखाएँ',
+      customerQrTitle: 'ग्राहक सक्रियण QR',
+      customerQrHint:
+        'ग्राहक से कहें कि अपने फ़ोन से इसे स्कैन करें। पाँच मिनट में समय समाप्त, एक बार ही चलेगा।',
+      customerQrCountdown: '%{time} में समय समाप्त',
+      customerQrExpired: 'इस कोड का समय समाप्त हो गया। बंद करें और नया दिखाएँ।',
+      customerQrClose: 'बंद करें',
+      customerQrFailed: 'सक्रियण कोड नहीं बन सका। फिर कोशिश करें।',
+      customerQrLinkLabel: 'सक्रियण लिंक',
+      loanQrTitle: 'रसीद QR',
+      loanQrHint:
+        'इस गिरवी का स्थायी लिंक। स्कैन से साइन-इन खुलता है — अकेले इससे पहुँच नहीं मिलती।',
+      loanQrMissingOrigin: 'रसीद QR दिखाने और प्रिंट करने के लिए EXPO_PUBLIC_WEB_ORIGIN सेट करें।',
       redeemedAwaitingArchive:
         'छुड़ाई हो गई — सामान लौटाया। ग्राहक सामान लेने के बाद इस गिरवी को संग्रहित करें ताकि उनके ऐप से हट जाए।',
       redeemedLive: 'यह गिरवी छुड़ाई गई है। सामान काउंटर पर लौटाया गया।',
@@ -158,9 +207,6 @@ export const hi = {
       sectionActions: 'कार्रवाई',
       totalItems: 'कुल वस्तुएँ : %{count}',
       addTransaction: '+ लेन-देन जोड़ें',
-      marketValue: 'बाज़ार मूल्य',
-      marketValueEmpty: 'इन वस्तुओं पर आकलित मूल्य नहीं।',
-      marketValueCaption: 'जमी हुई वस्तु कीमत (%{notIbja})',
       tenureDays: '%{days} दिन',
       dateRange: '%{from} – %{to}',
       asOfDate: '%{date} तक का हिसाब',
@@ -256,6 +302,8 @@ export const hi = {
       cameraUnavailableBody:
         'iOS सिम्युलेटर में कैमरा नहीं होता। गैलरी से फ़ोटो चुनें, या गिरवी खुद भरें।',
       cameraMountFailed: 'कैमरा चालू नहीं हुआ। गैलरी इस्तेमाल करें या खुद भरें।',
+      serialExists: 'क्रमांक %{serial} पहले से बही में है।',
+      openExistingLoan: 'मौजूदा गिरवी खोलें',
     },
     insights: {
       // REVIEW: shop analytics jargon
@@ -446,6 +494,8 @@ export const hi = {
       title: 'सूचनाएँ',
       subtitle:
         'भुगतान याददिलाने (देय से 15 दिन पहले, देय दिन, और बकाया) इस फ़ोन की सूचनाओं का उपयोग करते हैं, अनुमति के बाद।',
+      subtitleWeb:
+        'देय-तिथि सूचनाएँ ब्राउज़र में यहाँ दिखती हैं। फ़ोन की याददिलाना सूचनाएँ Android ऐप में ही तय होती हैं — इस टैब में शेड्यूल नहीं होतीं।',
       loadError: 'सूचनाएँ नहीं खुल सकीं।',
       emptyTitle: 'कोई सूचना नहीं',
       emptyBody: 'आपकी गिरवी की देय-तिथि सूचनाएँ अभी नहीं।',
@@ -466,6 +516,13 @@ export const hi = {
     language: 'भाषा',
     languageHint: 'तुरंत लागू होती है। इस डिवाइस पर सहेजी जाती है।',
     staffHint: 'दुकान डिफ़ॉल्ट केवल मालिक के लिए। RLS कर्मचारी लिखने से मना करता है।',
+    staffConcealed:
+      'अभी गिरवी रिकॉर्ड नहीं खुल पा रहे। घबराएँ नहीं — तकनीकी टीम जल्द ठीक करेगी।',
+    concealLoans: 'सभी गिरवी छिपाएँ',
+    concealLoansHint:
+      'कर्मचारी, खुदरा ग्राहक और व्यापारी कोई गिरवी डेटा नहीं देखेंगे जब तक आप यह बंद न करें। आपकी किताब दिखती रहेगी।',
+    concealOn: 'गिरवी कर्मचारी और ग्राहकों से छिपी हैं।',
+    concealOff: 'गिरवी फिर दिख रही हैं। कर्मचारी और ग्राहक ताज़ा करके देखेंगे।',
     shopDefaults: 'दुकान डिफ़ॉल्ट',
     shopDefaultsInfo:
       'दुकान डिफ़ॉल्ट बदलने से केवल नई गिरवी प्रभावित होती है। पुरानी नहीं (जब तक मालिक उस गिरवी को अलग से न बदले)।',
@@ -484,6 +541,16 @@ export const hi = {
     groupPreferences: 'पसंद',
     groupShop: 'दुकान',
     groupSession: 'सत्र',
+    groupAccount: 'खाता',
+    deleteAccount: 'मेरा खाता हटाएँ',
+    deleteAccountTitle: 'खाता हटाएँ?',
+    deleteAccountBody:
+      'इससे इस ऐप से आपका साइन-इन हट जाता है। खुली गिरवी दुकान के कानूनी रिकॉर्ड में रहती हैं — वे मिटती नहीं। इस संस्करण में खाता हटाना अभी उपलब्ध नहीं; मदद के लिए दुकान आएँ।',
+    deleteAccountConfirm: 'जारी रखें',
+    deleteAccountUnavailable:
+      'इस संस्करण में खाता हटाना उपलब्ध नहीं। मदद के लिए दुकान आएँ।',
+    remindersWebNote:
+      'इस फ़ोन पर भुगतान याददिलाना Android ऐप में ही काम करता है। यह वेबसाइट केवल रसीदें और सूचनाएँ दिखाती है — स्थानीय सूचनाएँ शेड्यूल नहीं करती।',
     roleOwner: 'मालिक',
     roleStaff: 'कर्मचारी',
   },
@@ -533,7 +600,7 @@ export const hi = {
     ownerOnly: 'केवल दुकान मालिक छुड़ाई पलट सकता है।',
   },
   print: {
-    letterhead: 'गिरवी दुकान',
+    letterhead: 'गिरवी सेवा',
     pledgeSubtitle: 'गिरवी अभिलेख · %{serial}',
     redemptionSubtitle: 'छुड़ाना रसीद · %{serial}',
     customer: 'ग्राहक:',
@@ -562,6 +629,7 @@ export const hi = {
     net: 'शुद्ध',
     purity: 'शुद्धता',
     noItems: 'इस टिकट पर कोई गिरवी-वस्तु पंक्ति नहीं।',
+    loanQrCaption: 'इस गिरवी को ग्राहक साइट पर खोलने के लिए स्कैन करें (साइन-इन ज़रूरी)।',
     // REVIEW: print lawyer-review disclaimer
     disclaimerLegal:
       'यह पत्रक इस गिरवी टिकट पर संग्रहीत शर्तें दर्शाता है। यह कानूनी सलाह नहीं है और मुद्रांकित दस्तावेज़ नहीं है। समझौते के रूप में उपयोग से पहले वकील से जाँच करवाएँ।',

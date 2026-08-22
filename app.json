@@ -1,16 +1,22 @@
 {
   "expo": {
-    "name": "jewelry-girvi-app",
+    "name": "Girvi Sewa",
     "slug": "jewelry-girvi-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "jewelrygirviapp",
+    "scheme": "girvisewa",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.anonymous.jewelry-girvi-app",
-      "appleTeamId": "U5RDM8MM7T"
+      "bundleIdentifier": "com.girvisewa.app",
+      "appleTeamId": "U5RDM8MM7T",
+      "infoPlist": {
+        "CFBundleLocalizations": [
+          "en",
+          "hi"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +29,7 @@
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "package": "com.anonymous.jewelrygirviapp"
+      "package": "com.girvisewa.app"
     },
     "web": {
       "output": "static",
@@ -43,7 +49,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Girvi Shop to scan handwritten receipt pads."
+          "cameraPermission": "Allow Girvi Sewa to scan handwritten receipt pads."
         }
       ],
       [
@@ -56,8 +62,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Girvi Shop to attach pledged-item and KYC photos.",
-          "cameraPermission": "Allow Girvi Shop to photograph pledged items and ID documents.",
+          "photosPermission": "Allow Girvi Sewa to attach pledged-item and KYC photos.",
+          "cameraPermission": "Allow Girvi Sewa to photograph pledged items and ID documents.",
           "microphonePermission": false
         }
       ],
@@ -65,13 +71,22 @@
       [
         "expo-localization",
         {
-          "supportedLocales": ["en", "hi"]
+          "supportedLocales": [
+            "en",
+            "hi"
+          ]
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "03e59023-9a4a-468c-8054-76a65237f8f7"
+      }
     }
   }
 }

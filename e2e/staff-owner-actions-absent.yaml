@@ -1,4 +1,4 @@
-appId: com.anonymous.jewelrygirviapp
+appId: com.girvisewa.app
 ---
 # Staff: Insights tab and owner-only loan actions must be absent.
 - runFlow:

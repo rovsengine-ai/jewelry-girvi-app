@@ -1,4 +1,4 @@
-appId: com.anonymous.jewelrygirviapp
+appId: com.girvisewa.app
 ---
 # Shared login. Pass PHONE via env (e.g. -e PHONE=9000000001). OTP is always 123456 locally.
 - launchApp:

@@ -1,4 +1,4 @@
-# Girvi Shop
+# Girvi Sewa
 
 Expo SDK 57 app for a jewellery pawn-broking (girvi) counter. Shop users
 (`owner` / `staff`) issue and redeem loans. Customers see only their own
@@ -81,9 +81,6 @@ npx supabase secrets set GEMINI_API_KEY=...
 # or: npx supabase secrets set MOONSHOT_API_KEY=sk-...
 ```
 
-There is no live gold feed. Pledge valuation freezes from manual `gold_rates`
-rows (seed / `set_manual_gold_rate`); figures stay labelled not IBJA.
-
 Copy `.env.example` to `.env` and fill the **anon** URL and key from
 `npx supabase status`.
 
@@ -114,6 +111,64 @@ Then open iOS simulator, Android emulator, or a dev client. Expo Go may not
 include every native module this app uses (`expo-notifications`, `expo-print`,
 camera). Prefer a development build.
 
+## Customer website (Vercel)
+
+The customer dashboard is a static Expo web export (`web.output: "static"`).
+Shop UI is not shipped in that bundle; staff use the native app.
+
+```bash
+npm run build:web   # → dist/
+```
+
+[`vercel.json`](vercel.json) sets `buildCommand` to `npm run build:web`,
+`outputDirectory` to `dist`, rewrites for `/g/:token` and `/a/:token` to the
+Edge Function at `api/qr-redirect.ts` (Android Intent vs web shell; never
+touches the database), a catch-all rewrite for other client-side deep links,
+`/.well-known/assetlinks.json` for Android App Links, and security headers.
+See [Publish websites](https://docs.expo.dev/guides/publishing-websites/) and
+[Android App Links](https://docs.expo.dev/linking/android-app-links/).
+
+### Android App Links fingerprint
+
+`public/.well-known/assetlinks.json` ships with package
+`com.girvisewa.app` and a placeholder SHA-256. Replace
+`REPLACE_WITH_RELEASE_SHA256_FINGERPRINT` before relying on verified App Links:
+
+```bash
+# EAS-managed credentials (preferred)
+eas credentials -p android
+# Select the production (or preview) profile → copy "SHA256 Fingerprint"
+
+# Or from a local upload keystore
+keytool -list -v -keystore /path/to/your-upload-key.keystore -alias your-key-alias
+# Use the SHA256 line (colon-separated hex)
+```
+
+Until a Play Store listing exists, Android-without-app falls back to the web
+dashboard (`api/lib/qr-redirect.ts` → `ANDROID_NO_APP_FALLBACK_URL = null`).
+Set that constant to the Play Store URL when the listing goes live.
+
+### Environment variables on Vercel
+
+Set these in the Vercel project (Production / Preview as needed). They are
+baked in at **build** time (`EXPO_PUBLIC_*`).
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `EXPO_PUBLIC_ENV` | yes | Must be `production` for the live site |
+| `EXPO_PUBLIC_SUPABASE_URL` | yes | Hosted project URL (`https://….supabase.co`), never localhost |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | yes | **Anon** (publishable) key only |
+| `EXPO_PUBLIC_WEB_ORIGIN` | yes | Public site origin for loan/activation QR URLs (no trailing slash), e.g. `https://your-app.vercel.app` |
+| `EXPO_PUBLIC_AUTH_MODE` | no | `pin` (default) or `otp` when SMS OTP is ready |
+| `EXPO_PUBLIC_ENABLE_ANDROID_BLUR` | no | Native chrome only; harmless if unset on web |
+
+Never set a Supabase **service-role** key (or any other secret) as
+`EXPO_PUBLIC_*` — those values are embedded in the public JS bundle. Service
+role belongs only in Edge Function secrets (`npx supabase secrets set …`).
+
+After you have a Vercel domain, add it in Supabase Dashboard → Authentication →
+URL Configuration (Site URL and Redirect URLs), or auth redirects will fail.
+
 ## Tests
 
 ```bash
@@ -136,7 +191,7 @@ native dev build (not Expo Go).
 2. `npx supabase start && npx supabase db reset`
 3. Copy `.env.example` → `.env` from `npx supabase status`, then
    `npx expo run:android` or `npx expo run:ios` (app id Android
-   `com.anonymous.jewelrygirviapp`).
+   `com.girvisewa.app`).
 4. With the app installed on an emulator/simulator:
 
 ```bash

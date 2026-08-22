@@ -22,9 +22,10 @@ export const en = {
     backToLoan: 'Back to loan',
     grantPermission: 'Grant permission',
     generating: 'Generating…',
-    loadingRate: 'Loading rate…',
-    notIbja: 'not IBJA',
-    per10g: '/ 10g',
+  },
+  network: {
+    offlineBanner: 'No network — changes are paused until you reconnect.',
+    unavailableOffline: 'Unavailable offline',
   },
   signaturePad: {
     captured: 'Signature captured',
@@ -52,10 +53,12 @@ export const en = {
     settings: 'Settings',
   },
   auth: {
-    title: 'Girvi Shop Login',
+    title: 'Girvi Sewa Login',
     subtitle: 'Sign in with your mobile number to view receipts or manage loans.',
+    pinSubtitle: 'Enter your mobile number and PIN to view your receipts.',
     mobileNumber: 'Mobile number',
     mobilePlaceholder: '10-digit mobile number',
+    phoneDisplay: 'Signing in as %{phone}',
     verificationCode: 'Verification code',
     otpPlaceholder: 'Enter OTP',
     sendOtp: 'Send OTP',
@@ -65,6 +68,35 @@ export const en = {
     enterVerificationCode: 'Enter the verification code from SMS.',
     noUserSession: 'No user session returned.',
     otpSent: 'Verification code sent to %{phone}',
+    pin: 'PIN',
+    pinPlaceholder: '6-digit PIN',
+    choosePin: 'Choose a 6-digit PIN',
+    confirmPin: 'Confirm PIN',
+    signInWithPin: 'Sign in',
+    invalidPin: 'Enter your 6-digit PIN.',
+    invalidPinOrPhone: 'That mobile number or PIN is not correct. Try again.',
+    accountLocked:
+      'This account is temporarily locked after too many wrong PIN attempts. Please wait 15 minutes, or visit the shop for help.',
+    signInFailed: 'Could not sign in. Try again.',
+    pinMismatch: 'The two PINs do not match.',
+    weakPin: 'Choose a stronger PIN — not a repeated or sequential number.',
+    activateTitle: 'Activate your account',
+    activateSubtitle: 'Set a PIN so you can sign in later without SMS.',
+    activateRedeeming: 'Checking your shop code…',
+    activateMissingToken: 'This activation link is incomplete. Ask the shop for a new QR.',
+    activateInvalidToken:
+      'This activation code is not valid or has expired. Ask the shop to show a new QR.',
+    savePinAndContinue: 'Save PIN and continue',
+  },
+  loanQrLanding: {
+    title: 'Loan receipt',
+    subtitle: 'Sign in to view this girvi.',
+    signInPrompt: 'This link does not show loan details until you sign in.',
+    signIn: 'Sign in',
+    missingToken: 'This receipt link is incomplete.',
+    maskedReference: 'Loan #…%{last4}',
+    notFoundTitle: 'Receipt not found',
+    notFoundBody: 'This receipt link is not available. Sign in to see your own girvis.',
   },
   loans: {
     tab: 'Loans',
@@ -79,8 +111,10 @@ export const en = {
     searchPlaceholder: 'Name, phone, or serial number',
     emptyTitle: 'No girvis',
     emptyBody: 'No girvis in this tab.',
+    concealedTitle: 'Temporary technical issue',
+    concealedBody:
+      'Loan records cannot be loaded right now. Do not panic — the technical team will resolve this soon.',
     scanReceipt: 'Scan Receipt',
-    notIbja: 'not IBJA',
     status: {
       active: 'Active',
       redeemed: 'Redeemed',
@@ -97,6 +131,9 @@ export const en = {
       loadError: 'Could not load receipts.',
       emptyTitle: 'No receipts yet',
       emptyBody: 'No girvi receipts linked to your account yet.',
+      concealedTitle: 'Temporary technical issue',
+      concealedBody:
+        'Receipts cannot be loaded right now. Do not panic — the technical team will resolve this soon.',
       noReceiptImage: 'No receipt image',
       collectItemsStatus: 'Paid — collect items',
       collectItemsTitle: 'Paid — collect your items',
@@ -127,17 +164,29 @@ export const en = {
       itemsEmptyTitle: 'No items',
       itemsEmptyBody: 'No item rows on this loan.',
       metalUnknown: 'metal unknown',
-      itemMeta: '%{metal} · %{ornament} · %{grams}g net · %{purity}%{qty}%{assessed}',
+      itemMeta: '%{metal} · %{ornament} · %{grams}g net · %{purity}%{qty}',
       purityNotAssessed: 'purity not assessed',
       purityKarat: '%{karat}K',
       quantitySuffix: ' · ×%{qty}',
-      assessedNotIbja: ' · assessed (not IBJA)',
       redeem: 'Redeem',
       renew: 'Renew',
       defaultLoan: 'Default loan',
       editTerms: 'Edit terms',
       printPledge: 'Print pledge',
       printReceipt: 'Print receipt',
+      showCustomerQr: 'Show customer QR',
+      customerQrTitle: 'Customer activation QR',
+      customerQrHint:
+        'Ask the customer to scan this on their phone. It expires in five minutes and works once.',
+      customerQrCountdown: 'Expires in %{time}',
+      customerQrExpired: 'This code has expired. Close and show a new one.',
+      customerQrClose: 'Close',
+      customerQrFailed: 'Could not create an activation code. Try again.',
+      customerQrLinkLabel: 'Activation link',
+      loanQrTitle: 'Receipt QR',
+      loanQrHint:
+        'Permanent link for this girvi. Scanning opens sign-in — it does not grant access by itself.',
+      loanQrMissingOrigin: 'Set EXPO_PUBLIC_WEB_ORIGIN to show and print the receipt QR.',
       redeemedAwaitingArchive:
         'Redeemed — items released. After the customer collects their jewellery, archive this girvi to remove it from their app.',
       redeemedLive: 'This loan is redeemed. Items were released at the counter.',
@@ -158,9 +207,6 @@ export const en = {
       sectionActions: 'Actions',
       totalItems: 'Total items : %{count}',
       addTransaction: '+ Add Transaction',
-      marketValue: 'Market value',
-      marketValueEmpty: 'No assessed value on these items.',
-      marketValueCaption: 'Frozen item valuations (%{notIbja})',
       tenureDays: '%{days} days',
       dateRange: '%{from} – %{to}',
       asOfDate: 'Calculated as of %{date}',
@@ -254,6 +300,8 @@ export const en = {
       cameraUnavailableBody:
         'The iOS Simulator has no camera. Choose a photo from the gallery, or enter the girvi manually.',
       cameraMountFailed: 'Camera preview failed to start. Use the gallery or enter manually.',
+      serialExists: 'Serial %{serial} is already on the book.',
+      openExistingLoan: 'Open existing girvi',
     },
     insights: {
       title: 'Insights',
@@ -443,6 +491,8 @@ export const en = {
       title: 'Alerts',
       subtitle:
         "Payment reminders (15 days before due, due day, and overdue) use this phone's notifications after you allow them.",
+      subtitleWeb:
+        'Due-date notices appear here in the browser. Local phone reminders need the Android app — they are not scheduled in this tab.',
       loadError: 'Could not load notices.',
       emptyTitle: 'No notices',
       emptyBody: 'No due-date notices for your girvis yet.',
@@ -463,6 +513,13 @@ export const en = {
     language: 'Language',
     languageHint: 'Applies immediately. Saved on this device.',
     staffHint: 'Shop defaults are owner-only. RLS still refuses staff writes.',
+    staffConcealed:
+      'Loan records cannot be loaded right now. Do not panic — the technical team will resolve this soon.',
+    concealLoans: 'Hide all girvis',
+    concealLoansHint:
+      'Staff, retail customers, and merchants see no loan data until you turn this off. Your own book stays visible.',
+    concealOn: 'Girvis are hidden from staff and customers.',
+    concealOff: 'Girvis are visible again. Staff and customers refresh to see them.',
     shopDefaults: 'Shop defaults',
     shopDefaultsInfo:
       'Changing shop defaults affects NEW loans only. Never existing ones (unless an owner edits that loan individually).',
@@ -481,6 +538,16 @@ export const en = {
     groupPreferences: 'Preferences',
     groupShop: 'Shop',
     groupSession: 'Session',
+    groupAccount: 'Account',
+    deleteAccount: 'Delete my account',
+    deleteAccountTitle: 'Delete my account?',
+    deleteAccountBody:
+      'This removes your sign-in from this app. Open girvis stay with the shop as legal records — they are not wiped. Account deletion is not available in this version yet; visit the shop if you need help.',
+    deleteAccountConfirm: 'Continue',
+    deleteAccountUnavailable:
+      'Account deletion is not available in this version. Visit the shop for help.',
+    remindersWebNote:
+      'Payment reminders on this phone need the Android app. This website shows receipts and notices only — it does not schedule local notifications.',
     roleOwner: 'Owner',
     roleStaff: 'Staff',
   },
@@ -528,7 +595,7 @@ export const en = {
     ownerOnly: 'Only the shop owner can reverse a redemption.',
   },
   print: {
-    letterhead: 'Girvi Shop',
+    letterhead: 'Girvi Sewa',
     pledgeSubtitle: 'Pledge record · %{serial}',
     redemptionSubtitle: 'Redemption receipt · %{serial}',
     customer: 'Customer:',
@@ -557,6 +624,7 @@ export const en = {
     net: 'Net',
     purity: 'Purity',
     noItems: 'No pledged-item rows on this ticket.',
+    loanQrCaption: 'Scan to open this girvi on the customer site (sign-in required).',
     disclaimerLegal:
       'This sheet lists terms stored on this girvi ticket. It is not legal advice and is not a stamped instrument. Have a lawyer review it before you rely on it as an agreement.',
     disclaimerPractice:
