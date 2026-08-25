@@ -16,6 +16,7 @@ import {
   generateLoanNotices,
   LoanPhotosIncompleteError,
   SerialExistsError,
+  quoteLoanPayoff,
   redeemLoan,
   renewLoan,
   resolveReceiptDisplayUrl,
@@ -1077,6 +1078,57 @@ describe('fetchRateYield', () => {
       expect.objectContaining({ rate_bps: 150, one_period_yield_paise: 30000 }),
     ]);
     expect(rpc).toHaveBeenCalledWith('shop_rate_yield');
+  });
+});
+
+describe('quoteLoanPayoff', () => {
+  test('maps the SQL quote row and does not compute interest in JS', async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          principal_paise: 5000000,
+          accrued_interest_paise: 150000,
+          total_due_paise: 5150000,
+          days_elapsed: 5,
+          complete_periods: 0,
+          remainder_days: 5,
+          remainder_rounded_up: false,
+          first_month_floor_applied: true,
+          capitalized: false,
+          period_interest_paise: 150000,
+          rate_bps: 300,
+          interest_model: 'retail',
+          partial_period_mode: 'min_month_then_pro_rata',
+          round_up_threshold_days: 24,
+          simple_period_days: 180,
+          disbursed_on: '2024-01-01',
+          as_of: '2024-01-06',
+          why_code: 'first_month_floor',
+        },
+      ],
+      error: null,
+    });
+
+    await expect(
+      quoteLoanPayoff({
+        principalPaise: 5000000,
+        disbursedOn: '2024-01-01',
+        asOf: '2024-01-06',
+        interestModel: 'retail',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        totalDuePaise: 5150000,
+        accruedInterestPaise: 150000,
+        why: 'first_month_floor',
+      }),
+    );
+    expect(rpc).toHaveBeenCalledWith('quote_loan_payoff', {
+      p_principal_paise: 5000000,
+      p_disbursed_on: '2024-01-01',
+      p_as_of: '2024-01-06',
+      p_interest_model: 'retail',
+    });
   });
 });
 

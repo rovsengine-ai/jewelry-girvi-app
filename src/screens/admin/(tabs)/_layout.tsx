@@ -1,6 +1,7 @@
 /**
  * Shop tab bar. Insights is hidden for staff via href: null; the screen itself
- * still refuses non-owners. https://docs.expo.dev/router/advanced/tabs/
+ * still refuses non-owners. Calculator is owner and staff. Customers never
+ * reach this layout. https://docs.expo.dev/router/advanced/tabs/
  * Icons: https://docs.expo.dev/versions/v57.0.0/sdk/symbols/
  */
 import { Tabs } from 'expo-router';
@@ -24,6 +25,20 @@ export default function AdminTabsLayout() {
           title: t('loans.tab'),
           tabBarIcon: ({ color, size }) => (
             <TabBarSymbol ios="list.bullet" android="list" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calculator"
+        options={{
+          title: t('tabs.calculator'),
+          tabBarIcon: ({ color, size }) => (
+            <TabBarSymbol
+              ios="plus.forwardslash.minus"
+              android="calculate"
+              color={color}
+              size={size}
+            />
           ),
         }}
       />

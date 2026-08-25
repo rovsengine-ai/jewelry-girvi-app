@@ -57,6 +57,14 @@ jest.mock('@/components/glass-surface', () => {
   };
 });
 
+jest.mock('@/lib/money', () => {
+  const actual = jest.requireActual('@/lib/money') as typeof import('@/lib/money');
+  return {
+    ...actual,
+    todayInKolkata: () => '2026-08-26',
+  };
+});
+
 jest.mock('@/providers/language-provider', () => {
   const i18n = require('@/i18n') as typeof import('@/i18n');
   const state = require('@/test/bilingual-snapshot') as typeof import('@/test/bilingual-snapshot');
@@ -130,6 +138,7 @@ jest.mock('@/lib/supabase', () => {
 
 jest.mock('@/services/loanService', () => ({
   fetchRateYield: jest.fn(async () => []),
+  quoteLoanPayoff: jest.fn(async () => null),
   fetchShopDefaults: jest.fn(async () => ({
     rate_bps: 300,
     simple_period_days: 180,
@@ -201,6 +210,7 @@ import AdminLoansScreen from '@/app/(admin)/(tabs)/loans';
 import AdminAlertsScreen from '@/app/(admin)/(tabs)/alerts';
 import AdminInsightsScreen from '@/app/(admin)/(tabs)/insights';
 import AdminSettingsScreen from '@/app/(admin)/(tabs)/settings';
+import AdminCalculatorScreen from '@/app/(admin)/(tabs)/calculator';
 import AdminArchiveScreen from '@/app/(admin)/archive';
 import AdminScannerScreen from '@/app/(admin)/scanner';
 import CustomerLoansScreen from '@/app/(customer)/(tabs)/loans';
@@ -290,6 +300,11 @@ describe('bilingual screen snapshots', () => {
   test('admin settings', async () => {
     useAuthMock.mockReturnValue(auth('owner') as never);
     await snap('admin-settings', () => <AdminSettingsScreen />);
+  });
+
+  test('admin calculator', async () => {
+    useAuthMock.mockReturnValue(auth('staff') as never);
+    await snap('admin-calculator', () => <AdminCalculatorScreen />);
   });
 
   test('admin archive', async () => {

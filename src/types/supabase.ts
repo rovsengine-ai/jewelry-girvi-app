@@ -589,6 +589,34 @@ export interface Database {
           overpayment_refunded_paise: number;
         }[];
       };
+      quote_loan_payoff: {
+        Args: {
+          p_principal_paise: number;
+          p_disbursed_on: string;
+          p_as_of?: string;
+          p_interest_model?: InterestModel | null;
+        };
+        Returns: {
+          principal_paise: number;
+          accrued_interest_paise: number;
+          total_due_paise: number;
+          days_elapsed: number;
+          complete_periods: number;
+          remainder_days: number;
+          remainder_rounded_up: boolean;
+          first_month_floor_applied: boolean;
+          capitalized: boolean;
+          period_interest_paise: number;
+          rate_bps: number;
+          interest_model: InterestModel;
+          partial_period_mode: PartialPeriodMode;
+          round_up_threshold_days: number;
+          simple_period_days: number;
+          disbursed_on: string;
+          as_of: string;
+          why_code: string;
+        }[];
+      };
       loans_overdue_as_of: {
         Args: { p_as_of?: string };
         Returns: {

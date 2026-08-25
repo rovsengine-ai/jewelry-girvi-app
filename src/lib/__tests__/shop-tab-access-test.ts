@@ -1,4 +1,10 @@
-import { insightsTabHref, isArchiveRoute, isShopOwner } from '@/lib/shop-tab-access';
+import {
+  ADMIN_CALCULATOR_HREF,
+  insightsTabHref,
+  isArchiveRoute,
+  isShopOwner,
+  isShopUser,
+} from '@/lib/shop-tab-access';
 
 describe('insights tab access', () => {
   test('owner may see the Insights tab', () => {
@@ -14,6 +20,20 @@ describe('insights tab access', () => {
   test('customer roles are not shop owners', () => {
     expect(isShopOwner('retail_customer')).toBe(false);
     expect(insightsTabHref('retail_customer')).toBeNull();
+  });
+});
+
+describe('shop user', () => {
+  test('owner and staff are shop users', () => {
+    expect(isShopUser('owner')).toBe(true);
+    expect(isShopUser('staff')).toBe(true);
+    expect(ADMIN_CALCULATOR_HREF).toBe('/(admin)/(tabs)/calculator');
+  });
+
+  test('customers are not shop users', () => {
+    expect(isShopUser('retail_customer')).toBe(false);
+    expect(isShopUser('merchant')).toBe(false);
+    expect(isShopUser(undefined)).toBe(false);
   });
 });
 

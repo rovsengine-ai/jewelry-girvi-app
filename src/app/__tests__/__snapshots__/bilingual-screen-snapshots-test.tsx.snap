@@ -8,6 +8,10 @@ exports[`bilingual screen snapshots admin archive: admin-archive-en 1`] = `[]`;
 
 exports[`bilingual screen snapshots admin archive: admin-archive-hi 1`] = `[]`;
 
+exports[`bilingual screen snapshots admin calculator: admin-calculator-en 1`] = `[]`;
+
+exports[`bilingual screen snapshots admin calculator: admin-calculator-hi 1`] = `[]`;
+
 exports[`bilingual screen snapshots admin insights: admin-insights-en 1`] = `[]`;
 
 exports[`bilingual screen snapshots admin insights: admin-insights-hi 1`] = `[]`;

@@ -8,7 +8,7 @@ import {
 import { kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
 import { newIdempotencyKey } from '@/lib/idempotency';
 import { isReminderKind, type LoanReminderSlot } from '@/lib/loan-reminders';
-import { asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
+import { asBps, asPaise, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { toE164India } from '@/lib/phone';
 import { prepareItemPhoto } from '@/lib/prepare-item-photo';
 import { convertScannerItem, type ScannerItemDraft } from '@/lib/scanner-items';
@@ -29,6 +29,8 @@ import type {
   LoanNotice,
   OverdueLoan,
   PartialPeriodMode,
+  QuoteLoanPayoff,
+  QuotePayoffWhy,
   RateYield,
   RedeemLoanResult,
   RenewLoanResult,
@@ -579,6 +581,80 @@ export async function fetchLoanBalances(
     interestPaidPaise: asPaise(row.interest_paid_paise),
     principalPaidPaise: asPaise(row.principal_paid_paise),
     overpaymentRefundedPaise: asPaise(row.overpayment_refunded_paise),
+  };
+}
+
+const QUOTE_WHY: ReadonlySet<QuotePayoffWhy> = new Set([
+  'same_day',
+  'first_month_floor',
+  'remainder_round_up',
+  'exact_periods',
+  'pro_rata_remainder',
+  'full_period',
+  'merchant_per_day',
+  'compounded',
+]);
+
+function asQuoteWhy(value: string): QuotePayoffWhy {
+  if (QUOTE_WHY.has(value as QuotePayoffWhy)) {
+    return value as QuotePayoffWhy;
+  }
+  throw new Error(`quote_loan_payoff returned unknown why: ${value}`);
+}
+
+function asWholeNumber(value: number | string, label: string): number {
+  const n = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    throw new Error(`Invalid ${label}: ${value}`);
+  }
+  return n;
+}
+
+/**
+ * Hypothetical payoff from amount + dates. Arithmetic stays in SQL.
+ * Shop owner and staff only — customers are refused by the RPC.
+ */
+export async function quoteLoanPayoff(input: {
+  principalPaise: number;
+  disbursedOn: string;
+  asOf: string;
+  interestModel: InterestModel;
+}): Promise<QuoteLoanPayoff> {
+  const { data, error } = await supabase.rpc('quote_loan_payoff', {
+    p_principal_paise: input.principalPaise,
+    p_disbursed_on: input.disbursedOn,
+    p_as_of: input.asOf,
+    p_interest_model: input.interestModel,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    throw new Error('quote_loan_payoff returned no row');
+  }
+
+  return {
+    principalPaise: asPaise(row.principal_paise),
+    accruedInterestPaise: asPaise(row.accrued_interest_paise),
+    totalDuePaise: asPaise(row.total_due_paise),
+    daysElapsed: asWholeNumber(row.days_elapsed, 'days_elapsed'),
+    completePeriods: asWholeNumber(row.complete_periods, 'complete_periods'),
+    remainderDays: asWholeNumber(row.remainder_days, 'remainder_days'),
+    remainderRoundedUp: Boolean(row.remainder_rounded_up),
+    firstMonthFloorApplied: Boolean(row.first_month_floor_applied),
+    capitalized: Boolean(row.capitalized),
+    periodInterestPaise: asPaise(row.period_interest_paise),
+    rateBps: asBps(row.rate_bps),
+    interestModel: row.interest_model,
+    partialPeriodMode: row.partial_period_mode,
+    roundUpThresholdDays: asWholeNumber(row.round_up_threshold_days, 'round_up_threshold_days'),
+    simplePeriodDays: asWholeNumber(row.simple_period_days, 'simple_period_days'),
+    disbursedOn: row.disbursed_on,
+    asOf: row.as_of,
+    why: asQuoteWhy(row.why_code),
   };
 }
 

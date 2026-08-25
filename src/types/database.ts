@@ -318,3 +318,36 @@ export interface LoanBalances {
   principalPaidPaise: number;
   overpaymentRefundedPaise: number;
 }
+
+/** Server-side explanation for a quote_loan_payoff row. */
+export type QuotePayoffWhy =
+  | 'same_day'
+  | 'first_month_floor'
+  | 'remainder_round_up'
+  | 'exact_periods'
+  | 'pro_rata_remainder'
+  | 'full_period'
+  | 'merchant_per_day'
+  | 'compounded';
+
+/** One row of public.quote_loan_payoff(). Shop owner and staff only. */
+export interface QuoteLoanPayoff {
+  principalPaise: number;
+  accruedInterestPaise: number;
+  totalDuePaise: number;
+  daysElapsed: number;
+  completePeriods: number;
+  remainderDays: number;
+  remainderRoundedUp: boolean;
+  firstMonthFloorApplied: boolean;
+  capitalized: boolean;
+  periodInterestPaise: number;
+  rateBps: number;
+  interestModel: InterestModel;
+  partialPeriodMode: PartialPeriodMode;
+  roundUpThresholdDays: number;
+  simplePeriodDays: number;
+  disbursedOn: string;
+  asOf: string;
+  why: QuotePayoffWhy;
+}
