@@ -7,6 +7,7 @@ export const hi = {
     langEn: 'EN',
     langHi: 'हिं',
     back: '← वापस',
+    close: 'बंद करें',
     cancel: 'रद्द',
     signOut: 'साइन आउट',
     remove: 'हटाएँ',
@@ -93,6 +94,9 @@ export const hi = {
     signUpSubtitle: 'अपनी रसीदें देखने के लिए मोबाइल नंबर और PIN चुनें।',
     createAccount: 'खाता बनाएँ',
     createAccountLink: 'अपना खाता चालू करें, यहाँ क्लिक करें',
+    createPinFromShopLink: 'दुकान ने अभी गिरवी जोड़ी है? यहाँ PIN बनाएँ',
+    createPinFromShopHint:
+      'वही मोबाइल नंबर लिखें जो दुकान ने इस्तेमाल किया। रसीदें देखने के लिए 6 अंकों का PIN चुनें।',
     alreadyHaveAccount: 'पहले से खाता है? साइन इन करें',
     alreadyRegistered:
       'इस नंबर पर पहले से PIN है। साइन इन करें, या PIN रीसेट के लिए दुकान पर आएँ।',

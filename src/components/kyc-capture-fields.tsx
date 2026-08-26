@@ -1,8 +1,10 @@
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Field } from '@/components/field';
+import { ImagePreviewTap } from '@/components/image-lightbox';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
@@ -84,6 +86,17 @@ export function KycCaptureFields({ value, onChange, testIdPrefix = 'kyc' }: Prop
         />
       </View>
       {value.localCustomerPhotoUri ? (
+        <ImagePreviewTap
+          uri={value.localCustomerPhotoUri}
+          testID={`${testIdPrefix}-customer-photo-preview`}>
+          <Image
+            source={{ uri: value.localCustomerPhotoUri }}
+            style={styles.thumb}
+            contentFit="cover"
+          />
+        </ImagePreviewTap>
+      ) : null}
+      {value.localCustomerPhotoUri ? (
         <ThemedText type="small" testID={`${testIdPrefix}-customer-photo-pending`}>
           {t('kyc.customerPhotoPending')}
         </ThemedText>
@@ -163,6 +176,11 @@ export function KycCaptureFields({ value, onChange, testIdPrefix = 'kyc' }: Prop
         />
       </View>
       {value.localPhotoUri && !photoLocked ? (
+        <ImagePreviewTap uri={value.localPhotoUri} testID={`${testIdPrefix}-id-photo-preview`}>
+          <Image source={{ uri: value.localPhotoUri }} style={styles.thumb} contentFit="cover" />
+        </ImagePreviewTap>
+      ) : null}
+      {value.localPhotoUri && !photoLocked ? (
         <ThemedText type="small" testID={`${testIdPrefix}-photo-pending`}>
           {t('kyc.photoPending')}
         </ThemedText>
@@ -183,4 +201,9 @@ const styles = StyleSheet.create({
   },
   photoRow: { flexDirection: 'row', gap: Spacing.two },
   photoBtn: { flex: 1 },
+  thumb: {
+    width: '100%',
+    height: 160,
+    borderRadius: Radii.md,
+  },
 });

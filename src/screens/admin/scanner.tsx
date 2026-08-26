@@ -21,6 +21,7 @@ import { Field } from '@/components/field';
 import { FilterChip } from '@/components/filter-chip';
 import { FormNotice } from '@/components/form-notice';
 import { GlassSurface } from '@/components/glass-surface';
+import { ImagePreviewTap } from '@/components/image-lightbox';
 import { KycCaptureFields } from '@/components/kyc-capture-fields';
 import { ListSkeleton } from '@/components/list-row-skeleton';
 import { Row } from '@/components/row';
@@ -31,15 +32,15 @@ import { ThemedView } from '@/components/themed-view';
 import { Radii, Sizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { newIdempotencyKey } from '@/lib/idempotency';
-import { readPracticeMode } from '@/lib/practice-mode';
-import { todayInKolkata } from '@/lib/money';
 import { emptyKycDraft, kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
+import { todayInKolkata } from '@/lib/money';
 import {
   inferMetalFromItemName,
   isOcrExtractionPartial,
 } from '@/lib/ocr-receipt-parse';
 import { pickStillImage, PermissionDeniedError } from '@/lib/pick-image';
 import { prepareItemPhoto } from '@/lib/prepare-item-photo';
+import { readPracticeMode } from '@/lib/practice-mode';
 import {
   emptyScannerItem,
   scannerItemsReducer,
@@ -222,11 +223,13 @@ function PledgeItemCard({
 
       <ThemedText type="smallBold">{t('items.photo')}</ThemedText>
       {item.localPhotoUri ? (
-        <Image
-          source={{ uri: item.localPhotoUri }}
-          style={styles.itemPhoto}
-          contentFit="cover"
-        />
+        <ImagePreviewTap uri={item.localPhotoUri} testID="item-photo-preview">
+          <Image
+            source={{ uri: item.localPhotoUri }}
+            style={styles.itemPhoto}
+            contentFit="cover"
+          />
+        </ImagePreviewTap>
       ) : null}
       <View style={styles.chipRow}>
         <Button
@@ -367,6 +370,9 @@ export default function AdminScannerScreen() {
   const resolveOcrError = (error: unknown) => ocrErrorDisplayMessage(error, t);
 
   const processReceiptUri = async (uri: string) => {
+    // Show the original still immediately; OCR compression can take a moment.
+    setLocalPhotoUri(uri);
+    setStep('review');
     setIsBusy(true);
     setFormError(null);
     setFormNotice(t('loans.scanner.ocrWorking'));
@@ -389,10 +395,12 @@ export default function AdminScannerScreen() {
     setFormError(null);
     setFormNotice(t('loans.scanner.ocrWorking'));
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
       if (!photo?.uri) {
         throw new Error(t('loans.scanner.cameraNoImage'));
       }
+      setLocalPhotoUri(photo.uri);
+      setStep('review');
       const { extraction, preparedUri } = await extractReceiptData(photo.uri);
       setFormNotice(null);
       applyOcrToForm(preparedUri, extraction);
@@ -712,7 +720,9 @@ export default function AdminScannerScreen() {
       >
         {localPhotoUri ? (
           <GlassSurface androidBlur style={styles.previewGlass}>
-            <Image source={{ uri: localPhotoUri }} style={styles.preview} contentFit="cover" />
+            <ImagePreviewTap uri={localPhotoUri} testID="receipt-photo-preview">
+              <Image source={{ uri: localPhotoUri }} style={styles.preview} contentFit="cover" />
+            </ImagePreviewTap>
           </GlassSurface>
         ) : null}
 

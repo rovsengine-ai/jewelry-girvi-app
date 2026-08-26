@@ -1,0 +1,25 @@
+# Keep Vercel upload under the file limit (use with --archive=tgz).
+node_modules
+.expo
+.git
+dist
+web-build
+ios
+android
+coverage
+.cursor
+agent-transcripts
+*.log
+.env
+.env.*
+!.env.example
+.vercel-build.env
+supabase/.temp
+supabase/functions/.env
+**/__tests__/**
+**/*.test.ts
+**/*.test.tsx
+e2e
+docs
+.kotlin
+example

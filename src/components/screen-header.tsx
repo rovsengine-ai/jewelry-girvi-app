@@ -4,19 +4,11 @@
  *
  * Docs: https://docs.expo.dev/versions/v57.0.0/sdk/localization/
  * https://docs.expo.dev/versions/v57.0.0/sdk/router/
- * https://docs.expo.dev/versions/v57.0.0/sdk/reanimated/
  * https://docs.expo.dev/versions/v57.0.0/sdk/symbols/
- * Sliding indicator: react-native-reanimated withTiming (already a dep).
  */
 import { useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, {
-  ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppIcon, TintedIconWell } from '@/components/app-icon';
@@ -24,94 +16,68 @@ import { ListRow } from '@/components/list-row';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Glass, MinTouchTarget, Radii, Spacing, TypeScale } from '@/constants/theme';
-import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import type { AppLanguage } from '@/i18n';
-import { MOTION } from '@/lib/motion';
 import { useLanguage } from '@/providers/language-provider';
 
 export function LanguageChips({ variant = 'default' }: { variant?: 'default' | 'chrome' }) {
   const colors = useTheme();
   const { language, setLanguage, t } = useLanguage();
-  const reduceMotion = useReduceMotion();
-  const [innerWidth, setInnerWidth] = useState(0);
-  const translateX = useSharedValue(0);
-  const selectedIndex = language === 'en' ? 0 : 1;
-  const segmentWidth = innerWidth / 2;
   const onChrome = variant === 'chrome';
-
-  useEffect(() => {
-    const next = selectedIndex * segmentWidth;
-    if (reduceMotion || segmentWidth === 0) {
-      translateX.value = next;
-      return;
-    }
-    translateX.value = withTiming(next, {
-      duration: MOTION.tabIndicatorMs,
-      reduceMotion: ReduceMotion.System,
-    });
-  }, [selectedIndex, segmentWidth, reduceMotion, translateX]);
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
 
   const chip = (code: AppLanguage, label: string) => {
     const selected = language === code;
-    const chipColor = onChrome
-      ? selected
-        ? colors.onGold
-        : colors.onChromeMuted
-      : selected
-        ? colors.primary
-        : colors.text;
     return (
       <PressableScale
-        accessibilityRole="tab"
+        accessibilityRole="button"
         accessibilityState={{ selected }}
         accessibilityLabel={label}
         testID={`language-${code}`}
         onPress={() => setLanguage(code)}
-        style={[
-          styles.segmentItem,
-          {
-            minWidth: MinTouchTarget + Spacing.one,
-            minHeight: MinTouchTarget + Spacing.one,
-          },
-        ]}>
-        <ThemedText type="label" style={{ color: chipColor }}>
-          {label}
-        </ThemedText>
+        style={styles.langPressable}>
+        <View
+          style={[
+            styles.langChip,
+            {
+              backgroundColor: selected
+                ? onChrome
+                  ? colors.gold
+                  : colors.primary
+                : onChrome
+                  ? colors.chromeWell
+                  : colors.elevated,
+              borderColor: selected
+                ? onChrome
+                  ? colors.gold
+                  : colors.primary
+                : onChrome
+                  ? colors.onChromeMuted
+                  : colors.border,
+            },
+          ]}>
+          <ThemedText
+            type="label"
+            style={{
+              color: selected
+                ? onChrome
+                  ? colors.onGold
+                  : colors.onPrimary
+                : onChrome
+                  ? colors.onChrome
+                  : colors.text,
+            }}>
+            {label}
+          </ThemedText>
+        </View>
       </PressableScale>
     );
   };
 
   return (
     <View
-      accessibilityRole="tablist"
+      accessibilityRole="toolbar"
       accessibilityLabel={t('a11y.language')}
-      onLayout={(event) => {
-        setInnerWidth(event.nativeEvent.layout.width - Spacing.half * 2);
-      }}
-      style={[
-        styles.segment,
-        {
-          backgroundColor: onChrome ? colors.chromeWell : colors.backgroundElement,
-        },
-      ]}>
-      {segmentWidth > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.indicator,
-            {
-              width: segmentWidth,
-              backgroundColor: onChrome ? colors.gold : colors.tintPrimary,
-            },
-            indicatorStyle,
-          ]}
-        />
-      ) : null}
+      style={styles.langRow}>
       {chip('en', t('common.langEn'))}
       {chip('hi', t('common.langHi'))}
     </View>
@@ -244,22 +210,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segment: {
+  langRow: {
     flexDirection: 'row',
-    borderRadius: Radii.pill,
-    overflow: 'hidden',
-    padding: Spacing.half,
+    alignItems: 'center',
+    gap: Spacing.one,
   },
-  indicator: {
-    position: 'absolute',
-    top: Spacing.half,
-    bottom: Spacing.half,
-    left: Spacing.half,
-    borderRadius: Radii.pill,
+  langPressable: {
+    minHeight: MinTouchTarget,
+    minWidth: MinTouchTarget,
   },
-  segmentItem: {
-    borderRadius: Radii.pill,
-    paddingHorizontal: Spacing.three,
+  langChip: {
+    minHeight: 36,
+    minWidth: 40,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Radii.md,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },

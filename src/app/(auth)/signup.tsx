@@ -118,7 +118,7 @@ export default function SignupScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={t('auth.signUpTitle')} subtitle={t('auth.signUpSubtitle')} />
+      <ScreenHeader title={t('auth.signUpTitle')} subtitle={t('auth.createPinFromShopHint')} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.form}>

@@ -213,6 +213,14 @@ export default function LoginScreen() {
               />
               <Link href={'/(auth)/signup' as Href} asChild>
                 <ThemedText type="small" style={styles.signUpLink}>
+                  {t('auth.createPinFromShopLink')}
+                </ThemedText>
+              </Link>
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.signUpHint}>
+                {t('auth.createPinFromShopHint')}
+              </ThemedText>
+              <Link href={'/(auth)/activate' as Href} asChild>
+                <ThemedText type="small" style={styles.signUpLink}>
                   {t('auth.createAccountLink')}
                 </ThemedText>
               </Link>
@@ -265,6 +273,14 @@ export default function LoginScreen() {
             />
             <Link href={'/(auth)/signup' as Href} asChild>
               <ThemedText type="small" style={styles.signUpLink}>
+                {t('auth.createPinFromShopLink')}
+              </ThemedText>
+            </Link>
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.signUpHint}>
+              {t('auth.createPinFromShopHint')}
+            </ThemedText>
+            <Link href={'/(auth)/activate' as Href} asChild>
+              <ThemedText type="small" style={styles.signUpLink}>
                 {t('auth.createAccountLink')}
               </ThemedText>
             </Link>
@@ -293,4 +309,5 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
   form: { flex: 1 },
   signUpLink: { textAlign: 'center', marginTop: Spacing.two },
+  signUpHint: { textAlign: 'center', marginTop: Spacing.one },
 });

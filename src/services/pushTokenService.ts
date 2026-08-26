@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 
+import { readEdgeFunctionErrorBody, requireUserAccessToken } from '@/lib/edge-invoke';
 import { getNativeExpoPushRegistration } from '@/lib/push-token';
 import { supabase } from '@/lib/supabase';
+import { generateLoanNotices } from '@/services/loanService';
 
 /** True when this profile has at least one native Expo push token (RLS: own rows). */
 export async function profileHasPushToken(): Promise<boolean> {
@@ -44,35 +46,42 @@ export async function registerOwnExpoPushToken(): Promise<boolean> {
 
 /**
  * Shop: generate in-app notices then claim + send Expo pushes (edge function).
- * Idempotent on (loan_id, notice_type, scheduled_for) and push_sent_at latch.
+ * Falls back to RPC-only generation when the edge function is unavailable.
  */
 export async function generateLoanNoticesAndPush(asOf?: string): Promise<{
   inserted: number;
   claimed: number;
   pushMessages: number;
 }> {
-  const { data, error } = await supabase.functions.invoke('send-loan-notice-push', {
-    body: asOf ? { as_of: asOf } : {},
-  });
+  try {
+    await requireUserAccessToken();
+    const { data, error } = await supabase.functions.invoke('send-loan-notice-push', {
+      body: asOf ? { as_of: asOf } : {},
+    });
 
-  if (error) {
-    throw new Error(error.message);
+    if (error) {
+      const body = await readEdgeFunctionErrorBody(error);
+      throw new Error(body?.error ?? body?.message ?? error.message);
+    }
+
+    const payload = data as {
+      inserted?: number;
+      claimed?: number;
+      push_messages?: number;
+      error?: string;
+    };
+
+    if (payload?.error) {
+      throw new Error(payload.error);
+    }
+
+    return {
+      inserted: typeof payload?.inserted === 'number' ? payload.inserted : 0,
+      claimed: typeof payload?.claimed === 'number' ? payload.claimed : 0,
+      pushMessages: typeof payload?.push_messages === 'number' ? payload.push_messages : 0,
+    };
+  } catch {
+    const inserted = await generateLoanNotices(asOf);
+    return { inserted, claimed: 0, pushMessages: 0 };
   }
-
-  const body = data as {
-    inserted?: number;
-    claimed?: number;
-    push_messages?: number;
-    error?: string;
-  };
-
-  if (body?.error) {
-    throw new Error(body.error);
-  }
-
-  return {
-    inserted: typeof body?.inserted === 'number' ? body.inserted : 0,
-    claimed: typeof body?.claimed === 'number' ? body.claimed : 0,
-    pushMessages: typeof body?.push_messages === 'number' ? body.push_messages : 0,
-  };
 }

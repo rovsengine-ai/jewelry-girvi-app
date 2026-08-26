@@ -45,3 +45,7 @@ example
 # generated native folders
 /ios
 /android
+.vercel-build.env
+.vercel
+/artifacts
+*.apk

@@ -15,6 +15,7 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
+import { FilterChip } from '@/components/filter-chip';
 import { FormNotice } from '@/components/form-notice';
 import { ListRow } from '@/components/list-row';
 import { ListSkeleton } from '@/components/list-row-skeleton';
@@ -453,22 +454,15 @@ export default function ShopSettingsScreen() {
           <ThemedText type="smallBold">{t('settings.teamRole')}</ThemedText>
           <View style={styles.modeRow}>
             {(['staff', 'owner'] as ShopTeamRole[]).map((id) => (
-              <PressableScale
+              <FilterChip
                 key={id}
                 testID={`team-role-${id}`}
+                label={
+                  id === 'staff' ? t('settings.teamCreateStaff') : t('settings.teamCreateOwner')
+                }
+                selected={teamRole === id}
                 onPress={() => setTeamRole(id)}
-                style={[
-                  styles.modeChip,
-                  {
-                    backgroundColor:
-                      teamRole === id ? colors.tintPrimary : colors.backgroundElement,
-                    borderColor: teamRole === id ? colors.primary : colors.border,
-                  },
-                ]}>
-                <ThemedText type="label">
-                  {id === 'staff' ? t('settings.teamCreateStaff') : t('settings.teamCreateOwner')}
-                </ThemedText>
-              </PressableScale>
+              />
             ))}
           </View>
           <Button

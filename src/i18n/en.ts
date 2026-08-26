@@ -7,6 +7,7 @@ export const en = {
     langEn: 'EN',
     langHi: 'हिं',
     back: '← Back',
+    close: 'Close',
     cancel: 'Cancel',
     signOut: 'Sign out',
     remove: 'Remove',
@@ -93,6 +94,9 @@ export const en = {
     signUpSubtitle: 'Enter your mobile number and choose a PIN to view your receipts.',
     createAccount: 'Create account',
     createAccountLink: 'Activate your account, click here',
+    createPinFromShopLink: 'Shop already added your girvi? Create a PIN here',
+    createPinFromShopHint:
+      'Use the same mobile number the shop used. Choose a 6-digit PIN to view your receipts.',
     alreadyHaveAccount: 'Already have an account? Sign in',
     alreadyRegistered:
       'This mobile number already has a PIN. Sign in, or visit the shop to reset your PIN.',

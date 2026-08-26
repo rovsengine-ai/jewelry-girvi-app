@@ -28,6 +28,7 @@ import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
 import { unknownMessage, type TranslateFn } from '@/i18n';
 import { formatBpsAsPercent, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
+import { formatIsoDateInput } from '@/lib/format-iso-date-input';
 import { readPracticeMode } from '@/lib/practice-mode';
 import { ADMIN_LOANS_HREF, isShopUser } from '@/lib/shop-tab-access';
 import { useAuth } from '@/providers/auth-provider';
@@ -414,17 +415,21 @@ export default function ShopCalculatorScreen() {
               <Field
                 label={t('calculator.pledgeDate')}
                 value={pledgeDate}
-                onChangeText={setPledgeDate}
+                onChangeText={(value) => setPledgeDate(formatIsoDateInput(value))}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="number-pad"
+                placeholder="YYYY-MM-DD"
                 testID="calculator-pledge-date"
               />
               <Field
                 label={t('calculator.payOn')}
                 value={payOn}
-                onChangeText={setPayOn}
+                onChangeText={(value) => setPayOn(formatIsoDateInput(value))}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="number-pad"
+                placeholder="YYYY-MM-DD"
                 testID="calculator-pay-on"
               />
               <ThemedText type="smallBold">{t('loans.scanner.customerType')}</ThemedText>
@@ -514,16 +519,20 @@ export default function ShopCalculatorScreen() {
                   <Field
                     label={t('calculator.interestCalc.fromDate')}
                     value={interestFromDate}
-                    onChangeText={setInterestFromDate}
+                    onChangeText={(value) => setInterestFromDate(formatIsoDateInput(value))}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    keyboardType="number-pad"
+                    placeholder="YYYY-MM-DD"
                   />
                   <Field
                     label={t('calculator.interestCalc.toDate')}
                     value={interestToDate}
-                    onChangeText={setInterestToDate}
+                    onChangeText={(value) => setInterestToDate(formatIsoDateInput(value))}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    keyboardType="number-pad"
+                    placeholder="YYYY-MM-DD"
                   />
                 </>
               ) : (
@@ -549,9 +558,11 @@ export default function ShopCalculatorScreen() {
               <Field
                 label={t('calculator.ageCalc.dob')}
                 value={ageDob}
-                onChangeText={setAgeDob}
+                onChangeText={(value) => setAgeDob(formatIsoDateInput(value))}
                 autoCapitalize="none"
                 autoCorrect={false}
+                keyboardType="number-pad"
+                placeholder="YYYY-MM-DD"
               />
               <View style={styles.buttonRow}>
                 <Button label={t('common.clear')} variant="secondary" onPress={clearAge} />
