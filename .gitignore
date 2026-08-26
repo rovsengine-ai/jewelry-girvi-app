@@ -49,3 +49,5 @@ example
 .vercel
 /artifacts
 *.apk
+.env.local
+.env.*.local
