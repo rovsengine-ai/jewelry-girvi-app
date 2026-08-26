@@ -75,8 +75,8 @@ export function LanguageChips({ variant = 'default' }: { variant?: 'default' | '
         style={[
           styles.segmentItem,
           {
-            minWidth: MinTouchTarget,
-            minHeight: MinTouchTarget,
+            minWidth: MinTouchTarget + Spacing.one,
+            minHeight: MinTouchTarget + Spacing.one,
           },
         ]}>
         <ThemedText type="label" style={{ color: chipColor }}>
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   },
   segmentItem: {
     borderRadius: Radii.pill,
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: Spacing.three,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -7,17 +7,17 @@ import { FadeIn, ReduceMotion } from 'react-native-reanimated';
  */
 export const MOTION = {
   stackDurationMs: 300,
-  tabFadeMs: 150,
-  rowEnterMs: 150,
+  tabFadeMs: 180,
+  rowEnterMs: 180,
   rowStaggerMs: 18,
   rowEnterCap: 8,
-  pressMs: 100,
-  pressScale: 0.98,
+  pressMs: 110,
+  pressScale: 0.97,
   shimmerMs: 900,
   accordionMs: 220,
   chevronRotateDeg: 180,
   /** Alias of tabFadeMs — gold tab indicator and language chip. */
-  tabIndicatorMs: 150,
+  tabIndicatorMs: 180,
 } as const;
 
 export type StackAnimationName = 'none' | 'slide_from_right';

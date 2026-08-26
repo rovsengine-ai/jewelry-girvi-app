@@ -27,7 +27,7 @@ function digitsOnly(value: string): string {
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { registerWithPin, refreshProfile } = useAuth();
+  const { registerWithPin, refreshProfile, signOut } = useAuth();
   const { t } = useLanguage();
 
   const [phone, setPhone] = useState('');
@@ -104,6 +104,11 @@ export default function SignupScreen() {
 
     const role = (profileRow as Profile | null)?.role as UserRole | undefined;
     if (role === 'owner' || role === 'staff') {
+      if (Platform.OS === 'web') {
+        await signOut();
+        setFormError(t('auth.webShopUseMobile'));
+        return;
+      }
       router.replace(routeForRole(role));
       return;
     }

@@ -22,7 +22,7 @@ function digitsOnly(value: string): string {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { authMode, refreshProfile, sendOtp, verifyOtp, signInWithPin } = useAuth();
+  const { authMode, refreshProfile, sendOtp, verifyOtp, signInWithPin, signOut } = useAuth();
   const { t } = useLanguage();
 
   const [phone, setPhone] = useState('');
@@ -108,6 +108,11 @@ export default function LoginScreen() {
       .maybeSingle();
 
     const role = (profileRow as Profile | null)?.role as UserRole | undefined;
+    if (Platform.OS === 'web' && (role === 'owner' || role === 'staff')) {
+      await signOut();
+      setFormError(t('auth.webShopUseMobile'));
+      return;
+    }
     router.replace(routeForRole(role));
   };
 
@@ -158,6 +163,11 @@ export default function LoginScreen() {
       .maybeSingle();
 
     const role = (profileRow as Profile | null)?.role as UserRole | undefined;
+    if (Platform.OS === 'web' && (role === 'owner' || role === 'staff')) {
+      await signOut();
+      setFormError(t('auth.webShopUseMobile'));
+      return;
+    }
     router.replace(routeForRole(role));
   };
 
@@ -253,6 +263,11 @@ export default function LoginScreen() {
               requiresNetwork
               onPress={() => void (step === 'phone' ? handleSendOtp() : handleVerifyOtp())}
             />
+            <Link href={'/(auth)/signup' as Href} asChild>
+              <ThemedText type="small" style={styles.signUpLink}>
+                {t('auth.createAccountLink')}
+              </ThemedText>
+            </Link>
 
             {step === 'otp' ? (
               <Button

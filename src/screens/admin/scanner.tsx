@@ -10,7 +10,7 @@ import * as Device from 'expo-device';
 import { BlurTargetView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,6 +31,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Radii, Sizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { newIdempotencyKey } from '@/lib/idempotency';
+import { readPracticeMode } from '@/lib/practice-mode';
 import { todayInKolkata } from '@/lib/money';
 import { emptyKycDraft, kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
 import {
@@ -283,6 +284,7 @@ export default function AdminScannerScreen() {
   const [formNotice, setFormNotice] = useState<string | null>(null);
   const [ocrPartial, setOcrPartial] = useState(false);
   const [savedLoanId, setSavedLoanId] = useState<string | null>(null);
+  const [practiceMode, setPracticeMode] = useState(false);
   const [kycPendingCustomerId, setKycPendingCustomerId] = useState<string | null>(null);
   const [kycDraft, setKycDraft] = useState<KycDraft>(() => emptyKycDraft());
   const [photoGap, setPhotoGap] = useState<LoanPhotosIncompleteError | null>(null);
@@ -292,6 +294,10 @@ export default function AdminScannerScreen() {
   // https://docs.expo.dev/versions/v57.0.0/sdk/device/
   const cameraAvailable = Device.isDevice;
   const [cameraMountError, setCameraMountError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void readPracticeMode().then(setPracticeMode).catch(() => setPracticeMode(false));
+  }, []);
 
   const updateForm = useCallback((key: keyof LoanFormData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -484,6 +490,12 @@ export default function AdminScannerScreen() {
     setFormNotice(null);
     setKycPendingCustomerId(null);
     try {
+      if (practiceMode) {
+        setPhotoGap(null);
+        setSavedLoanId(null);
+        setFormNotice(t('loans.scanner.practiceNotice'));
+        return;
+      }
       const signatureDataUrl = (await signaturePadRef.current?.readSignature()) ?? null;
       const kycInput = kycDraftHasContent(kycDraft) ? kycDraft : null;
       const outcome = await createLoanWithCustomer(

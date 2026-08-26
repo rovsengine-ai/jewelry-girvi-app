@@ -27,7 +27,11 @@ import { rowEntering } from '@/lib/motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
-import { fetchLoansConcealed, resolveReceiptDisplayUrl } from '@/services/loanService';
+import {
+  fetchLoanItemPhotos,
+  fetchLoansConcealed,
+  resolveReceiptDisplayUrl,
+} from '@/services/loanService';
 import type { Loan } from '@/types/database';
 
 type CustomerLoanView = Pick<
@@ -36,6 +40,7 @@ type CustomerLoanView = Pick<
 > & {
   displayUrl?: string | null;
   signatureUrl?: string | null;
+  itemPhotoUrl?: string | null;
 };
 
 export default function CustomerLoansScreen() {
@@ -71,11 +76,33 @@ export default function CustomerLoansScreen() {
     }
 
     const rows = (data ?? []) as CustomerLoanView[];
+    const loanIds = rows.map((row) => row.id);
+    const itemPhotosByLoanId = new Map<string, string | null>();
+    if (loanIds.length > 0) {
+      const { data: loanItems } = await supabase
+        .from('loan_items')
+        .select('id, loan_id')
+        .in('loan_id', loanIds);
+      const typedItems = (loanItems ?? []) as Array<{ id: string; loan_id: string }>;
+      if (typedItems.length > 0) {
+        const photos = await fetchLoanItemPhotos(typedItems.map((item) => item.id));
+        const itemById = new Map(typedItems.map((item) => [item.id, item.loan_id] as const));
+        for (const photo of photos) {
+          const loanId = itemById.get(photo.loan_item_id);
+          if (!loanId || itemPhotosByLoanId.has(loanId)) continue;
+          itemPhotosByLoanId.set(loanId, photo.storage_path);
+        }
+      }
+    }
+
     const withUrls = await Promise.all(
       rows.map(async (row) => ({
         ...row,
         displayUrl: await resolveReceiptDisplayUrl(row.receipt_image_url).catch(() => null),
         signatureUrl: await resolveReceiptDisplayUrl(row.digital_signature_url).catch(() => null),
+        itemPhotoUrl: await resolveReceiptDisplayUrl(itemPhotosByLoanId.get(row.id) ?? null).catch(
+          () => null,
+        ),
       })),
     );
     setLoans(withUrls);
@@ -180,6 +207,14 @@ export default function CustomerLoansScreen() {
                       accessibilityLabel={t('loans.detail.pledgeSignature')}
                     />
                   ) : null}
+                  {item.itemPhotoUrl ? (
+                    <Image
+                      source={{ uri: item.itemPhotoUrl }}
+                      style={styles.itemPhoto}
+                      contentFit="cover"
+                      accessibilityLabel={t('items.photo')}
+                    />
+                  ) : null}
                   <View style={styles.badgeWrap}>
                     <Badge
                       status={item.status}
@@ -216,6 +251,12 @@ const styles = StyleSheet.create({
     height: Sizes.signatureThumbHeight,
     marginTop: Spacing.two,
     backgroundColor: '#FFFFFF',
+  },
+  itemPhoto: {
+    width: '100%',
+    height: Sizes.itemPhotoThumbHeight,
+    marginTop: Spacing.two,
+    borderRadius: Radii.md,
   },
   receiptPlaceholder: {
     minHeight: Sizes.receiptPlaceholderHeight,

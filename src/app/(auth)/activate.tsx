@@ -3,7 +3,7 @@
  * Linking: https://docs.expo.dev/versions/v57.0.0/sdk/linking/
  * Router: https://docs.expo.dev/versions/v57.0.0/sdk/router/
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -37,11 +37,13 @@ export default function ActivateScreen() {
   const [pinConfirm, setPinConfirm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const hasRedeemedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
+      if (hasRedeemedRef.current) return;
       if (!token || token.trim() === '') {
         if (!cancelled) {
           setFormError(t('auth.activateMissingToken'));
@@ -51,12 +53,17 @@ export default function ActivateScreen() {
       }
 
       setIsSubmitting(true);
+      hasRedeemedRef.current = true;
       const result = await redeemActivation(token.trim());
       if (cancelled) return;
       setIsSubmitting(false);
 
       if (!result.ok) {
-        setFormError(t('auth.activateInvalidToken'));
+        setFormError(
+          result.code === 'invalid_token'
+            ? t('auth.activateInvalidToken')
+            : (result.message ?? t('auth.signInFailed')),
+        );
         setStep('failed');
         return;
       }

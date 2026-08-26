@@ -118,21 +118,28 @@ Deno.serve(async (req: Request) => {
       if (existing.role === 'owner' || existing.role === 'staff') {
         return jsonResponse({ error: 'A shop account already exists for this number.' }, 409);
       }
-      return jsonResponse(
-        { error: 'This number belongs to a customer account. Use a different mobile number.' },
-        409,
-      );
     }
 
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      phone,
-      phone_confirm: true,
-      user_metadata: {
-        role: shopRole,
-        full_name: fullName,
-        created_by_shop_owner: user.id,
-      },
-    });
+    const { data: created, error: createError } =
+      existing && (existing.role === 'retail_customer' || existing.role === 'merchant')
+        ? await admin.auth.admin.createUser({
+            email: `shop-${Date.now()}-${crypto.randomUUID().slice(0, 8)}@pin.local`,
+            email_confirm: true,
+            user_metadata: {
+              role: shopRole,
+              full_name: fullName,
+              created_by_shop_owner: user.id,
+            },
+          })
+        : await admin.auth.admin.createUser({
+            phone,
+            phone_confirm: true,
+            user_metadata: {
+              role: shopRole,
+              full_name: fullName,
+              created_by_shop_owner: user.id,
+            },
+          });
 
     if (createError || !created.user) {
       return jsonResponse(
@@ -144,7 +151,7 @@ Deno.serve(async (req: Request) => {
     if (fullName) {
       const { error: nameError } = await admin
         .from('profiles')
-        .update({ full_name: fullName, role: shopRole })
+        .update({ full_name: fullName, role: shopRole, phone_number: phone })
         .eq('id', created.user.id);
 
       if (nameError) {
@@ -153,7 +160,7 @@ Deno.serve(async (req: Request) => {
     } else {
       const { error: roleError } = await admin
         .from('profiles')
-        .update({ role: shopRole })
+        .update({ role: shopRole, phone_number: phone })
         .eq('id', created.user.id);
 
       if (roleError) {

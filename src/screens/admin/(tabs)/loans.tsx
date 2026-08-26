@@ -9,7 +9,7 @@ import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { AdminLoanRow } from '@/components/admin-loan-row';
-import { AppIcon } from '@/components/app-icon';
+import { AppIcon, TintedIconWell } from '@/components/app-icon';
 import { EmptyState } from '@/components/empty-state';
 import { Fab } from '@/components/fab';
 import { FilterChip, FilterChipRow } from '@/components/filter-chip';
@@ -171,7 +171,9 @@ export default function AdminLoansScreen() {
               accessibilityLabel={t('a11y.scanPledge')}
               onPress={openAddGirvi}
               style={styles.headerAdd}>
-              <AppIcon ios="plus.circle.fill" android="add_circle" color={colors.onChrome} />
+              <TintedIconWell tint={colors.gold}>
+                <AppIcon ios="plus.circle.fill" android="add_circle" color={colors.onGold} />
+              </TintedIconWell>
             </PressableScale>
           ) : undefined
         }
@@ -316,6 +318,7 @@ const styles = StyleSheet.create({
     minHeight: MinTouchTarget,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: Spacing.one,
   },
   searchWrap: {
     paddingHorizontal: Spacing.four,

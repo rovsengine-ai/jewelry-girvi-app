@@ -29,6 +29,7 @@ import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBpsAsPercent, percentInputToBps } from '@/lib/money';
 import { parseOwnerOnlyError } from '@/lib/redemption';
+import { persistPracticeMode, readPracticeMode } from '@/lib/practice-mode';
 import { ADMIN_ARCHIVE_HREF, isShopOwner } from '@/lib/shop-tab-access';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
@@ -135,8 +136,13 @@ export default function ShopSettingsScreen() {
   const [teamBusy, setTeamBusy] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
   const [teamNotice, setTeamNotice] = useState<string | null>(null);
+  const [practiceMode, setPracticeMode] = useState(false);
 
   const isOwner = isShopOwner(profile?.role);
+
+  useEffect(() => {
+    void readPracticeMode().then(setPracticeMode).catch(() => setPracticeMode(false));
+  }, []);
 
   useEffect(() => {
     if (isOwner) return;
@@ -310,7 +316,42 @@ export default function ShopSettingsScreen() {
           <SectionLabel>{t('settings.groupPreferences')}</SectionLabel>
           <SettingsGroup>
             <LanguageSettingsRow />
+            <ListRow
+              testID="practice-mode-row"
+              tone="elevated"
+              isLast
+              leading={
+                <TintedIconWell tint={colors.tintWarning}>
+                  <AppIcon ios="flask" android="science" color={colors.onTintWarning} />
+                </TintedIconWell>
+              }
+              content={
+                <View>
+                  <ThemedText type="bodyLarge">{t('settings.practiceMode')}</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    {t('settings.practiceModeHint')}
+                  </ThemedText>
+                </View>
+              }
+              trailing={
+                <Switch
+                  testID="practice-mode-switch"
+                  value={practiceMode}
+                  onValueChange={(next) => {
+                    setPracticeMode(next);
+                    void persistPracticeMode(next);
+                  }}
+                  trackColor={{ false: colors.backgroundElement, true: colors.warning }}
+                  thumbColor={colors.elevated}
+                />
+              }
+            />
           </SettingsGroup>
+          {practiceMode ? (
+            <View style={{ paddingHorizontal: Spacing.four }}>
+              <FormNotice info={t('settings.practiceModeOn')} />
+            </View>
+          ) : null}
           {signOutRow}
         </ScrollView>
       </ThemedView>
@@ -345,7 +386,42 @@ export default function ShopSettingsScreen() {
         <SectionLabel>{t('settings.groupPreferences')}</SectionLabel>
         <SettingsGroup>
           <LanguageSettingsRow />
+          <ListRow
+            testID="practice-mode-row"
+            tone="elevated"
+            isLast
+            leading={
+              <TintedIconWell tint={colors.tintWarning}>
+                <AppIcon ios="flask" android="science" color={colors.onTintWarning} />
+              </TintedIconWell>
+            }
+            content={
+              <View>
+                <ThemedText type="bodyLarge">{t('settings.practiceMode')}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {t('settings.practiceModeHint')}
+                </ThemedText>
+              </View>
+            }
+            trailing={
+              <Switch
+                testID="practice-mode-switch"
+                value={practiceMode}
+                onValueChange={(next) => {
+                  setPracticeMode(next);
+                  void persistPracticeMode(next);
+                }}
+                trackColor={{ false: colors.backgroundElement, true: colors.warning }}
+                thumbColor={colors.elevated}
+              />
+            }
+          />
         </SettingsGroup>
+        {practiceMode ? (
+          <View style={{ paddingHorizontal: Spacing.four }}>
+            <FormNotice info={t('settings.practiceModeOn')} />
+          </View>
+        ) : null}
 
         <SectionLabel>{t('settings.groupTeam')}</SectionLabel>
         <ThemedText type="small" style={styles.hint}>
@@ -379,12 +455,14 @@ export default function ShopSettingsScreen() {
             {(['staff', 'owner'] as ShopTeamRole[]).map((id) => (
               <PressableScale
                 key={id}
+                testID={`team-role-${id}`}
                 onPress={() => setTeamRole(id)}
                 style={[
                   styles.modeChip,
                   {
                     backgroundColor:
                       teamRole === id ? colors.tintPrimary : colors.backgroundElement,
+                    borderColor: teamRole === id ? colors.primary : colors.border,
                   },
                 ]}>
                 <ThemedText type="label">
@@ -426,6 +504,7 @@ export default function ShopSettingsScreen() {
                 value={loansConcealed}
                 disabled={concealBusy || isOffline}
                 onValueChange={(value) => void handleConcealToggle(value)}
+                ios_backgroundColor={colors.backgroundSelected}
                 trackColor={{ false: colors.backgroundElement, true: colors.primary }}
                 thumbColor={colors.elevated}
                 accessibilityLabel={
@@ -510,6 +589,7 @@ export default function ShopSettingsScreen() {
                   {
                     backgroundColor:
                       partialPeriodMode === id ? colors.tintPrimary : colors.backgroundElement,
+                    borderColor: partialPeriodMode === id ? colors.primary : colors.border,
                   },
                 ]}>
                 <ThemedText type="label">{t(MODE_KEYS[id])}</ThemedText>
@@ -542,11 +622,13 @@ const styles = StyleSheet.create({
   accountCard: { marginHorizontal: Spacing.four, marginTop: Spacing.three },
   accountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   accountCopy: { flex: 1, minWidth: 0, gap: Spacing.half },
-  modeRow: { gap: Spacing.two },
+  modeRow: { gap: Spacing.two, flexDirection: 'row', flexWrap: 'wrap' },
   modeChip: {
     minHeight: MinTouchTarget,
     borderRadius: Radii.pill,
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderWidth: 1,
+    borderColor: 'transparent',
     justifyContent: 'center',
   },
   saveButton: { marginHorizontal: Spacing.four },

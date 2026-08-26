@@ -109,6 +109,23 @@ async function isProfileLocked(
   return new Date(data.locked_until as string).getTime() > Date.now();
 }
 
+async function isPhoneLocked(
+  admin: ReturnType<typeof createClient>,
+  phone: string,
+): Promise<boolean> {
+  const normalized = normalizePhoneE164(phone);
+  if (!normalized) return false;
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from('customer_credentials')
+    .select('locked_until, profiles!inner(phone_number)')
+    .eq('profiles.phone_number', normalized)
+    .gt('locked_until', nowIso)
+    .limit(1);
+  if (error) return false;
+  return Boolean(data && data.length > 0);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -159,7 +176,10 @@ Deno.serve(async (req: Request) => {
 
       if (!ok || !profileId) {
         const { data: foundId } = await admin.rpc('find_profile_by_phone', { p_phone: phone });
-        if (typeof foundId === 'string' && (await isProfileLocked(admin, foundId))) {
+        const isLocked =
+          (typeof foundId === 'string' && (await isProfileLocked(admin, foundId))) ||
+          (await isPhoneLocked(admin, phone));
+        if (isLocked) {
           return jsonResponse({ error: 'locked' }, 403);
         }
         return jsonResponse({ error: 'invalid' }, 401);
@@ -182,25 +202,27 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ error: 'invalid', message: 'Phone and PIN are required' }, 400);
       }
 
-      const { data: existing, error: existingError } = await admin
+      const { data: existingRows, error: existingError } = await admin
         .from('profiles')
         .select('id, role')
         .eq('phone_number', phone)
-        .maybeSingle();
+        .returns<Array<{ id: string; role: string }>>();
 
       if (existingError) {
         return jsonResponse({ error: 'server', message: existingError.message }, 500);
       }
 
-      if (existing) {
-        if (existing.role === 'owner' || existing.role === 'staff') {
-          return jsonResponse({ error: 'forbidden', message: 'Shop accounts use staff sign-in' }, 403);
-        }
+      const existing = existingRows ?? [];
+      const customerProfile = existing.find(
+        (row) => row.role === 'retail_customer' || row.role === 'merchant',
+      );
+      const hasShopProfile = existing.some((row) => row.role === 'owner' || row.role === 'staff');
 
+      if (customerProfile) {
         const { data: cred, error: credError } = await admin
           .from('customer_credentials')
           .select('profile_id')
-          .eq('profile_id', existing.id)
+          .eq('profile_id', customerProfile.id)
           .maybeSingle();
 
         if (credError) {
@@ -215,7 +237,7 @@ Deno.serve(async (req: Request) => {
         }
 
         const { error: pinError } = await admin.rpc('set_customer_pin_for_profile', {
-          p_profile_id: existing.id,
+          p_profile_id: customerProfile.id,
           p_pin: pin,
         });
 
@@ -226,26 +248,42 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: 'server', message: pinError.message }, 500);
         }
 
-        const session = await mintSessionForProfile(admin, existing.id);
+        const session = await mintSessionForProfile(admin, customerProfile.id);
         return jsonResponse({
           access_token: session.access_token,
           refresh_token: session.refresh_token,
-          profile_id: existing.id,
+          profile_id: customerProfile.id,
           created: false,
         });
       }
 
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        phone,
-        phone_confirm: true,
-        user_metadata: { role: 'retail_customer' },
-      });
+      const { data: created, error: createError } = hasShopProfile
+        ? await admin.auth.admin.createUser({
+            email: `customer-${Date.now()}-${crypto.randomUUID().slice(0, 8)}@pin.local`,
+            email_confirm: true,
+            user_metadata: { role: 'retail_customer' },
+          })
+        : await admin.auth.admin.createUser({
+            phone,
+            phone_confirm: true,
+            user_metadata: { role: 'retail_customer' },
+          });
 
       if (createError || !created.user) {
         return jsonResponse(
           { error: 'server', message: createError?.message ?? 'Could not create account' },
           500,
         );
+      }
+
+      if (hasShopProfile) {
+        const { error: profilePatchError } = await admin
+          .from('profiles')
+          .update({ role: 'retail_customer', phone_number: phone })
+          .eq('id', created.user.id);
+        if (profilePatchError) {
+          return jsonResponse({ error: 'server', message: profilePatchError.message }, 500);
+        }
       }
 
       const { error: pinError } = await admin.rpc('set_customer_pin_for_profile', {

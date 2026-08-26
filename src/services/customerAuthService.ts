@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { edgeFunctionErrorMessage, readEdgeFunctionErrorBody } from '@/lib/edge-invoke';
 
 export type PinSignInErrorCode = 'locked' | 'invalid' | 'server';
 
@@ -46,6 +47,15 @@ type EdgeError = {
   message?: string;
 };
 
+function edgeErrorCode(payload: unknown, body: EdgeError | null): string | undefined {
+  const payloadError =
+    payload && typeof payload === 'object' && 'error' in payload
+      ? (payload as { error?: unknown }).error
+      : undefined;
+  const raw = payloadError ?? body?.error;
+  return typeof raw === 'string' ? raw : undefined;
+}
+
 /**
  * Verifies PIN in SQL (via Edge) and returns Auth session tokens.
  * Phone is passed as the customer typed it — SQL normalises via
@@ -61,7 +71,8 @@ export async function signInWithCustomerPin(
   );
 
   const payload = data ?? null;
-  const code = payload && 'error' in payload ? payload.error : undefined;
+  const body = error ? await readEdgeFunctionErrorBody(error) : null;
+  const code = edgeErrorCode(payload, body);
 
   if (code === 'locked') {
     return { ok: false, code: 'locked' };
@@ -80,7 +91,14 @@ export async function signInWithCustomerPin(
   }
 
   if (error) {
-    return { ok: false, code: 'server', message: error.message };
+    return {
+      ok: false,
+      code: 'server',
+      message: edgeFunctionErrorMessage(
+        error,
+        (body?.message as string | undefined) ?? 'Could not sign in. Try again.',
+      ),
+    };
   }
 
   return {
@@ -112,12 +130,28 @@ export async function redeemLoginTokenForSession(token: string): Promise<Activat
     };
   }
 
-  if (payload && 'error' in payload && payload.error === 'invalid_token') {
-    return { ok: false, code: 'invalid_token', message: payload.message };
+  const body = error ? await readEdgeFunctionErrorBody(error) : null;
+  const code = edgeErrorCode(payload, body);
+  if (code === 'invalid_token') {
+    return {
+      ok: false,
+      code: 'invalid_token',
+      message:
+        payload && typeof payload === 'object' && 'message' in payload
+          ? (payload as { message?: string }).message
+          : undefined,
+    };
   }
 
   if (error) {
-    return { ok: false, code: 'server', message: error.message };
+    return {
+      ok: false,
+      code: 'server',
+      message: edgeFunctionErrorMessage(
+        error,
+        (body?.message as string | undefined) ?? 'Could not activate this link. Try again.',
+      ),
+    };
   }
 
   return {
@@ -146,7 +180,8 @@ export async function registerCustomerWithPin(
   );
 
   const payload = data ?? null;
-  const code = payload && 'error' in payload ? payload.error : undefined;
+  const body = error ? await readEdgeFunctionErrorBody(error) : null;
+  const code = edgeErrorCode(payload, body);
 
   if (code === 'weak_pin') {
     return { ok: false, code: 'weak_pin' };
@@ -184,7 +219,14 @@ export async function registerCustomerWithPin(
   }
 
   if (error) {
-    return { ok: false, code: 'server', message: error.message };
+    return {
+      ok: false,
+      code: 'server',
+      message: edgeFunctionErrorMessage(
+        error,
+        (body?.message as string | undefined) ?? 'Could not create your account. Try again.',
+      ),
+    };
   }
 
   return {
@@ -222,4 +264,4 @@ export async function issueLoginToken(
 }
 
 /** Activation deep link path + query. https://docs.expo.dev/versions/v57.0.0/sdk/linking/ */
-export const LOGIN_TOKEN_TTL_MS = 5 * 60 * 1000;
+export const LOGIN_TOKEN_TTL_MS = 30 * 60 * 1000;
