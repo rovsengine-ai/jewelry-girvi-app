@@ -33,9 +33,13 @@ GRANT EXECUTE ON FUNCTION public.generate_opaque_token(integer)
 ALTER TABLE public.loans
   ADD COLUMN IF NOT EXISTS public_token text;
 
+ALTER TABLE public.loans DISABLE TRIGGER loans_enforce_mutation_permissions;
+
 UPDATE public.loans
 SET public_token = public.generate_opaque_token(32)
 WHERE public_token IS NULL;
+
+ALTER TABLE public.loans ENABLE TRIGGER loans_enforce_mutation_permissions;
 
 ALTER TABLE public.loans
   ALTER COLUMN public_token SET DEFAULT public.generate_opaque_token(32);

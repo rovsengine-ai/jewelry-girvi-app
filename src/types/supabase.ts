@@ -861,6 +861,14 @@ export interface Database {
         Args: { p_pin: string };
         Returns: undefined;
       };
+      set_customer_pin_for_profile: {
+        Args: { p_profile_id: string; p_pin: string };
+        Returns: undefined;
+      };
+      admin_reset_customer_pin: {
+        Args: { p_profile_id: string };
+        Returns: undefined;
+      };
       verify_customer_pin: {
         Args: { p_phone: string; p_pin: string };
         Returns: {

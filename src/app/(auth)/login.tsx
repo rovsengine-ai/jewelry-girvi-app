@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Link, useRouter, type Href } from 'expo-router';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -201,6 +201,11 @@ export default function LoginScreen() {
                 requiresNetwork
                 onPress={() => void handlePinSignIn()}
               />
+              <Link href={'/(auth)/signup' as Href} asChild>
+                <ThemedText type="small" style={styles.signUpLink}>
+                  {t('auth.createAccountLink')}
+                </ThemedText>
+              </Link>
             </Card>
           </View>
         </KeyboardAvoidingView>
@@ -272,4 +277,5 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
   form: { flex: 1 },
+  signUpLink: { textAlign: 'center', marginTop: Spacing.two },
 });

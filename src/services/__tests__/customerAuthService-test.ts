@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase';
 import {
   issueLoginToken,
   redeemLoginTokenForSession,
+  registerCustomerWithPin,
+  resetCustomerPin,
   setCustomerPin,
   signInWithCustomerPin,
 } from '@/services/customerAuthService';
@@ -85,5 +87,45 @@ describe('customerAuthService', () => {
     rpc.mockResolvedValue({ data: null, error: null });
     await expect(setCustomerPin('654321')).resolves.toEqual({ error: null });
     expect(rpc).toHaveBeenCalledWith('set_customer_pin', { p_pin: '654321' });
+  });
+
+  it('registers customer via edge register action', async () => {
+    invoke.mockResolvedValue({
+      data: {
+        access_token: 'a',
+        refresh_token: 'r',
+        profile_id: 'p1',
+        created: true,
+      },
+      error: null,
+    });
+    const result = await registerCustomerWithPin('9000000001', '582914');
+    expect(invoke).toHaveBeenCalledWith('customer-session', {
+      body: { action: 'register', phone: '9000000001', pin: '582914' },
+    });
+    expect(result).toEqual({
+      ok: true,
+      accessToken: 'a',
+      refreshToken: 'r',
+      profileId: 'p1',
+      created: true,
+    });
+  });
+
+  it('maps already_registered on signup', async () => {
+    invoke.mockResolvedValue({
+      data: { error: 'already_registered', message: 'exists' },
+      error: null,
+    });
+    const result = await registerCustomerWithPin('9000000001', '582914');
+    expect(result).toEqual({ ok: false, code: 'already_registered', message: 'exists' });
+  });
+
+  it('resets customer PIN through RPC', async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+    await expect(resetCustomerPin('cust-1')).resolves.toEqual({ error: null });
+    expect(rpc).toHaveBeenCalledWith('admin_reset_customer_pin', {
+      p_profile_id: 'cust-1',
+    });
   });
 });

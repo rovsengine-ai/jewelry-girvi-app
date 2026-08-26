@@ -54,12 +54,18 @@ Your app is genuinely a **shop-side ledger plus a customer receipt viewer**. No
 one applies for credit inside it. That is a defensible position, but you must
 present it that way from the first submission:
 
-- Store listing describes it as *pledge / pawn-shop record keeping and receipt
-  management*. Never "get a loan", "apply", "instant cash".
+- Store **title**, **short description**, and **screenshots** describe it as
+  *record-keeping software for a pawn-broking shop* (pledge records, receipts,
+  shop ledger). Do **not** use: loan, gold loan, girvi finance, credit, EMI, or
+  interest rate. Never "get a loan", "apply", "instant cash".
 - The customer side must have **no application flow, no offers, no credit
-  marketing**. Read-only receipts. Phase 4 enforces this.
+  marketing**, and **no in-app repayment collection** (UPI / Razorpay / any
+  gateway). Read-only receipts. The moment you add those, you are a lending app
+  and the Financial features declaration becomes false. Phase 4 enforces the
+  read-only customer surface.
 - Complete the Play Console **Financial features** declaration honestly. Have
   your state pawnbroker/money-lender licence scanned and ready.
+- Agent rule: `.cursor/rules/play-store-positioning.mdc` (always apply).
 
 **Contingency you should take seriously:** you do not actually need Play Store
 for this product to work. Customers — Android and iOS both — use the website

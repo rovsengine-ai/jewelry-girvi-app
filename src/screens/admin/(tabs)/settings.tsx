@@ -39,6 +39,7 @@ import {
   setLoansConcealed,
   updateShopDefaults,
 } from '@/services/loanService';
+import { createShopUser, type ShopTeamRole } from '@/services/shopUserService';
 import type { PartialPeriodMode, Profile, UserRole } from '@/types/database';
 
 function shopRoleLabel(
@@ -127,6 +128,13 @@ export default function ShopSettingsScreen() {
   const [formNotice, setFormNotice] = useState<string | null>(null);
   const [loansConcealed, setLoansConcealedState] = useState(false);
   const [concealBusy, setConcealBusy] = useState(false);
+  const [teamName, setTeamName] = useState('');
+  const [teamPhone, setTeamPhone] = useState('');
+  const [teamPin, setTeamPin] = useState('');
+  const [teamRole, setTeamRole] = useState<ShopTeamRole>('staff');
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [teamNotice, setTeamNotice] = useState<string | null>(null);
 
   const isOwner = isShopOwner(profile?.role);
 
@@ -183,6 +191,7 @@ export default function ShopSettingsScreen() {
   const handleSave = async () => {
     setFormError(null);
     setFormNotice(null);
+    setIsSaving(true);
     try {
       const rateBps = percentInputToBps(ratePercent);
       const next = await updateShopDefaults({
@@ -208,6 +217,42 @@ export default function ShopSettingsScreen() {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCreateTeamMember = async () => {
+    setTeamError(null);
+    setTeamNotice(null);
+    setTeamBusy(true);
+    void Haptics.selectionAsync();
+    try {
+      const result = await createShopUser({
+        phoneNumber: teamPhone,
+        fullName: teamName,
+        role: teamRole,
+        pin: teamPin,
+      });
+      if (!result.ok) {
+        if (result.code === 'weak_pin') {
+          setTeamError(t('settings.teamWeakPin'));
+        } else if (result.code === 'conflict') {
+          setTeamError(result.message ?? t('settings.teamConflict'));
+        } else if (result.code === 'forbidden') {
+          setTeamError(t('settings.teamForbidden'));
+        } else {
+          setTeamError(result.message ?? t('errors.unknown'));
+        }
+        return;
+      }
+      setTeamName('');
+      setTeamPhone('');
+      setTeamPin('');
+      setTeamRole('staff');
+      setTeamNotice(t('settings.teamCreated'));
+    } catch (error) {
+      setTeamError(error instanceof Error ? error.message : t('errors.unknown'));
+    } finally {
+      setTeamBusy(false);
     }
   };
 
@@ -301,6 +346,61 @@ export default function ShopSettingsScreen() {
         <SettingsGroup>
           <LanguageSettingsRow />
         </SettingsGroup>
+
+        <SectionLabel>{t('settings.groupTeam')}</SectionLabel>
+        <ThemedText type="small" style={styles.hint}>
+          {t('settings.teamHint')}
+        </ThemedText>
+        <FormNotice error={teamError} notice={teamNotice} />
+        <Card>
+          <Field
+            label={t('settings.teamName')}
+            value={teamName}
+            onChangeText={setTeamName}
+            testID="team-name"
+          />
+          <Field
+            label={t('settings.teamPhone')}
+            value={teamPhone}
+            onChangeText={setTeamPhone}
+            keyboardType="phone-pad"
+            testID="team-phone"
+          />
+          <Field
+            label={t('settings.teamPin')}
+            value={teamPin}
+            onChangeText={setTeamPin}
+            keyboardType="number-pad"
+            secureTextEntry
+            testID="team-pin"
+          />
+          <ThemedText type="smallBold">{t('settings.teamRole')}</ThemedText>
+          <View style={styles.modeRow}>
+            {(['staff', 'owner'] as ShopTeamRole[]).map((id) => (
+              <PressableScale
+                key={id}
+                onPress={() => setTeamRole(id)}
+                style={[
+                  styles.modeChip,
+                  {
+                    backgroundColor:
+                      teamRole === id ? colors.tintPrimary : colors.backgroundElement,
+                  },
+                ]}>
+                <ThemedText type="label">
+                  {id === 'staff' ? t('settings.teamCreateStaff') : t('settings.teamCreateOwner')}
+                </ThemedText>
+              </PressableScale>
+            ))}
+          </View>
+          <Button
+            testID="create-team-member"
+            label={t('settings.teamCreate')}
+            loading={teamBusy}
+            requiresNetwork
+            onPress={() => void handleCreateTeamMember()}
+          />
+        </Card>
 
         <SectionLabel>{t('settings.groupShop')}</SectionLabel>
         <SettingsGroup>

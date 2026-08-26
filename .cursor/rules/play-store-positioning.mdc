@@ -1,0 +1,57 @@
+---
+description: Play Store listing and product posture — pawn-shop record-keeping, not a lending app
+alwaysApply: true
+---
+
+# Play Store positioning (India)
+
+This product is **record-keeping software for a pawn-broking shop**: shop ledger
+plus a customer receipt viewer. Money moves at the counter. Nobody applies for
+credit inside the app.
+
+Google Play classifies India financial apps from **store listing text and
+screenshots first**. Wrong wording pulls the app into personal-loan / DLA review
+that a state-licensed pawnbroker usually cannot satisfy. A false Financial
+features declaration becomes false the moment the binary collects repayments
+online or lets customers apply for credit.
+
+## Store listing — forbidden words and framing
+
+Do **not** use these in the **store title**, **short description**, **full
+description**, or **screenshot captions / on-image text**:
+
+- loan / gold loan
+- girvi finance
+- credit
+- EMI
+- interest rate
+
+Describe the app as **record-keeping for a pawn-broking shop** (pledge records,
+receipts, shop ledger, customer receipt viewer). Prefer: pledge, pawn shop,
+record keeping, receipt, ledger, shop book.
+
+Never: "get a loan", "apply", "instant cash", credit offers, or marketing that
+implies in-app lending.
+
+## Product hard stops (keep the declaration true)
+
+- **No in-app repayment collection** — no UPI, Razorpay, cards, wallets, or any
+  payment gateway for collecting principal / dues inside the app.
+- **No customer "apply for loan" / self-service pledge application flow.**
+  Customers are read-only: view their own receipts / pledge records. Shop staff
+  create records at the counter.
+- Do not add credit offers, loan marketplaces, or disbursement marketing on
+  customer surfaces.
+
+Internal SQL/domain terms (`loans` table, interest engine) may remain in code
+and shop-only UI. That does **not** license those words on the Play listing or
+on screenshots submitted to Play Console.
+
+## When editing copy or features
+
+1. Play Console assets and any marketing screenshot → follow the banned-word
+   list above.
+2. New customer features → receipt/viewer only; refuse apply / pay-online work.
+3. Financial features declaration → stay honest; do not ship payment collection
+   or apply-for-credit without an explicit product decision that accepts
+   reclassification as a lending app.

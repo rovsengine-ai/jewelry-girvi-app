@@ -88,6 +88,15 @@ export const hi = {
     activateInvalidToken:
       'यह कोड मान्य नहीं है या समय समाप्त हो गया। दुकान से नया QR दिखाएँ।',
     savePinAndContinue: 'PIN सेव करें और आगे बढ़ें',
+    signUpTitle: 'खाता बनाएँ',
+    signUpSubtitle: 'अपनी रसीदें देखने के लिए मोबाइल नंबर और PIN चुनें।',
+    createAccount: 'खाता बनाएँ',
+    createAccountLink: 'नए ग्राहक? खाता बनाएँ',
+    alreadyHaveAccount: 'पहले से खाता है? साइन इन करें',
+    alreadyRegistered:
+      'इस नंबर पर पहले से PIN है। साइन इन करें, या PIN रीसेट के लिए दुकान पर आएँ।',
+    shopAccountUseStaffLogin: 'दुकान कर्मचारी उसी स्क्रीन पर अपने PIN से साइन इन करें।',
+    signUpFailed: 'खाता नहीं बन सका। फिर कोशिश करें।',
   },
   loanQrLanding: {
     title: 'गिरवी रसीद',
@@ -183,6 +192,14 @@ export const hi = {
       customerQrExpired: 'इस कोड का समय समाप्त हो गया। बंद करें और नया दिखाएँ।',
       customerQrClose: 'बंद करें',
       customerQrFailed: 'सक्रियण कोड नहीं बन सका। फिर कोशिश करें।',
+      resetCustomerPin: 'ग्राहक PIN रीसेट',
+      resetCustomerPinHint:
+        'ग्राहक का PIN हटाता है ताकि वे लॉगिन पर खाता बनाएँ से नया PIN सेट कर सकें।',
+      resetCustomerPinConfirmTitle: 'इस ग्राहक का PIN रीसेट करें?',
+      resetCustomerPinConfirmBody:
+        'ग्राहक को ऐप में साइन इन → खाता बनाएँ खोलकर अपने नंबर से नया PIN सेट करना होगा।',
+      resetCustomerPinDone: 'ग्राहक PIN हटा दिया गया। ऐप से नया PIN बनाने को कहें।',
+      resetCustomerPinFailed: 'PIN रीसेट नहीं हो सका। फिर कोशिश करें।',
       customerQrLinkLabel: 'सक्रियण लिंक',
       loanQrTitle: 'रसीद QR',
       loanQrHint:
@@ -554,6 +571,19 @@ export const hi = {
       'इस फ़ोन पर भुगतान याददिलाना Android ऐप में ही काम करता है। यह वेबसाइट केवल रसीदें और सूचनाएँ दिखाती है — स्थानीय सूचनाएँ शेड्यूल नहीं करती।',
     roleOwner: 'मालिक',
     roleStaff: 'कर्मचारी',
+    groupTeam: 'टीम',
+    teamHint: 'स्टाफ या मालिक खाता बनाएं। वे उसी लॉगिन स्क्रीन पर फ़ोन और PIN से साइन इन करेंगे।',
+    teamName: 'पूरा नाम',
+    teamPhone: 'मोबाइल नंबर',
+    teamPin: 'शुरुआती PIN (6 अंक)',
+    teamRole: 'भूमिका',
+    teamCreateStaff: 'कर्मचारी',
+    teamCreateOwner: 'मालिक',
+    teamCreate: 'टीम सदस्य जोड़ें',
+    teamCreated: 'टीम सदस्य जोड़ा गया। वे अपने PIN से साइन इन कर सकते हैं।',
+    teamConflict: 'यह मोबाइल नंबर पहले से उपयोग में है।',
+    teamWeakPin: 'मजबूत PIN चुनें — दोहराया या क्रमिक नंबर नहीं।',
+    teamForbidden: 'केवल दुकान मालिक टीम सदस्य जोड़ सकता है।',
   },
   calculator: {
     title: 'भुगतान कैलकुलेटर',

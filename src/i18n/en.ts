@@ -88,6 +88,15 @@ export const en = {
     activateInvalidToken:
       'This activation code is not valid or has expired. Ask the shop to show a new QR.',
     savePinAndContinue: 'Save PIN and continue',
+    signUpTitle: 'Create your account',
+    signUpSubtitle: 'Enter your mobile number and choose a PIN to view your receipts.',
+    createAccount: 'Create account',
+    createAccountLink: 'New customer? Create an account',
+    alreadyHaveAccount: 'Already have an account? Sign in',
+    alreadyRegistered:
+      'This mobile number already has a PIN. Sign in, or visit the shop to reset your PIN.',
+    shopAccountUseStaffLogin: 'Shop staff sign in with the same login screen using their PIN.',
+    signUpFailed: 'Could not create your account. Try again.',
   },
   loanQrLanding: {
     title: 'Loan receipt',
@@ -183,6 +192,14 @@ export const en = {
       customerQrExpired: 'This code has expired. Close and show a new one.',
       customerQrClose: 'Close',
       customerQrFailed: 'Could not create an activation code. Try again.',
+      resetCustomerPin: 'Reset customer PIN',
+      resetCustomerPinHint:
+        'Clears the customer PIN so they can create a new one from Create account on the login screen.',
+      resetCustomerPinConfirmTitle: 'Reset PIN for this customer?',
+      resetCustomerPinConfirmBody:
+        'The customer will need to open Create account on the login screen and set a new PIN with their mobile number.',
+      resetCustomerPinDone: 'Customer PIN cleared. Ask them to create a new PIN from the app.',
+      resetCustomerPinFailed: 'Could not reset the customer PIN. Try again.',
       customerQrLinkLabel: 'Activation link',
       loanQrTitle: 'Receipt QR',
       loanQrHint:
@@ -551,6 +568,19 @@ export const en = {
       'Payment reminders on this phone need the Android app. This website shows receipts and notices only — it does not schedule local notifications.',
     roleOwner: 'Owner',
     roleStaff: 'Staff',
+    groupTeam: 'Team',
+    teamHint: 'Create staff or owner accounts. They sign in with phone and PIN on the same login screen.',
+    teamName: 'Full name',
+    teamPhone: 'Mobile number',
+    teamPin: 'Initial PIN (6 digits)',
+    teamRole: 'Role',
+    teamCreateStaff: 'Staff',
+    teamCreateOwner: 'Owner',
+    teamCreate: 'Add team member',
+    teamCreated: 'Team member added. They can sign in with their PIN.',
+    teamConflict: 'This mobile number is already in use.',
+    teamWeakPin: 'Choose a stronger PIN — not a repeated or sequential number.',
+    teamForbidden: 'Only the shop owner can add team members.',
   },
   calculator: {
     title: 'Payoff calculator',

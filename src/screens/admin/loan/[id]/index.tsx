@@ -66,6 +66,7 @@ import {
 import {
   issueLoginToken,
   LOGIN_TOKEN_TTL_MS,
+  resetCustomerPin,
 } from '@/services/customerAuthService';
 import { shareHtmlAsPdf } from '@/services/printService';
 import { resolveCustomerPhotoUrl } from '@/services/kycService';
@@ -113,6 +114,9 @@ export default function LoanDetailScreen() {
   const [customerQrRemainingMs, setCustomerQrRemainingMs] = useState(0);
   const [customerQrLoading, setCustomerQrLoading] = useState(false);
   const [customerQrError, setCustomerQrError] = useState<string | null>(null);
+  const [resetPinOpen, setResetPinOpen] = useState(false);
+  const [resetPinSaving, setResetPinSaving] = useState(false);
+  const [resetPinError, setResetPinError] = useState<string | null>(null);
   const paymentIdempotencyKeyRef = useRef(newIdempotencyKey());
   const customerChevron = useChevronRotation(customerOpen);
   const itemsChevron = useChevronRotation(itemsOpen);
@@ -288,6 +292,24 @@ export default function LoanDetailScreen() {
     setCustomerQrExpiresAt(null);
     setCustomerQrRemainingMs(0);
     setCustomerQrError(null);
+  };
+
+  const handleResetCustomerPin = async () => {
+    if (!loan) return;
+    setResetPinError(null);
+    setResetPinSaving(true);
+    const { error } = await resetCustomerPin(loan.customer_id);
+    setResetPinSaving(false);
+
+    if (error) {
+      setResetPinError(
+        error.includes('shop_only') ? t('loans.detail.resetCustomerPinFailed') : error,
+      );
+      return;
+    }
+
+    setResetPinOpen(false);
+    setFormNotice(t('loans.detail.resetCustomerPinDone'));
   };
 
   const handleShowCustomerQr = async () => {
@@ -823,6 +845,17 @@ export default function LoanDetailScreen() {
               onPress={() => void handleShowCustomerQr()}
             />
           ) : null}
+          {isShopUser ? (
+            <Button
+              testID="reset-customer-pin"
+              label={t('loans.detail.resetCustomerPin')}
+              variant="secondary"
+              onPress={() => {
+                setResetPinError(null);
+                setResetPinOpen(true);
+              }}
+            />
+          ) : null}
           {loan.status === 'active' ? (
             <Button
               testID="open-redeem"
@@ -1033,6 +1066,36 @@ export default function LoanDetailScreen() {
               label={t('loans.detail.customerQrClose')}
               variant="secondary"
               onPress={closeCustomerQr}
+            />
+          </Card>
+        </View>
+      ) : null}
+      {resetPinOpen ? (
+        <View
+          testID="reset-pin-overlay"
+          style={[styles.customerQrOverlay, { backgroundColor: colors.overlay }]}>
+          <Card style={styles.customerQrCard}>
+            <ThemedText type="smallBold">{t('loans.detail.resetCustomerPinConfirmTitle')}</ThemedText>
+            <ThemedText type="small">{t('loans.detail.resetCustomerPinConfirmBody')}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('loans.detail.resetCustomerPinHint')}
+            </ThemedText>
+            <FormNotice error={resetPinError} />
+            <Button
+              label={t('common.cancel')}
+              variant="secondary"
+              disabled={resetPinSaving}
+              onPress={() => {
+                setResetPinOpen(false);
+                setResetPinError(null);
+              }}
+            />
+            <Button
+              testID="reset-customer-pin-confirm"
+              label={t('loans.detail.resetCustomerPin')}
+              loading={resetPinSaving}
+              requiresNetwork
+              onPress={() => void handleResetCustomerPin()}
             />
           </Card>
         </View>

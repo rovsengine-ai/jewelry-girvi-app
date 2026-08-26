@@ -8,9 +8,11 @@ import { ADMIN_LOANS_HREF, CUSTOMER_LOANS_HREF } from '@/lib/shop-tab-access';
 import { clearLoanReminderNotifications } from '@/services/loanReminderNotifications';
 import {
   redeemLoginTokenForSession,
+  registerCustomerWithPin,
   setCustomerPin,
   signInWithCustomerPin,
   type PinSignInErrorCode,
+  type RegisterErrorCode,
 } from '@/services/customerAuthService';
 import type { Profile, UserRole } from '@/types/database';
 
@@ -21,6 +23,10 @@ export type SignInWithPinResult =
 export type RedeemActivationResult =
   | { ok: true; loanId: string | null }
   | { ok: false; code: 'invalid_token' | 'server'; message?: string };
+
+export type RegisterWithPinResult =
+  | { ok: true; created: boolean }
+  | { ok: false; code: RegisterErrorCode; message?: string };
 
 interface AuthContextValue {
   session: Session | null;
@@ -42,6 +48,8 @@ interface AuthContextValue {
    */
   redeemActivation: (token: string) => Promise<RedeemActivationResult>;
   setPinForCurrentUser: (pin: string) => Promise<{ error: string | null }>;
+  /** Customer self-signup with phone + PIN (no SMS). */
+  registerWithPin: (phone: string, pin: string) => Promise<RegisterWithPinResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -169,6 +177,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return setCustomerPin(pin);
   }, []);
 
+  const registerWithPin = useCallback(
+    async (phone: string, pin: string): Promise<RegisterWithPinResult> => {
+      const result = await registerCustomerWithPin(phone, pin);
+      if (!result.ok) {
+        return { ok: false, code: result.code, message: result.message };
+      }
+
+      const { error } = await supabase.auth.setSession({
+        access_token: result.accessToken,
+        refresh_token: result.refreshToken,
+      });
+      if (error) {
+        return { ok: false, code: 'server', message: error.message };
+      }
+
+      return { ok: true, created: result.created };
+    },
+    [],
+  );
+
   const value = useMemo(
     () => ({
       session,
@@ -182,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithPin,
       redeemActivation,
       setPinForCurrentUser,
+      registerWithPin,
     }),
     [
       session,
@@ -194,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithPin,
       redeemActivation,
       setPinForCurrentUser,
+      registerWithPin,
     ],
   );
 

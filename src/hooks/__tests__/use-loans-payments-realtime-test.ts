@@ -33,6 +33,7 @@ const authStub = {
   signInWithPin: jest.fn(),
   redeemActivation: jest.fn(),
   setPinForCurrentUser: jest.fn(),
+  registerWithPin: jest.fn(),
 };
 
 describe('useLoansPaymentsRealtime', () => {

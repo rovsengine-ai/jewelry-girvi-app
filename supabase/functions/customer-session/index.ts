@@ -28,6 +28,18 @@ function pinLocalEmail(userId: string): string {
   return `${userId.replace(/-/g, '')}@pin.local`;
 }
 
+/** Same rules as create-walkin-customer and public.normalize_phone_e164. */
+function normalizePhoneE164(input: string): string | null {
+  const digits = input.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits}`;
+  }
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  return null;
+}
+
 async function ensureEmailForMagicLink(
   admin: ReturnType<typeof createClient>,
   user: User,
@@ -158,6 +170,102 @@ Deno.serve(async (req: Request) => {
         access_token: session.access_token,
         refresh_token: session.refresh_token,
         profile_id: profileId,
+      });
+    }
+
+    if (body.action === 'register') {
+      const phoneRaw = typeof body.phone === 'string' ? body.phone.trim() : '';
+      const pin = typeof body.pin === 'string' ? body.pin.trim() : '';
+      const phone = normalizePhoneE164(phoneRaw);
+
+      if (!phone || !pin) {
+        return jsonResponse({ error: 'invalid', message: 'Phone and PIN are required' }, 400);
+      }
+
+      const { data: existing, error: existingError } = await admin
+        .from('profiles')
+        .select('id, role')
+        .eq('phone_number', phone)
+        .maybeSingle();
+
+      if (existingError) {
+        return jsonResponse({ error: 'server', message: existingError.message }, 500);
+      }
+
+      if (existing) {
+        if (existing.role === 'owner' || existing.role === 'staff') {
+          return jsonResponse({ error: 'forbidden', message: 'Shop accounts use staff sign-in' }, 403);
+        }
+
+        const { data: cred, error: credError } = await admin
+          .from('customer_credentials')
+          .select('profile_id')
+          .eq('profile_id', existing.id)
+          .maybeSingle();
+
+        if (credError) {
+          return jsonResponse({ error: 'server', message: credError.message }, 500);
+        }
+
+        if (cred) {
+          return jsonResponse(
+            { error: 'already_registered', message: 'Account already exists. Sign in or visit the shop to reset PIN.' },
+            409,
+          );
+        }
+
+        const { error: pinError } = await admin.rpc('set_customer_pin_for_profile', {
+          p_profile_id: existing.id,
+          p_pin: pin,
+        });
+
+        if (pinError) {
+          if (pinError.message.includes('weak_pin')) {
+            return jsonResponse({ error: 'weak_pin' }, 400);
+          }
+          return jsonResponse({ error: 'server', message: pinError.message }, 500);
+        }
+
+        const session = await mintSessionForProfile(admin, existing.id);
+        return jsonResponse({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          profile_id: existing.id,
+          created: false,
+        });
+      }
+
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        phone,
+        phone_confirm: true,
+        user_metadata: { role: 'retail_customer' },
+      });
+
+      if (createError || !created.user) {
+        return jsonResponse(
+          { error: 'server', message: createError?.message ?? 'Could not create account' },
+          500,
+        );
+      }
+
+      const { error: pinError } = await admin.rpc('set_customer_pin_for_profile', {
+        p_profile_id: created.user.id,
+        p_pin: pin,
+      });
+
+      if (pinError) {
+        if (pinError.message.includes('weak_pin')) {
+          return jsonResponse({ error: 'weak_pin' }, 400);
+        }
+        return jsonResponse({ error: 'server', message: pinError.message }, 500);
+      }
+
+      const session = await mintSessionForProfile(admin, created.user.id);
+      return jsonResponse({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        profile_id: created.user.id,
+        created: true,
       });
     }
 

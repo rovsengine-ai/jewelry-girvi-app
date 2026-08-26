@@ -27,6 +27,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // Typed routes may lag new screens; treat segments as strings for path checks.
     const routeSegments = segments as readonly string[];
     const onActivate = routeSegments.includes('activate');
+    const onSignup = routeSegments.includes('signup');
     // Public QR deep links — must work signed-out (App Links + web).
     const onLoanQrLink = routeSegments.includes('g');
     const onActivationAppLink = routeSegments[0] === 'a';
@@ -38,7 +39,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (inAuthGroup && !onActivate) {
+    if (inAuthGroup && !onActivate && !onSignup) {
       router.replace(routeForRole(profile?.role));
     }
   }, [session, profile, isLoading, segments, router]);
