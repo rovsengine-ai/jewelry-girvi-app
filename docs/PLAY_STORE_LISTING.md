@@ -61,9 +61,19 @@ ledger, shop book.
 
 ### B. Store listing assets
 
+Ready files in the repo (upload these in Play Console):
+
+| Asset | Path |
+| --- | --- |
+| App icon 512×512 | `assets/branding/play-icon-512.png` |
+| Feature graphic 1024×500 | `assets/branding/play-store/feature-graphic-1024x500.png` |
+| Extra promo (counter ledger) | `assets/branding/play-store/feature-counter-ledger-1024x500.png` |
+| Extra promo (receipt viewer) | `assets/branding/play-store/feature-receipt-viewer-1024x500.png` |
+| Extra promo (scan & print) | `assets/branding/play-store/feature-scan-print-1024x500.png` |
+
 - [ ] Short + full description (paste from this file)
-- [ ] App icon 512×512 (from Play Console “App icon”)
-- [ ] Feature graphic 1024×500
+- [ ] App icon 512×512 — use `play-icon-512.png` above
+- [ ] Feature graphic 1024×500 — use `feature-graphic-1024x500.png` above
 - [ ] Phone screenshots (min 2): login, shop ledger, receipt, calculator —
   **no banned words on image text**
 - [ ] Optional: Hindi listing if you want a second locale
