@@ -290,6 +290,9 @@ export const hi = {
       qrLoanNotFound: 'इस बही में उस QR की गिरवी नहीं मिली।',
       qrWorking: 'गिरवी खोली जा रही है…',
       usePhoneCamera: 'फ़ोन कैमरा इस्तेमाल करें',
+      enableLiveCamera: 'कैमरा अनुमति दें',
+      webCameraLead:
+        'अनुमति दें दबाने पर यह कंप्यूटर कैमरा मांगेगा। फ़ोटो चुनकर भी चल सकता है।',
       enterManually: 'खुद भरें',
       pickFromGallery: 'गैलरी से चुनें',
       retake: 'फिर से लें',

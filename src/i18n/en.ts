@@ -288,6 +288,9 @@ export const en = {
       qrLoanNotFound: 'No girvi on this book matches that QR.',
       qrWorking: 'Opening girvi…',
       usePhoneCamera: 'Use phone camera',
+      enableLiveCamera: 'Allow camera',
+      webCameraLead:
+        'This computer will ask for camera access when you tap Allow camera. You can also choose a photo.',
       enterManually: 'Enter manually',
       pickFromGallery: 'Choose from gallery',
       retake: 'Retake',

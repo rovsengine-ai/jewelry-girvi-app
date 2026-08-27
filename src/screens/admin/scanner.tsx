@@ -275,7 +275,14 @@ export default function AdminScannerScreen() {
   const { t } = useLanguage();
   const colors = useTheme();
 
-  const [permission, requestPermission] = useCameraPermissions();
+  // Web: do not query permission on mount. Chrome/Brave often hang or report
+  // a status without a user gesture, so getUserMedia never prompts and the
+  // <video> stays white. Request only from a tap.
+  // https://docs.expo.dev/versions/v57.0.0/sdk/camera/
+  const isWeb = Platform.OS === 'web';
+  const [permission, requestPermission] = useCameraPermissions(
+    isWeb ? { get: false } : undefined,
+  );
   const cameraRef = useRef<CameraView>(null);
   const cameraBlurTargetRef = useRef<View>(null);
   const reviewScrollRef = useRef<ScrollView>(null);
@@ -305,12 +312,14 @@ export default function AdminScannerScreen() {
   // https://docs.expo.dev/versions/v57.0.0/sdk/camera/
   const [cameraAvailable, setCameraAvailable] = useState(Device.isDevice);
   const [cameraMountError, setCameraMountError] = useState<string | null>(null);
+  const [webLivePreview, setWebLivePreview] = useState(false);
 
   useEffect(() => {
     void readPracticeMode().then(setPracticeMode).catch(() => setPracticeMode(false));
   }, []);
 
   useEffect(() => {
+    if (isWeb) return;
     let cancelled = false;
     void CameraView.isAvailableAsync()
       .then((available) => {
@@ -322,7 +331,7 @@ export default function AdminScannerScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isWeb]);
 
   const updateForm = useCallback((key: keyof LoanFormData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -364,6 +373,7 @@ export default function AdminScannerScreen() {
     setExistingLoan(null);
     setCustomerRole('retail_customer');
     setCameraMountError(null);
+    setWebLivePreview(false);
   }, []);
 
   const applyOcrToForm = (uri: string, extracted: OcrExtractionResult) => {
@@ -473,6 +483,7 @@ export default function AdminScannerScreen() {
     setCameraMode('ocr');
     qrLockRef.current = false;
     setCameraMountError(null);
+    setWebLivePreview(false);
     setStep('camera');
   };
 
@@ -482,7 +493,23 @@ export default function AdminScannerScreen() {
     setCameraMode('qr');
     qrLockRef.current = false;
     setCameraMountError(null);
+    setWebLivePreview(false);
     setStep('camera');
+  };
+
+  const enableWebLiveCamera = async () => {
+    setFormError(null);
+    setCameraMountError(null);
+    try {
+      const result = await requestPermission();
+      if (result.granted) {
+        setWebLivePreview(true);
+        return;
+      }
+      setFormError(t('loans.scanner.cameraNeededBody'));
+    } catch {
+      setFormError(t('loans.scanner.cameraMountFailed'));
+    }
   };
 
   const openLoanFromQr = async (raw: string) => {
@@ -716,13 +743,16 @@ export default function AdminScannerScreen() {
     const previewHint =
       cameraMode === 'qr'
         ? t('loans.scanner.scanReceiptQrHint')
-        : Platform.OS === 'web'
-          ? t('loans.scanner.cameraWebHint')
+        : isWeb
+          ? t('loans.scanner.webCameraLead')
           : !cameraAvailable || cameraMountError
             ? t('loans.scanner.cameraUnavailableBody')
             : t('loans.scanner.cameraPreviewHint');
+    const showLivePreview = isWeb
+      ? webLivePreview && permission?.granted === true && !cameraMountError
+      : Boolean(cameraAvailable) && !cameraMountError;
 
-    if (!permission) {
+    if (!isWeb && !permission) {
       return (
         <ThemedView style={styles.container} type="surfaceSunken">
           <ScreenHeader showBack title={cameraTitle} />
@@ -731,7 +761,7 @@ export default function AdminScannerScreen() {
       );
     }
 
-    if (!permission.granted) {
+    if (!isWeb && permission && !permission.granted) {
       return (
         <ThemedView style={styles.container} type="surfaceSunken">
           <ScreenHeader
@@ -765,6 +795,37 @@ export default function AdminScannerScreen() {
       );
     }
 
+    const liveCamera = (
+      <CameraView
+        ref={cameraRef}
+        style={isWeb ? styles.cameraWebView : styles.camera}
+        facing={isWeb ? 'front' : 'back'}
+        barcodeScannerSettings={
+          cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
+        }
+        onBarcodeScanned={cameraMode === 'qr' ? onQrScanned : undefined}
+        onMountError={() => {
+          setWebLivePreview(false);
+          setCameraMountError(t('loans.scanner.cameraMountFailed'));
+        }}
+      />
+    );
+
+    const cameraFallback = (
+      <View style={[styles.camera, styles.cameraFallback, { backgroundColor: '#111111' }]}>
+        <EmptyState
+          title={
+            cameraMountError
+              ? t('loans.scanner.cameraUnavailableTitle')
+              : t('loans.scanner.cameraNeededTitle')
+          }
+          body={cameraMountError ?? previewHint}
+          iconIos="camera"
+          iconAndroid="photo_camera"
+        />
+      </View>
+    );
+
     return (
       <ThemedView style={styles.container}>
         <ScreenHeader
@@ -772,61 +833,17 @@ export default function AdminScannerScreen() {
           title={cameraTitle}
           onBack={() => setStep('choose')}
         />
-        <View style={[styles.cameraStage, Platform.OS === 'web' ? styles.cameraStageWeb : null]}>
-          {Platform.OS === 'web' ? (
+        <View style={[styles.cameraStage, isWeb ? styles.cameraStageWeb : null]}>
+          {isWeb ? (
             <View style={[styles.camera, styles.cameraWeb]}>
-              {cameraAvailable === false || cameraMountError ? (
-                <View style={[styles.camera, styles.cameraFallback, { backgroundColor: colors.surfaceSunken }]}>
-                  <EmptyState
-                    title={t('loans.scanner.cameraUnavailableTitle')}
-                    body={cameraMountError ?? previewHint}
-                    iconIos="camera"
-                    iconAndroid="photo_camera"
-                  />
-                </View>
-              ) : (
-                <CameraView
-                  ref={cameraRef}
-                  style={styles.cameraWebView}
-                  facing="back"
-                  barcodeScannerSettings={
-                    cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
-                  }
-                  onBarcodeScanned={cameraMode === 'qr' ? onQrScanned : undefined}
-                  onMountError={() => {
-                    setCameraMountError(t('loans.scanner.cameraMountFailed'));
-                  }}
-                />
-              )}
+              {showLivePreview ? liveCamera : cameraFallback}
             </View>
           ) : (
           <BlurTargetView ref={cameraBlurTargetRef} style={styles.camera}>
-            {cameraAvailable === false || cameraMountError ? (
-              <View style={[styles.camera, styles.cameraFallback, { backgroundColor: colors.surfaceSunken }]}>
-                <EmptyState
-                  title={t('loans.scanner.cameraUnavailableTitle')}
-                  body={cameraMountError ?? previewHint}
-                  iconIos="camera"
-                  iconAndroid="photo_camera"
-                />
-              </View>
-            ) : (
-              <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing="back"
-                barcodeScannerSettings={
-                  cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
-                }
-                onBarcodeScanned={cameraMode === 'qr' ? onQrScanned : undefined}
-                onMountError={() => {
-                  setCameraMountError(t('loans.scanner.cameraMountFailed'));
-                }}
-              />
-            )}
+            {showLivePreview ? liveCamera : cameraFallback}
           </BlurTargetView>
           )}
-          {cameraAvailable && !cameraMountError ? (
+          {showLivePreview ? (
             <View pointerEvents="none" style={styles.viewfinder}>
               <View style={[styles.viewfinderFrame, { borderColor: colors.onChrome }]} />
             </View>
@@ -836,15 +853,22 @@ export default function AdminScannerScreen() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.cameraDockScroll}>
             <GlassSurface
-              androidBlur={Platform.OS !== 'web'}
-              blurTarget={Platform.OS === 'web' ? undefined : cameraBlurTargetRef}
+              androidBlur={!isWeb}
+              blurTarget={isWeb ? undefined : cameraBlurTargetRef}
               intensity="strong"
               style={styles.cameraDock}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.dockHint}>
                 {previewHint}
               </ThemedText>
               <FormNotice error={formError} notice={formNotice} />
-              {cameraAvailable && !cameraMountError ? (
+              {isWeb && !showLivePreview ? (
+                <Button
+                  testID="scanner-enable-camera"
+                  label={t('loans.scanner.enableLiveCamera')}
+                  onPress={() => void enableWebLiveCamera()}
+                />
+              ) : null}
+              {showLivePreview ? (
                 <Button
                   testID="scanner-capture"
                   label={
@@ -860,7 +884,7 @@ export default function AdminScannerScreen() {
               <Button
                 testID="scanner-phone-camera"
                 label={t('loans.scanner.usePhoneCamera')}
-                variant={cameraAvailable && !cameraMountError ? 'secondary' : 'primary'}
+                variant={showLivePreview ? 'secondary' : isWeb ? 'secondary' : 'primary'}
                 loading={isBusy}
                 requiresNetwork
                 onPress={() => void pickPhoneCamera()}
