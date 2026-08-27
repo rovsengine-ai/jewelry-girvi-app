@@ -180,6 +180,8 @@ export interface LoanWithCustomer extends Loan {
     | 'address'
     | 'role'
     | 'id_document_type'
+    | 'id_document_last4'
+    | 'id_document_path'
     | 'kyc_verified_on'
     | 'guardian_name'
     | 'photo_path'

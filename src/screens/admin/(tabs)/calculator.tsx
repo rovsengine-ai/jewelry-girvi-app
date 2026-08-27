@@ -27,8 +27,8 @@ import { Radii, Spacing } from '@/constants/theme';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
 import { unknownMessage, type TranslateFn } from '@/i18n';
-import { formatBpsAsPercent, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { formatIsoDateInput } from '@/lib/format-iso-date-input';
+import { formatBpsAsPercent, percentInputToBps, rupeesInputToPaise, todayInKolkata } from '@/lib/money';
 import { readPracticeMode } from '@/lib/practice-mode';
 import { ADMIN_LOANS_HREF, isShopUser } from '@/lib/shop-tab-access';
 import { useAuth } from '@/providers/auth-provider';
@@ -37,10 +37,21 @@ import { quoteLoanPayoff } from '@/services/loanService';
 import type { InterestModel, QuoteLoanPayoff, QuotePayoffWhy } from '@/types/database';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const PERIOD_DAYS = 30;
+const DEFAULT_ROUND_UP_THRESHOLD = 24;
+
 type CalculatorMode = 'payoff' | 'interest' | 'age';
 type InterestCalcMode = 'simple' | 'compound';
 type InterestRateType = 'percent' | 'rupees';
 type InterestDurationMode = 'dates' | 'duration';
+type CompoundFrequency = 'yearly' | 'half_yearly' | 'quarterly' | 'monthly' | 'other';
+
+const COMPOUND_FREQUENCY_DAYS: Record<Exclude<CompoundFrequency, 'other'>, number> = {
+  yearly: 365,
+  half_yearly: 182,
+  quarterly: 90,
+  monthly: 30,
+};
 
 export function parseCalculatorIsoDate(raw: string): string | null {
   const trimmed = raw.trim();
@@ -81,6 +92,91 @@ function parseNonNegativeInt(raw: string): number | null {
   return value;
 }
 
+/**
+ * Shop-style retail accrual for practice mode: complete 30-day months +
+ * remainder days. Round-up only when remainder >= threshold; otherwise
+ * bill remainder as pro-rata days (e.g. 121d → 4 months + 1 day).
+ */
+function practiceQuotePayoff(input: {
+  principalPaise: number;
+  disbursedOn: string;
+  asOf: string;
+  interestModel: InterestModel;
+  rateBps: number;
+  roundUpThresholdDays?: number;
+}): QuoteLoanPayoff {
+  const days = utcDiffDays(input.disbursedOn, input.asOf);
+  const periodInterestPaise = Math.round((input.principalPaise * input.rateBps) / 10000);
+  const dailyInterestPaise = periodInterestPaise / PERIOD_DAYS;
+  const threshold = input.roundUpThresholdDays ?? DEFAULT_ROUND_UP_THRESHOLD;
+
+  let completePeriods = 0;
+  let remainderDays = 0;
+  let remainderRoundedUp = false;
+  let accruedInterestPaise = 0;
+  let why: QuotePayoffWhy = 'same_day';
+  let partialPeriodMode: QuoteLoanPayoff['partialPeriodMode'] = 'pro_rata';
+
+  if (days === 0) {
+    why = 'same_day';
+  } else if (input.interestModel === 'merchant') {
+    // Merchant: simple per-day, never round up.
+    accruedInterestPaise = Math.round(dailyInterestPaise * days);
+    completePeriods = Math.floor(days / PERIOD_DAYS);
+    remainderDays = days % PERIOD_DAYS;
+    why = 'merchant_per_day';
+    partialPeriodMode = 'pro_rata';
+  } else {
+    completePeriods = Math.floor(days / PERIOD_DAYS);
+    remainderDays = days % PERIOD_DAYS;
+    partialPeriodMode = 'min_month_then_pro_rata';
+    if (days > 0 && days < PERIOD_DAYS) {
+      accruedInterestPaise = periodInterestPaise;
+      why = 'first_month_floor';
+    } else if (remainderDays === 0) {
+      accruedInterestPaise = periodInterestPaise * completePeriods;
+      why = 'exact_periods';
+    } else if (remainderDays >= threshold) {
+      remainderRoundedUp = true;
+      accruedInterestPaise = periodInterestPaise * (completePeriods + 1);
+      why = 'remainder_round_up';
+    } else {
+      accruedInterestPaise =
+        periodInterestPaise * completePeriods + Math.round(dailyInterestPaise * remainderDays);
+      why = 'pro_rata_remainder';
+    }
+  }
+
+  return {
+    principalPaise: input.principalPaise,
+    accruedInterestPaise,
+    totalDuePaise: input.principalPaise + accruedInterestPaise,
+    daysElapsed: days,
+    completePeriods,
+    remainderDays,
+    remainderRoundedUp,
+    firstMonthFloorApplied: why === 'first_month_floor',
+    capitalized: false,
+    periodInterestPaise,
+    rateBps: input.rateBps,
+    interestModel: input.interestModel,
+    partialPeriodMode,
+    roundUpThresholdDays: threshold,
+    simplePeriodDays: 180,
+    disbursedOn: input.disbursedOn,
+    asOf: input.asOf,
+    why,
+  };
+}
+
+function compoundFrequencyDays(freq: CompoundFrequency, otherDays: string): number | null {
+  if (freq === 'other') {
+    const parsed = parsePositiveNumber(otherDays);
+    return parsed == null ? null : Math.round(parsed);
+  }
+  return COMPOUND_FREQUENCY_DAYS[freq];
+}
+
 function quoteWhyMessage(why: QuotePayoffWhy, t: TranslateFn): string {
   switch (why) {
     case 'same_day':
@@ -114,22 +210,33 @@ export default function ShopCalculatorScreen() {
   const tabBarPadding = useTabBarScrollPadding();
   const [mode, setMode] = useState<CalculatorMode>('payoff');
   const [amountRupees, setAmountRupees] = useState('');
-  const [pledgeDate, setPledgeDate] = useState(todayInKolkata);
-  const [payOn, setPayOn] = useState(todayInKolkata);
+  const [pledgeDate, setPledgeDate] = useState(() => todayInKolkata());
+  const [payOn, setPayOn] = useState(() => todayInKolkata());
   const [interestModel, setInterestModel] = useState<InterestModel>('retail');
+  const [payoffRatePercent, setPayoffRatePercent] = useState('');
   const [quote, setQuote] = useState<QuoteLoanPayoff | null>(null);
   const [isQuoting, setIsQuoting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const formRef = useRef({ amountRupees, pledgeDate, payOn, interestModel });
-  formRef.current = { amountRupees, pledgeDate, payOn, interestModel };
+  const formRef = useRef({
+    amountRupees,
+    pledgeDate,
+    payOn,
+    interestModel,
+    payoffRatePercent,
+  });
+  formRef.current = { amountRupees, pledgeDate, payOn, interestModel, payoffRatePercent };
   const [interestAmount, setInterestAmount] = useState('');
   const [interestRate, setInterestRate] = useState('');
-  const [interestRateType, setInterestRateType] = useState<InterestRateType>('rupees');
+  const [interestRateType, setInterestRateType] = useState<InterestRateType>('percent');
   const [interestCalcMode, setInterestCalcMode] = useState<InterestCalcMode>('simple');
   const [interestDurationMode, setInterestDurationMode] = useState<InterestDurationMode>('dates');
-  const [interestFromDate, setInterestFromDate] = useState(todayInKolkata);
-  const [interestToDate, setInterestToDate] = useState(todayInKolkata);
-  const [interestDurationDays, setInterestDurationDays] = useState('');
+  const [interestFromDate, setInterestFromDate] = useState(() => todayInKolkata());
+  const [interestToDate, setInterestToDate] = useState(() => todayInKolkata());
+  const [interestYears, setInterestYears] = useState('0');
+  const [interestMonths, setInterestMonths] = useState('0');
+  const [interestDays, setInterestDays] = useState('0');
+  const [compoundFrequency, setCompoundFrequency] = useState<CompoundFrequency>('yearly');
+  const [compoundOtherDays, setCompoundOtherDays] = useState('30');
   const [interestResult, setInterestResult] = useState<{
     days: number;
     interestRupees: number;
@@ -167,6 +274,16 @@ export default function ShopCalculatorScreen() {
     );
   }
 
+  const clearPayoff = () => {
+    setAmountRupees('');
+    setPledgeDate(todayInKolkata());
+    setPayOn(todayInKolkata());
+    setInterestModel('retail');
+    setPayoffRatePercent('');
+    setQuote(null);
+    setFormError(null);
+  };
+
   const onCalculate = async () => {
     setFormError(null);
     setQuote(null);
@@ -194,40 +311,32 @@ export default function ShopCalculatorScreen() {
       return;
     }
 
+    let rateBpsOverride: number | undefined;
+    if (form.payoffRatePercent.trim()) {
+      try {
+        rateBpsOverride = percentInputToBps(form.payoffRatePercent);
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : t('calculator.invalidRateOverride'));
+        return;
+      }
+    }
+
     setIsQuoting(true);
     try {
       const next = practiceMode
-        ? (() => {
-            const days = utcDiffDays(disbursedOn, asOf);
-            const rateBps = form.interestModel === 'merchant' ? 300 : 300;
-            const periodInterestPaise = Math.round((principalPaise * rateBps) / 10000);
-            const accruedInterestPaise = Math.round((periodInterestPaise * days) / 30);
-            return {
-              principalPaise,
-              accruedInterestPaise,
-              totalDuePaise: principalPaise + accruedInterestPaise,
-              daysElapsed: days,
-              completePeriods: Math.floor(days / 30),
-              remainderDays: days % 30,
-              remainderRoundedUp: false,
-              firstMonthFloorApplied: false,
-              capitalized: false,
-              periodInterestPaise,
-              rateBps,
-              interestModel: form.interestModel,
-              partialPeriodMode: 'pro_rata' as const,
-              roundUpThresholdDays: 15,
-              simplePeriodDays: 90,
-              disbursedOn,
-              asOf,
-              why: 'pro_rata_remainder' as const,
-            } satisfies QuoteLoanPayoff;
-          })()
+        ? practiceQuotePayoff({
+            principalPaise,
+            disbursedOn,
+            asOf,
+            interestModel: form.interestModel,
+            rateBps: rateBpsOverride ?? (form.interestModel === 'merchant' ? 150 : 250),
+          })
         : await quoteLoanPayoff({
             principalPaise,
             disbursedOn,
             asOf,
             interestModel: form.interestModel,
+            ...(rateBpsOverride != null ? { rateBps: rateBpsOverride } : {}),
           });
       setQuote(next);
     } catch (err) {
@@ -240,12 +349,16 @@ export default function ShopCalculatorScreen() {
   const clearInterest = () => {
     setInterestAmount('');
     setInterestRate('');
-    setInterestRateType('rupees');
+    setInterestRateType('percent');
     setInterestCalcMode('simple');
     setInterestDurationMode('dates');
-    setInterestFromDate(todayInKolkata);
-    setInterestToDate(todayInKolkata);
-    setInterestDurationDays('');
+    setInterestFromDate(todayInKolkata());
+    setInterestToDate(todayInKolkata());
+    setInterestYears('0');
+    setInterestMonths('0');
+    setInterestDays('0');
+    setCompoundFrequency('yearly');
+    setCompoundOtherDays('30');
     setInterestResult(null);
     setFormError(null);
   };
@@ -278,20 +391,34 @@ export default function ShopCalculatorScreen() {
         return;
       }
     } else {
-      const parsedDays = parseNonNegativeInt(interestDurationDays);
-      if (parsedDays === null) {
+      const years = parseNonNegativeInt(interestYears);
+      const months = parseNonNegativeInt(interestMonths);
+      const dayPart = parseNonNegativeInt(interestDays);
+      if (years === null || months === null || dayPart === null) {
         setFormError(t('calculator.interestCalc.invalidDuration'));
         return;
       }
-      days = parsedDays;
+      days = years * 365 + months * 30 + dayPart;
     }
 
-    const monthlyRate = interestRateType === 'percent' ? rateValue / 100 : rateValue / principal;
-    const dailyRate = monthlyRate / 30;
-    const interest =
-      interestCalcMode === 'compound'
-        ? principal * (Math.pow(1 + dailyRate, days) - 1)
-        : principal * dailyRate * days;
+    const monthlyRateFraction =
+      interestRateType === 'percent' ? rateValue / 100 : rateValue / principal;
+    const dailyRate = monthlyRateFraction / PERIOD_DAYS;
+
+    let interest: number;
+    if (interestCalcMode === 'simple') {
+      interest = principal * dailyRate * days;
+    } else {
+      const freqDays = compoundFrequencyDays(compoundFrequency, compoundOtherDays);
+      if (freqDays == null || freqDays <= 0) {
+        setFormError(t('calculator.interestCalc.invalidCompoundOther'));
+        return;
+      }
+      const ratePerPeriod = dailyRate * freqDays;
+      const periods = days / freqDays;
+      interest = principal * (Math.pow(1 + ratePerPeriod, periods) - 1);
+    }
+
     const total = principal + interest;
     setInterestResult({
       days,
@@ -407,7 +534,10 @@ export default function ShopCalculatorScreen() {
               <Field
                 label={t('calculator.amount')}
                 value={amountRupees}
-                onChangeText={setAmountRupees}
+                onChangeText={(value) => {
+                  setAmountRupees(value);
+                  if (quote) setQuote(null);
+                }}
                 keyboardType="numeric"
                 placeholder={t('calculator.amountPlaceholder')}
                 testID="calculator-amount"
@@ -415,7 +545,10 @@ export default function ShopCalculatorScreen() {
               <Field
                 label={t('calculator.pledgeDate')}
                 value={pledgeDate}
-                onChangeText={(value) => setPledgeDate(formatIsoDateInput(value))}
+                onChangeText={(value) => {
+                  setPledgeDate(formatIsoDateInput(value));
+                  if (quote) setQuote(null);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="number-pad"
@@ -425,7 +558,10 @@ export default function ShopCalculatorScreen() {
               <Field
                 label={t('calculator.payOn')}
                 value={payOn}
-                onChangeText={(value) => setPayOn(formatIsoDateInput(value))}
+                onChangeText={(value) => {
+                  setPayOn(formatIsoDateInput(value));
+                  if (quote) setQuote(null);
+                }}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="number-pad"
@@ -437,23 +573,57 @@ export default function ShopCalculatorScreen() {
                 <FilterChip
                   label={t('loans.interestModel.retail')}
                   selected={interestModel === 'retail'}
-                  onPress={() => setInterestModel('retail')}
+                  onPress={() => {
+                    setInterestModel('retail');
+                    if (quote) setQuote(null);
+                  }}
                   testID="calculator-model-retail"
                 />
                 <FilterChip
                   label={t('loans.interestModel.merchant')}
                   selected={interestModel === 'merchant'}
-                  onPress={() => setInterestModel('merchant')}
+                  onPress={() => {
+                    setInterestModel('merchant');
+                    setPayoffRatePercent('');
+                    if (quote) setQuote(null);
+                  }}
                   testID="calculator-model-merchant"
                 />
               </View>
-              <Button
-                testID="calculator-submit"
-                label={t('calculator.calculate')}
-                loading={isQuoting}
-                requiresNetwork
-                onPress={() => void onCalculate()}
+              {interestModel === 'merchant' ? (
+                <FormNotice info={t('calculator.merchantSimpleHint')} />
+              ) : null}
+              <Field
+                label={
+                  interestModel === 'retail'
+                    ? t('calculator.rateOverrideRetail')
+                    : t('calculator.rateOverrideMerchant')
+                }
+                value={payoffRatePercent}
+                onChangeText={(value) => {
+                  setPayoffRatePercent(value);
+                  if (quote) setQuote(null);
+                }}
+                keyboardType="decimal-pad"
+                placeholder={t('calculator.rateOverridePlaceholder')}
+                testID="calculator-rate-override"
               />
+              <ThemedText type="small">{t('calculator.rateOverrideHint')}</ThemedText>
+              <View style={styles.buttonRow}>
+                <Button
+                  testID="calculator-clear"
+                  label={t('common.clear')}
+                  variant="secondary"
+                  onPress={clearPayoff}
+                />
+                <Button
+                  testID="calculator-submit"
+                  label={t('calculator.calculate')}
+                  loading={isQuoting}
+                  requiresNetwork={!practiceMode}
+                  onPress={() => void onCalculate()}
+                />
+              </View>
             </Card>
           </>
         ) : null}
@@ -462,6 +632,7 @@ export default function ShopCalculatorScreen() {
           <>
             <SectionLabel>{t('calculator.interestCalc.title')}</SectionLabel>
             <Card style={styles.formCard}>
+              <ThemedText type="smallBold">{t('calculator.interestCalc.interestType')}</ThemedText>
               <View style={styles.modelRow}>
                 <FilterChip
                   label={t('calculator.interestCalc.simple')}
@@ -477,9 +648,13 @@ export default function ShopCalculatorScreen() {
               <Field
                 label={t('calculator.interestCalc.principalAmount')}
                 value={interestAmount}
-                onChangeText={setInterestAmount}
+                onChangeText={(value) => {
+                  setInterestAmount(value);
+                  if (interestResult) setInterestResult(null);
+                }}
                 keyboardType="numeric"
               />
+              <ThemedText type="smallBold">{t('calculator.interestCalc.rateUnit')}</ThemedText>
               <View style={styles.modelRow}>
                 <FilterChip
                   label={t('calculator.interestCalc.rateTypeRupees')}
@@ -502,6 +677,7 @@ export default function ShopCalculatorScreen() {
                 onChangeText={setInterestRate}
                 keyboardType="numeric"
               />
+              <ThemedText type="smallBold">{t('calculator.interestCalc.timeMode')}</ThemedText>
               <View style={styles.modelRow}>
                 <FilterChip
                   label={t('calculator.interestCalc.useDates')}
@@ -536,13 +712,64 @@ export default function ShopCalculatorScreen() {
                   />
                 </>
               ) : (
-                <Field
-                  label={t('calculator.interestCalc.durationDays')}
-                  value={interestDurationDays}
-                  onChangeText={setInterestDurationDays}
-                  keyboardType="number-pad"
-                />
+                <View style={styles.durationRow}>
+                  <View style={styles.durationField}>
+                    <Field
+                      label={t('calculator.interestCalc.years')}
+                      value={interestYears}
+                      onChangeText={setInterestYears}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                  <View style={styles.durationField}>
+                    <Field
+                      label={t('calculator.interestCalc.months')}
+                      value={interestMonths}
+                      onChangeText={setInterestMonths}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                  <View style={styles.durationField}>
+                    <Field
+                      label={t('calculator.interestCalc.daysPart')}
+                      value={interestDays}
+                      onChangeText={setInterestDays}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
               )}
+              {interestCalcMode === 'compound' ? (
+                <>
+                  <ThemedText type="smallBold">{t('calculator.interestCalc.compoundFrequency')}</ThemedText>
+                  <View style={styles.modelRow}>
+                    {(
+                      [
+                        ['yearly', 'freqYearly'],
+                        ['half_yearly', 'freqHalfYearly'],
+                        ['quarterly', 'freqQuarterly'],
+                        ['monthly', 'freqMonthly'],
+                        ['other', 'freqOther'],
+                      ] as const
+                    ).map(([id, labelKey]) => (
+                      <FilterChip
+                        key={id}
+                        label={t(`calculator.interestCalc.${labelKey}`)}
+                        selected={compoundFrequency === id}
+                        onPress={() => setCompoundFrequency(id)}
+                      />
+                    ))}
+                  </View>
+                  {compoundFrequency === 'other' ? (
+                    <Field
+                      label={t('calculator.interestCalc.compoundOtherDays')}
+                      value={compoundOtherDays}
+                      onChangeText={setCompoundOtherDays}
+                      keyboardType="number-pad"
+                    />
+                  ) : null}
+                </>
+              ) : null}
               <View style={styles.buttonRow}>
                 <Button label={t('common.clear')} variant="secondary" onPress={clearInterest} />
                 <Button label={t('calculator.calculate')} onPress={calculateInterest} />
@@ -643,6 +870,14 @@ export default function ShopCalculatorScreen() {
             <View style={styles.why}>
               <FormNotice info={quoteWhyMessage(quote.why, t)} />
             </View>
+            <View style={styles.dismissRow}>
+              <Button
+                testID="calculator-dismiss-result"
+                label={t('calculator.dismissResult')}
+                variant="secondary"
+                onPress={clearPayoff}
+              />
+            </View>
           </>
         ) : null}
         {mode === 'interest' && interestResult ? (
@@ -663,6 +898,13 @@ export default function ShopCalculatorScreen() {
                 trailing={<MoneyText paise={Math.round(interestResult.totalRupees * 100)} />}
               />
             </SettingsGroup>
+            <View style={styles.dismissRow}>
+              <Button
+                label={t('calculator.dismissResult')}
+                variant="secondary"
+                onPress={clearInterest}
+              />
+            </View>
           </>
         ) : null}
         {mode === 'age' && ageResult ? (
@@ -723,6 +965,17 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     flexDirection: 'row',
     gap: Spacing.two,
+  },
+  dismissRow: {
+    marginHorizontal: Spacing.four,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  durationField: {
+    flex: 1,
+    minWidth: 0,
   },
   goldPill: {
     marginHorizontal: Spacing.three,

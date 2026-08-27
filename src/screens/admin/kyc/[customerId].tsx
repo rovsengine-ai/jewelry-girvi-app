@@ -7,7 +7,7 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
@@ -49,18 +49,22 @@ export default function KycCaptureScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScreenHeader showBack title={t('kyc.title')} />
-      <ThemedView style={styles.body}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.body}>
         <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         {isLoading ? (
           <ListSkeleton rows={6} />
         ) : error || !customer ? (
           <EmptyState title={t('kyc.loadErrorTitle')} body={error ?? t('kyc.customerNotFound')} />
         ) : (
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.content}>
             <KycCaptureForm customer={customer} />
           </ScrollView>
         )}
-      </ThemedView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

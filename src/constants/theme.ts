@@ -838,7 +838,7 @@ export const Glass = {
   blurIntensity: Platform.select({ ios: 40, android: 28, default: 28 }) ?? 28,
   /** Stronger soft blur for floating docks / choice sheets. */
   blurIntensityStrong: Platform.select({ ios: 64, android: 42, default: 42 }) ?? 42,
-  tabBarHeight: Platform.select({ ios: 50, android: 56, default: 56 }) ?? 56,
+  tabBarHeight: Platform.select({ ios: 50, android: 56, web: 64, default: 56 }) ?? 56,
   headerHeight: 56,
   get supportsNativeGlass(): boolean {
     // Liquid Glass is iOS-only; never probe the native module on web/Android.
@@ -873,5 +873,5 @@ export const Elevation = {
   }) as ViewStyle,
 };
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+export const BottomTabInset = Platform.select({ ios: 50, android: 80, web: 88, default: 80 }) ?? 80;
 export const MaxContentWidth = 800;

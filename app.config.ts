@@ -40,7 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...config,
-    name: config.name ?? 'Girvi Sewa',
+    name: config.name ?? 'GIRVI SEWA',
     slug: config.slug ?? 'jewelry-girvi-app',
     android: {
       ...config.android,

@@ -936,6 +936,7 @@ describe('updateShopDefaults', () => {
     await expect(
       updateShopDefaults({
         rateBps: 400,
+        merchantRateBps: 150,
         partialPeriodMode: 'pro_rata',
         roundUpThresholdDays: 20,
         simplePeriodDays: 180,
@@ -945,6 +946,7 @@ describe('updateShopDefaults', () => {
     ).resolves.toMatchObject({ rate_bps: 400 });
     expect(rpc).toHaveBeenCalledWith('update_shop_defaults', {
       p_rate_bps: 400,
+      p_merchant_rate_bps: 150,
       p_partial_period_mode: 'pro_rata',
       p_round_up_threshold_days: 20,
       p_simple_period_days: 180,

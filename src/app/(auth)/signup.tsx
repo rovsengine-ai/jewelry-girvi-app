@@ -104,11 +104,6 @@ export default function SignupScreen() {
 
     const role = (profileRow as Profile | null)?.role as UserRole | undefined;
     if (role === 'owner' || role === 'staff') {
-      if (Platform.OS === 'web') {
-        await signOut();
-        setFormError(t('auth.webShopUseMobile'));
-        return;
-      }
       router.replace(routeForRole(role));
       return;
     }
@@ -120,7 +115,7 @@ export default function SignupScreen() {
     <ThemedView style={styles.container}>
       <ScreenHeader title={t('auth.signUpTitle')} subtitle={t('auth.createPinFromShopHint')} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.form}>
         <View style={styles.content}>
           <Card>
@@ -144,6 +139,7 @@ export default function SignupScreen() {
               keyboardType="number-pad"
               maxLength={6}
               secureTextEntry
+              secureToggle
               editable={!isSubmitting}
               testID="signup-pin"
             />
@@ -155,6 +151,7 @@ export default function SignupScreen() {
               keyboardType="number-pad"
               maxLength={6}
               secureTextEntry
+              secureToggle
               editable={!isSubmitting}
               testID="signup-pin-confirm"
             />

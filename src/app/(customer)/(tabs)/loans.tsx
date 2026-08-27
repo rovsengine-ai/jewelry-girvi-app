@@ -4,7 +4,6 @@
  *
  * Expo Router (SDK 57): https://docs.expo.dev/versions/v57.0.0/sdk/router/
  */
-import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
@@ -14,11 +13,12 @@ import { Badge } from '@/components/badge';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { FormNotice } from '@/components/form-notice';
+import { PreviewImage } from '@/components/image-lightbox';
 import { ListSkeleton } from '@/components/list-row-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radii, Sizes, Spacing } from '@/constants/theme';
+import { Sizes, Spacing } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useLoansPaymentsRealtime } from '@/hooks/use-loans-payments-realtime';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
@@ -189,10 +189,12 @@ export default function CustomerLoansScreen() {
               <Animated.View entering={rowEntering(index, reduceMotion)}>
                 <Card style={styles.card} testID={`customer-loan-${item.serial_number}`}>
                   {item.displayUrl ? (
-                    <Image
-                      source={{ uri: item.displayUrl }}
-                      style={styles.receiptImage}
-                      contentFit="cover"
+                    <PreviewImage
+                      uri={item.displayUrl}
+                      variant="wide"
+                      testID={`customer-loan-receipt-${item.serial_number}`}
+                      accessibilityLabel={t('loans.detail.receiptImage')}
+                      style={styles.media}
                     />
                   ) : (
                     <View style={styles.receiptPlaceholder}>
@@ -200,19 +202,21 @@ export default function CustomerLoansScreen() {
                     </View>
                   )}
                   {item.signatureUrl ? (
-                    <Image
-                      source={{ uri: item.signatureUrl }}
-                      style={styles.signatureImage}
-                      contentFit="contain"
+                    <PreviewImage
+                      uri={item.signatureUrl}
+                      variant="wide"
+                      testID={`customer-loan-signature-${item.serial_number}`}
                       accessibilityLabel={t('loans.detail.pledgeSignature')}
+                      style={[styles.media, styles.signatureWell]}
                     />
                   ) : null}
                   {item.itemPhotoUrl ? (
-                    <Image
-                      source={{ uri: item.itemPhotoUrl }}
-                      style={styles.itemPhoto}
-                      contentFit="cover"
+                    <PreviewImage
+                      uri={item.itemPhotoUrl}
+                      variant="wide"
+                      testID={`customer-loan-item-${item.serial_number}`}
                       accessibilityLabel={t('items.photo')}
+                      style={styles.media}
                     />
                   ) : null}
                   <View style={styles.badgeWrap}>
@@ -244,20 +248,9 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: Spacing.four, gap: Spacing.two, paddingTop: Spacing.two },
   loader: { marginTop: Spacing.five },
   listContent: { gap: Spacing.three, paddingBottom: Spacing.five },
-  card: { overflow: 'hidden', padding: 0 },
-  receiptImage: { width: '100%', height: Sizes.receiptImageHeight, borderRadius: Radii.md },
-  signatureImage: {
-    width: '100%',
-    height: Sizes.signatureThumbHeight,
-    marginTop: Spacing.two,
-    backgroundColor: '#FFFFFF',
-  },
-  itemPhoto: {
-    width: '100%',
-    height: Sizes.itemPhotoThumbHeight,
-    marginTop: Spacing.two,
-    borderRadius: Radii.md,
-  },
+  card: { overflow: 'hidden', padding: Spacing.two, gap: Spacing.two },
+  media: { marginTop: Spacing.one },
+  signatureWell: { backgroundColor: '#FFFFFF' },
   receiptPlaceholder: {
     minHeight: Sizes.receiptPlaceholderHeight,
     alignItems: 'center',

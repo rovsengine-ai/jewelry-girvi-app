@@ -1,5 +1,6 @@
 /**
  * Full-screen local/remote image preview with pinch/scroll zoom.
+ * Thumbnails use contentFit="contain" so photos are not squashed.
  * https://docs.expo.dev/versions/v57.0.0/sdk/image/
  */
 import { Image } from 'expo-image';
@@ -12,11 +13,13 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useLanguage } from '@/providers/language-provider';
 
@@ -95,6 +98,50 @@ export function ImagePreviewTap({
   );
 }
 
+type PreviewImageProps = {
+  uri: string;
+  testID?: string;
+  accessibilityLabel?: string;
+  /** Visual well style. Defaults to a 4:3 contain preview. */
+  variant?: 'wide' | 'square' | 'portrait' | 'avatar';
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Tappable image that keeps aspect ratio (contain) and opens a lightbox.
+ * Prefer this over raw Image + fixed height + cover for receipts/items/KYC.
+ */
+export function PreviewImage({
+  uri,
+  testID,
+  accessibilityLabel,
+  variant = 'wide',
+  style,
+}: PreviewImageProps) {
+  const colors = useTheme();
+  const frameStyle =
+    variant === 'square'
+      ? styles.frameSquare
+      : variant === 'portrait'
+        ? styles.framePortrait
+        : variant === 'avatar'
+          ? styles.frameAvatar
+          : styles.frameWide;
+
+  return (
+    <ImagePreviewTap uri={uri} testID={testID}>
+      <View style={[frameStyle, { backgroundColor: colors.backgroundElement }, style]}>
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          accessibilityLabel={accessibilityLabel}
+        />
+      </View>
+    </ImagePreviewTap>
+  );
+}
+
 const styles = StyleSheet.create({
   backdrop: { flex: 1 },
   scroll: { flex: 1 },
@@ -112,5 +159,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.two,
+  },
+  frameWide: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+  },
+  framePortrait: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+  },
+  frameSquare: {
+    width: 96,
+    height: 96,
+    borderRadius: Radii.sm,
+    overflow: 'hidden',
+  },
+  frameAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: Radii.pill,
+    overflow: 'hidden',
   },
 });

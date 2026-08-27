@@ -4,17 +4,17 @@
  * Photos: https://docs.expo.dev/versions/v57.0.0/sdk/image/
  * Accordion: https://docs.expo.dev/versions/v57.0.0/sdk/reanimated/
  */
-import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { Accordion, useChevronRotation } from '@/components/accordion';
 import { ArchiveConfirm } from '@/components/archive-confirm';
 import { AppIcon } from '@/components/app-icon';
 import { CustomerAvatar } from '@/components/customer-avatar';
+import { ImagePreviewTap, PreviewImage } from '@/components/image-lightbox';
 import { Badge } from '@/components/badge';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -34,6 +34,7 @@ import { TokenQr } from '@/components/token-qr';
 import { MinTouchTarget, Radii, Sizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { unknownMessage } from '@/i18n';
+import { fitQrSize } from '@/lib/fit-qr-size';
 import { newIdempotencyKey } from '@/lib/idempotency';
 import { kycStatusLabel } from '@/lib/kyc';
 import {
@@ -69,7 +70,7 @@ import {
   resetCustomerPin,
 } from '@/services/customerAuthService';
 import { shareHtmlAsPdf } from '@/services/printService';
-import { resolveCustomerPhotoUrl } from '@/services/kycService';
+import { resolveCustomerPhotoUrl, resolveKycDisplayUrl } from '@/services/kycService';
 import type { LoanBalances, LoanItem, LoanWithCustomer, Payment } from '@/types/database';
 
 export default function LoanDetailScreen() {
@@ -78,14 +79,18 @@ export default function LoanDetailScreen() {
   const { profile } = useAuth();
   const { t, language } = useLanguage();
   const colors = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const receiptQrSize = fitQrSize(windowWidth, Sizes.qrCode, 80);
+  const activationQrSize = fitQrSize(windowWidth, Sizes.qrCodeLarge, 72);
   const isOwner = profile?.role === 'owner';
   const isShopUser = profile?.role === 'owner' || profile?.role === 'staff';
 
   const [loan, setLoan] = useState<LoanWithCustomer | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [balances, setBalances] = useState<LoanBalances | null>(null);
-  const [receiptDisplayUrl, setReceiptDisplayUrl] = useState<string | null>(null);
   const [customerPhotoUrl, setCustomerPhotoUrl] = useState<string | null>(null);
+  const [idDocumentUrl, setIdDocumentUrl] = useState<string | null>(null);
+  const [receiptDisplayUrl, setReceiptDisplayUrl] = useState<string | null>(null);
   const [dueOn, setDueOn] = useState<string | null>(null);
   const [items, setItems] = useState<LoanItem[]>([]);
   const [itemPhotoUrls, setItemPhotoUrls] = useState<Record<string, string>>({});
@@ -137,6 +142,8 @@ export default function LoanDetailScreen() {
               address,
               role,
               id_document_type,
+              id_document_last4,
+              id_document_path,
               kyc_verified_on,
               guardian_name,
               photo_path
@@ -159,13 +166,13 @@ export default function LoanDetailScreen() {
     setPayments((paymentData ?? []) as Payment[]);
 
     if (loanData) {
-      const [nextBalances, signed, photoSigned, pledgeSigned, releaseSigned, nextDueOn, nextItems, overdueRows] =
+      const profile = (loanData as LoanWithCustomer).profiles;
+      const [nextBalances, signed, photoSigned, idSigned, pledgeSigned, releaseSigned, nextDueOn, nextItems, overdueRows] =
         await Promise.all([
         fetchLoanBalances(id, todayInKolkata()),
         resolveReceiptDisplayUrl(loanData.receipt_image_url),
-        resolveCustomerPhotoUrl(
-          (loanData as LoanWithCustomer).profiles?.photo_path ?? null,
-        ),
+        resolveCustomerPhotoUrl(profile?.photo_path ?? null),
+        resolveKycDisplayUrl(profile?.id_document_path ?? null).catch(() => null),
         resolveReceiptDisplayUrl(loanData.digital_signature_url),
         resolveReceiptDisplayUrl(loanData.release_signature_url),
         fetchLoanCurrentDueOn(id),
@@ -175,6 +182,7 @@ export default function LoanDetailScreen() {
       setBalances(nextBalances);
       setReceiptDisplayUrl(signed);
       setCustomerPhotoUrl(photoSigned);
+      setIdDocumentUrl(idSigned);
       setPledgeSignatureUrl(pledgeSigned);
       setReleaseSignatureUrl(releaseSigned);
       setDueOn(nextDueOn);
@@ -194,6 +202,7 @@ export default function LoanDetailScreen() {
     } else {
       setReceiptDisplayUrl(null);
       setCustomerPhotoUrl(null);
+      setIdDocumentUrl(null);
       setPledgeSignatureUrl(null);
       setReleaseSignatureUrl(null);
       setDueOn(null);
@@ -461,7 +470,10 @@ export default function LoanDetailScreen() {
           </PressableScale>
         }
       />
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={styles.body}>
         <View style={styles.padded}>
           <FormNotice error={formError} notice={formNotice} />
           {loan.status === 'redeemed' && loan.archived_at == null ? (
@@ -485,10 +497,12 @@ export default function LoanDetailScreen() {
               }
               onPress={() => setCustomerOpen(!customerOpen)}
               style={styles.customerPress}>
-              <CustomerAvatar
-                name={loan.profiles?.full_name}
-                photoUrl={customerPhotoUrl}
-              />
+              <ImagePreviewTap uri={customerPhotoUrl} testID="loan-customer-photo-preview">
+                <CustomerAvatar
+                  name={loan.profiles?.full_name}
+                  photoUrl={customerPhotoUrl}
+                />
+              </ImagePreviewTap>
               <View style={styles.customerCopy}>
                 <ThemedText type="bodyLarge">
                   {loan.profiles?.full_name ?? t('common.unknownCustomer')}
@@ -545,16 +559,42 @@ export default function LoanDetailScreen() {
         <View style={styles.padded}>
           <ListRow
             tone="elevated"
-            isLast
+            isLast={!customerPhotoUrl && !idDocumentUrl}
             testID="loan-kyc-status"
             content={
-              <ThemedText type="label">
+              <ThemedText type="bodyLarge">
                 {t('loans.detail.kycLine', {
                   status: kycStatusLabel(loan.profiles?.kyc_verified_on ?? null, language),
                 })}
               </ThemedText>
             }
           />
+          {customerPhotoUrl || idDocumentUrl ? (
+            <View style={styles.kycPhotos}>
+              {customerPhotoUrl ? (
+                <View style={styles.kycPhotoBlock}>
+                  <ThemedText type="smallBold">{t('kyc.customerPhoto')}</ThemedText>
+                  <PreviewImage
+                    uri={customerPhotoUrl}
+                    variant="portrait"
+                    testID="loan-kyc-customer-photo"
+                    accessibilityLabel={t('kyc.customerPhoto')}
+                  />
+                </View>
+              ) : null}
+              {idDocumentUrl ? (
+                <View style={styles.kycPhotoBlock}>
+                  <ThemedText type="smallBold">{t('kyc.photographId')}</ThemedText>
+                  <PreviewImage
+                    uri={idDocumentUrl}
+                    variant="wide"
+                    testID="loan-kyc-id-photo"
+                    accessibilityLabel={t('kyc.photographId')}
+                  />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           <Button
             testID="open-kyc"
             label={t('loans.detail.captureVerifyKyc')}
@@ -564,17 +604,28 @@ export default function LoanDetailScreen() {
         </View>
 
         {receiptDisplayUrl ? (
-          <Image source={{ uri: receiptDisplayUrl }} style={styles.receipt} contentFit="cover" />
+          <View style={styles.mediaBlock}>
+            <ThemedText type="smallBold" style={styles.mediaLabel}>
+              {t('loans.detail.receiptImage')}
+            </ThemedText>
+            <PreviewImage
+              uri={receiptDisplayUrl}
+              variant="wide"
+              testID="loan-receipt-preview"
+              accessibilityLabel={t('loans.detail.receiptImage')}
+            />
+          </View>
         ) : null}
 
         <Card style={styles.block}>
           <ThemedText type="smallBold">{t('loans.detail.pledgeSignature')}</ThemedText>
           {pledgeSignatureUrl ? (
-            <Image
-              source={{ uri: pledgeSignatureUrl }}
-              style={styles.signature}
-              contentFit="contain"
+            <PreviewImage
+              uri={pledgeSignatureUrl}
+              variant="wide"
+              testID="loan-pledge-signature"
               accessibilityLabel={t('loans.detail.pledgeSignature')}
+              style={styles.signatureWell}
             />
           ) : (
             <ThemedText type="small" themeColor="textSecondary">
@@ -585,11 +636,12 @@ export default function LoanDetailScreen() {
             <>
               <ThemedText type="smallBold">{t('loans.detail.releaseSignature')}</ThemedText>
               {releaseSignatureUrl ? (
-                <Image
-                  source={{ uri: releaseSignatureUrl }}
-                  style={styles.signature}
-                  contentFit="contain"
+                <PreviewImage
+                  uri={releaseSignatureUrl}
+                  variant="wide"
+                  testID="loan-release-signature"
                   accessibilityLabel={t('loans.detail.releaseSignature')}
+                  style={styles.signatureWell}
                 />
               ) : (
                 <ThemedText type="small" themeColor="textSecondary">
@@ -785,10 +837,10 @@ export default function LoanDetailScreen() {
                   isLast={index === items.length - 1}
                   leading={
                     itemPhotoUrls[item.id] ? (
-                      <Image
-                        source={{ uri: itemPhotoUrls[item.id] }}
-                        style={styles.itemThumb}
-                        contentFit="cover"
+                      <PreviewImage
+                        uri={itemPhotoUrls[item.id]}
+                        variant="square"
+                        testID={`loan-item-photo-${item.id}`}
                         accessibilityLabel={t('items.photo')}
                       />
                     ) : (
@@ -823,7 +875,7 @@ export default function LoanDetailScreen() {
         <Card style={styles.block} testID="loan-receipt-qr">
           {loanQrValue ? (
             <View style={styles.loanQrWrap}>
-              <TokenQr value={loanQrValue} size={Sizes.qrCode} testID="loan-receipt-qr-code" />
+              <TokenQr value={loanQrValue} size={receiptQrSize} testID="loan-receipt-qr-code" />
               <ThemedText type="small" themeColor="textSecondary">
                 {t('loans.detail.loanQrHint')}
               </ThemedText>
@@ -1032,6 +1084,10 @@ export default function LoanDetailScreen() {
         <View
           testID="customer-qr-overlay"
           style={[styles.customerQrOverlay, { backgroundColor: colors.overlay }]}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.customerQrScroll}
+            style={styles.customerQrScrollView}>
           <Card style={styles.customerQrCard}>
             <ThemedText type="smallBold">{t('loans.detail.customerQrTitle')}</ThemedText>
             <ThemedText type="small">{t('loans.detail.customerQrHint')}</ThemedText>
@@ -1044,14 +1100,26 @@ export default function LoanDetailScreen() {
                 <View style={styles.activationQrWrap}>
                   <TokenQr
                     value={customerQrUrl}
-                    size={Sizes.qrCodeLarge}
+                    size={activationQrSize}
                     testID="customer-activation-qr"
                   />
                 </View>
                 <ThemedText type="label">{t('loans.detail.customerQrLinkLabel')}</ThemedText>
-                <ThemedText type="small" selectable>
+                <ThemedText type="small" selectable style={styles.breakUrl}>
                   {customerQrUrl}
                 </ThemedText>
+                {Platform.OS === 'web' ? (
+                  <Button
+                    testID="customer-qr-copy"
+                    label={t('loans.detail.customerQrCopy')}
+                    variant="secondary"
+                    onPress={() => {
+                      void navigator.clipboard?.writeText(customerQrUrl).then(() => {
+                        setFormNotice(t('loans.detail.customerQrCopied'));
+                      });
+                    }}
+                  />
+                ) : null}
                 <ThemedText type="smallBold">
                   {customerQrRemainingMs > 0
                     ? t('loans.detail.customerQrCountdown', {
@@ -1068,6 +1136,7 @@ export default function LoanDetailScreen() {
               onPress={closeCustomerQr}
             />
           </Card>
+          </ScrollView>
         </View>
       ) : null}
       {resetPinOpen ? (
@@ -1121,10 +1190,23 @@ const styles = StyleSheet.create({
   customerQrOverlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',
+  },
+  customerQrScrollView: {
+    maxHeight: '100%',
+  },
+  customerQrScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
     padding: Spacing.four,
   },
   customerQrCard: {
     gap: Spacing.three,
+    width: '100%',
+    maxWidth: '100%',
+  },
+  breakUrl: {
+    width: '100%',
+    ...(Platform.OS === 'web' ? { wordBreak: 'break-all' as const } : {}),
   },
   activationQrWrap: {
     alignItems: 'center',
@@ -1161,6 +1243,7 @@ const styles = StyleSheet.create({
   },
   threeUp: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.two,
     paddingTop: Spacing.two,
   },
@@ -1170,8 +1253,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   stat: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 1,
+    flexBasis: 96,
+    minWidth: 96,
     gap: Spacing.half,
   },
   termsHead: {
@@ -1197,22 +1281,39 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   heroName: { flex: 1, minWidth: 0 },
-  receipt: {
-    width: 'auto',
+  mediaBlock: {
     marginHorizontal: Spacing.four,
-    height: Sizes.receiptThumbHeight,
+    gap: Spacing.one,
+    marginVertical: Spacing.two,
+  },
+  mediaLabel: {
+    paddingHorizontal: Spacing.half,
+  },
+  kycPhotos: {
+    gap: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  kycPhotoBlock: {
+    gap: Spacing.one,
+  },
+  signatureWell: {
+    backgroundColor: '#FFFFFF',
+  },
+  receipt: {
+    width: '100%',
+    aspectRatio: 4 / 3,
     borderRadius: Radii.md,
     marginVertical: Spacing.two,
   },
   signature: {
     width: '100%',
-    height: Sizes.signatureThumbHeight,
+    aspectRatio: 4 / 3,
     borderRadius: Radii.sm,
     backgroundColor: '#FFFFFF',
   },
   itemThumb: {
-    width: MinTouchTarget,
-    height: MinTouchTarget,
+    width: 96,
+    height: 96,
     borderRadius: Radii.sm,
   },
   actions: {

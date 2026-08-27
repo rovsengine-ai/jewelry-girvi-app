@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppIcon } from '@/components/app-icon';
 import { Card } from '@/components/card';
@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ListRow } from '@/components/list-row';
 import { ListSkeleton } from '@/components/list-row-skeleton';
 import { MoneyText } from '@/components/money-text';
+import { PressableScale } from '@/components/pressable-scale';
 import { ScreenHeader } from '@/components/screen-header';
 import { SectionLabel } from '@/components/section-label';
 import { SettingsGroup } from '@/components/settings-group';
@@ -40,6 +41,7 @@ export default function AdminInsightsScreen() {
 
   const [yieldRows, setYieldRows] = useState<RateYield[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const isOwner = isShopOwner(profile?.role);
@@ -74,6 +76,18 @@ export default function AdminInsightsScreen() {
       }
     })();
   }, [isOwner, loadYield, t]);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    setLoadError(null);
+    try {
+      await loadYield();
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : t('loans.insights.loadErrorBody'));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const totalCapitalPaise = yieldRows.reduce((sum, row) => sum + row.principal_paise, 0);
   const totalOnePeriodPaise = yieldRows.reduce((sum, row) => sum + row.one_period_yield_paise, 0);
@@ -117,9 +131,23 @@ export default function AdminInsightsScreen() {
         leading={
           <AppIcon ios="diamond.fill" android="diamond" color={colors.gold} />
         }
+        trailing={
+          <PressableScale
+            testID="insights-refresh"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.refresh')}
+            onPress={() => void onRefresh()}
+            style={styles.refreshHit}>
+            <AppIcon ios="arrow.clockwise" android="refresh" color={colors.onChrome} />
+          </PressableScale>
+        }
         hero={goldHero}
       />
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: tabBarPadding }]}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => void onRefresh()} />
+        }>
         {loadError ? (
           <EmptyState title={t('loans.insights.loadErrorTitle')} body={loadError} />
         ) : null}
@@ -205,4 +233,10 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
   },
   analyticsCard: { flex: 1 },
+  refreshHit: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

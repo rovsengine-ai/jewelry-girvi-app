@@ -19,13 +19,12 @@ import { FilterChip } from '@/components/filter-chip';
 import { FormNotice } from '@/components/form-notice';
 import { ListRow } from '@/components/list-row';
 import { ListSkeleton } from '@/components/list-row-skeleton';
-import { PressableScale } from '@/components/pressable-scale';
 import { LanguageSettingsRow, ScreenHeader } from '@/components/screen-header';
 import { SectionLabel } from '@/components/section-label';
 import { SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
 import { formatBpsAsPercent, percentInputToBps } from '@/lib/money';
@@ -117,6 +116,7 @@ export default function ShopSettingsScreen() {
   const { isOffline } = useNetwork();
 
   const [ratePercent, setRatePercent] = useState('');
+  const [merchantRatePercent, setMerchantRatePercent] = useState('');
   const [simplePeriodDays, setSimplePeriodDays] = useState('');
   const [compoundEveryDays, setCompoundEveryDays] = useState('');
   const [graceDays, setGraceDays] = useState('');
@@ -162,6 +162,7 @@ export default function ShopSettingsScreen() {
       try {
         const defaults = await fetchShopDefaults();
         setRatePercent(formatBpsAsPercent(defaults.rate_bps));
+        setMerchantRatePercent(formatBpsAsPercent(defaults.merchant_rate_bps));
         setSimplePeriodDays(String(defaults.simple_period_days));
         setCompoundEveryDays(String(defaults.compound_every_days));
         setGraceDays(String(defaults.grace_days));
@@ -201,8 +202,10 @@ export default function ShopSettingsScreen() {
     setIsSaving(true);
     try {
       const rateBps = percentInputToBps(ratePercent);
+      const merchantRateBps = percentInputToBps(merchantRatePercent);
       const next = await updateShopDefaults({
         rateBps,
+        merchantRateBps,
         partialPeriodMode,
         roundUpThresholdDays: parseWholeNumber(
           roundUpThresholdDays,
@@ -214,6 +217,7 @@ export default function ShopSettingsScreen() {
         graceDays: parseWholeNumber(graceDays, t('settings.graceDays'), t),
       });
       setRatePercent(formatBpsAsPercent(next.rate_bps));
+      setMerchantRatePercent(formatBpsAsPercent(next.merchant_rate_bps));
       setFormNotice(t('settings.saved'));
     } catch (error) {
       const message = error instanceof Error ? error.message : t('errors.unknown');
@@ -449,6 +453,7 @@ export default function ShopSettingsScreen() {
             onChangeText={setTeamPin}
             keyboardType="number-pad"
             secureTextEntry
+            secureToggle
             testID="team-pin"
           />
           <ThemedText type="smallBold">{t('settings.teamRole')}</ThemedText>
@@ -539,6 +544,10 @@ export default function ShopSettingsScreen() {
           notice={formNotice}
         />
 
+        <SectionLabel>{t('settings.retailDefaults')}</SectionLabel>
+        <ThemedText type="small" style={styles.hint}>
+          {t('settings.retailDefaultsHint')}
+        </ThemedText>
         <Card>
           <Field
             label={t('settings.rateLabel')}
@@ -572,24 +581,34 @@ export default function ShopSettingsScreen() {
             onChangeText={setRoundUpThresholdDays}
             keyboardType="number-pad"
           />
+          <ThemedText type="small">{t('settings.roundUpThresholdHint')}</ThemedText>
           <ThemedText type="smallBold">{t('settings.partialPeriodMode')}</ThemedText>
           <View style={styles.modeRow}>
             {(Object.keys(MODE_KEYS) as PartialPeriodMode[]).map((id) => (
-              <PressableScale
+              <FilterChip
                 key={id}
+                testID={`partial-mode-${id}`}
+                label={t(MODE_KEYS[id])}
+                selected={partialPeriodMode === id}
                 onPress={() => setPartialPeriodMode(id)}
-                style={[
-                  styles.modeChip,
-                  {
-                    backgroundColor:
-                      partialPeriodMode === id ? colors.tintPrimary : colors.backgroundElement,
-                    borderColor: partialPeriodMode === id ? colors.primary : colors.border,
-                  },
-                ]}>
-                <ThemedText type="label">{t(MODE_KEYS[id])}</ThemedText>
-              </PressableScale>
+              />
             ))}
           </View>
+        </Card>
+
+        <SectionLabel>{t('settings.merchantDefaults')}</SectionLabel>
+        <ThemedText type="small" style={styles.hint}>
+          {t('settings.merchantDefaultsHint')}
+        </ThemedText>
+        <Card>
+          <Field
+            label={t('settings.merchantRateLabel')}
+            value={merchantRatePercent}
+            onChangeText={setMerchantRatePercent}
+            keyboardType="decimal-pad"
+            testID="settings-merchant-rate"
+          />
+          <ThemedText type="small">{t('settings.merchantRateHint')}</ThemedText>
         </Card>
 
         <Button
@@ -599,7 +618,6 @@ export default function ShopSettingsScreen() {
           requiresNetwork
           style={styles.saveButton}
           onPress={() => {
-            setIsSaving(true);
             void handleSave();
           }}
         />
@@ -617,13 +635,5 @@ const styles = StyleSheet.create({
   accountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   accountCopy: { flex: 1, minWidth: 0, gap: Spacing.half },
   modeRow: { gap: Spacing.two, flexDirection: 'row', flexWrap: 'wrap' },
-  modeChip: {
-    minHeight: MinTouchTarget,
-    borderRadius: Radii.pill,
-    paddingHorizontal: Spacing.three,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    justifyContent: 'center',
-  },
   saveButton: { marginHorizontal: Spacing.four },
 });

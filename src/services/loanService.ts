@@ -619,12 +619,15 @@ export async function quoteLoanPayoff(input: {
   disbursedOn: string;
   asOf: string;
   interestModel: InterestModel;
+  /** Optional override (bps). When omitted, shop defaults are used. */
+  rateBps?: number;
 }): Promise<QuoteLoanPayoff> {
   const { data, error } = await supabase.rpc('quote_loan_payoff', {
     p_principal_paise: input.principalPaise,
     p_disbursed_on: input.disbursedOn,
     p_as_of: input.asOf,
     p_interest_model: input.interestModel,
+    ...(input.rateBps != null ? { p_rate_bps: input.rateBps } : {}),
   });
 
   if (error) {
@@ -968,6 +971,7 @@ export async function fetchArchivedLoans(): Promise<ArchivedLoan[]> {
 
 export async function updateShopDefaults(input: {
   rateBps: number;
+  merchantRateBps: number;
   partialPeriodMode: PartialPeriodMode;
   roundUpThresholdDays: number;
   simplePeriodDays: number;
@@ -976,6 +980,7 @@ export async function updateShopDefaults(input: {
 }): Promise<ShopDefaults> {
   const { data, error } = await supabase.rpc('update_shop_defaults', {
     p_rate_bps: input.rateBps,
+    p_merchant_rate_bps: input.merchantRateBps,
     p_partial_period_mode: input.partialPeriodMode,
     p_round_up_threshold_days: input.roundUpThresholdDays,
     p_simple_period_days: input.simplePeriodDays,

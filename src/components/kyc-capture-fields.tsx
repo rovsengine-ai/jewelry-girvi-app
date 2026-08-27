@@ -9,6 +9,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Radii, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatIsoDateInput } from '@/lib/format-iso-date-input';
 import { acceptLast4Draft, ID_DOCUMENT_TYPE_OPTIONS } from '@/lib/kyc';
 import type { KycDraft } from '@/lib/kyc-draft';
 import { pickStillImage } from '@/lib/pick-image';
@@ -92,7 +93,7 @@ export function KycCaptureFields({ value, onChange, testIdPrefix = 'kyc' }: Prop
           <Image
             source={{ uri: value.localCustomerPhotoUri }}
             style={styles.thumb}
-            contentFit="cover"
+            contentFit="contain"
           />
         </ImagePreviewTap>
       ) : null}
@@ -141,8 +142,11 @@ export function KycCaptureFields({ value, onChange, testIdPrefix = 'kyc' }: Prop
         testID={`${testIdPrefix}-dob`}
         label={t('kyc.dob')}
         value={value.dateOfBirth}
-        onChangeText={(dateOfBirth) => patch({ dateOfBirth })}
+        onChangeText={(dateOfBirth) => patch({ dateOfBirth: formatIsoDateInput(dateOfBirth) })}
         placeholder={t('kyc.dobPlaceholder')}
+        keyboardType="number-pad"
+        autoCapitalize="none"
+        autoCorrect={false}
       />
 
       <Field
@@ -177,7 +181,7 @@ export function KycCaptureFields({ value, onChange, testIdPrefix = 'kyc' }: Prop
       </View>
       {value.localPhotoUri && !photoLocked ? (
         <ImagePreviewTap uri={value.localPhotoUri} testID={`${testIdPrefix}-id-photo-preview`}>
-          <Image source={{ uri: value.localPhotoUri }} style={styles.thumb} contentFit="cover" />
+          <Image source={{ uri: value.localPhotoUri }} style={styles.thumb} contentFit="contain" />
         </ImagePreviewTap>
       ) : null}
       {value.localPhotoUri && !photoLocked ? (
@@ -203,7 +207,8 @@ const styles = StyleSheet.create({
   photoBtn: { flex: 1 },
   thumb: {
     width: '100%',
-    height: 160,
+    aspectRatio: 4 / 3,
     borderRadius: Radii.md,
+    backgroundColor: '#111',
   },
 });

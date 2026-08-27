@@ -1,15 +1,24 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
-import { Link, useRouter, type Href } from 'expo-router';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { Link, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 
+import { AppIcon } from '@/components/app-icon';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Field } from '@/components/field';
 import { FormNotice } from '@/components/form-notice';
+import { PressableScale } from '@/components/pressable-scale';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { toE164India } from '@/lib/phone';
 import { routeForRole, useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
@@ -22,8 +31,12 @@ function digitsOnly(value: string): string {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { authMode, refreshProfile, sendOtp, verifyOtp, signInWithPin, signOut } = useAuth();
+  const params = useLocalSearchParams<{ shop?: string | string[] }>();
+  const shopParam = Array.isArray(params.shop) ? params.shop[0] : params.shop;
+  const shopLogin = shopParam === '1' || shopParam === 'true';
+  const { authMode, refreshProfile, sendOtp, verifyOtp, signInWithPin } = useAuth();
   const { t } = useLanguage();
+  const colors = useTheme();
 
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -42,6 +55,17 @@ export default function LoginScreen() {
   } catch {
     displayE164 = null;
   }
+
+  const shopHeaderTrailing = shopLogin ? undefined : (
+    <PressableScale
+      testID="shop-login-entry"
+      accessibilityRole="button"
+      accessibilityLabel={t('a11y.shopLogin')}
+      onPress={() => router.setParams({ shop: '1' })}
+      style={styles.shopHit}>
+      <AppIcon ios="storefront.fill" android="storefront" color={colors.gold} />
+    </PressableScale>
+  );
 
   const handleSendOtp = async () => {
     setFormError(null);
@@ -69,6 +93,23 @@ export default function LoginScreen() {
 
     setStep('otp');
     setFormNotice(t('auth.otpSent', { phone: normalized }));
+  };
+
+  const routeAfterAuth = async () => {
+    await refreshProfile();
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      setFormError(t('auth.noUserSession'));
+      return;
+    }
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    const role = (profileRow as Profile | null)?.role as UserRole | undefined;
+    router.replace(routeForRole(role));
   };
 
   const handleVerifyOtp = async () => {
@@ -99,21 +140,7 @@ export default function LoginScreen() {
       return;
     }
 
-    await refreshProfile();
-
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', (await supabase.auth.getUser()).data.user?.id ?? '')
-      .maybeSingle();
-
-    const role = (profileRow as Profile | null)?.role as UserRole | undefined;
-    if (Platform.OS === 'web' && (role === 'owner' || role === 'staff')) {
-      await signOut();
-      setFormError(t('auth.webShopUseMobile'));
-      return;
-    }
-    router.replace(routeForRole(role));
+    await routeAfterAuth();
   };
 
   const handlePinSignIn = async () => {
@@ -130,7 +157,6 @@ export default function LoginScreen() {
     }
 
     setIsSubmitting(true);
-    // Pass digits as typed — SQL normalises. toE164India is display-only above.
     const result = await signInWithPin(phoneDigits, digitsOnly(pin));
     setIsSubmitting(false);
 
@@ -147,38 +173,24 @@ export default function LoginScreen() {
       return;
     }
 
-    await refreshProfile();
-
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) {
-      setFormError(t('auth.noUserSession'));
-      return;
-    }
-
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-
-    const role = (profileRow as Profile | null)?.role as UserRole | undefined;
-    if (Platform.OS === 'web' && (role === 'owner' || role === 'staff')) {
-      await signOut();
-      setFormError(t('auth.webShopUseMobile'));
-      return;
-    }
-    router.replace(routeForRole(role));
+    await routeAfterAuth();
   };
+
+  const title = shopLogin ? t('auth.shopLoginTitle') : t('auth.title');
+  const subtitle = shopLogin ? t('auth.shopLoginSubtitle') : t('auth.pinSubtitle');
 
   if (authMode === 'pin') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={t('auth.title')} subtitle={t('auth.pinSubtitle')} />
+        <ScreenHeader title={title} subtitle={subtitle} trailing={shopHeaderTrailing} />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
           style={styles.form}>
-          <View style={styles.content}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}>
             <Card>
               <Field
                 label={t('auth.mobileNumber')}
@@ -200,6 +212,7 @@ export default function LoginScreen() {
                 keyboardType="number-pad"
                 maxLength={6}
                 secureTextEntry
+                secureToggle
                 editable={!isSubmitting}
                 testID="login-pin"
               />
@@ -211,21 +224,33 @@ export default function LoginScreen() {
                 requiresNetwork
                 onPress={() => void handlePinSignIn()}
               />
-              <Link href={'/(auth)/signup' as Href} asChild>
-                <ThemedText type="small" style={styles.signUpLink}>
-                  {t('auth.createPinFromShopLink')}
-                </ThemedText>
-              </Link>
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.signUpHint}>
-                {t('auth.createPinFromShopHint')}
-              </ThemedText>
-              <Link href={'/(auth)/activate' as Href} asChild>
-                <ThemedText type="small" style={styles.signUpLink}>
-                  {t('auth.createAccountLink')}
-                </ThemedText>
-              </Link>
+              {shopLogin ? (
+                <PressableScale
+                  testID="customer-login-link"
+                  onPress={() => router.setParams({ shop: undefined })}>
+                  <ThemedText type="small" style={styles.signUpLink}>
+                    {t('auth.customerLoginLink')}
+                  </ThemedText>
+                </PressableScale>
+              ) : (
+                <>
+                  <Link href={'/(auth)/signup' as Href} asChild>
+                    <ThemedText type="small" style={styles.signUpLink}>
+                      {t('auth.createPinFromShopLink')}
+                    </ThemedText>
+                  </Link>
+                  <ThemedText type="caption" themeColor="textSecondary" style={styles.signUpHint}>
+                    {t('auth.createPinFromShopHint')}
+                  </ThemedText>
+                  <Link href={'/(auth)/activate' as Href} asChild>
+                    <ThemedText type="small" style={styles.signUpLink}>
+                      {t('auth.createAccountLink')}
+                    </ThemedText>
+                  </Link>
+                </>
+              )}
             </Card>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </ThemedView>
     );
@@ -233,11 +258,11 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={t('auth.title')} subtitle={t('auth.subtitle')} />
+      <ScreenHeader title={t('auth.title')} subtitle={t('auth.subtitle')} trailing={shopHeaderTrailing} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.form}>
-        <View style={styles.content}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
           <Card>
             <Field
               label={t('auth.mobileNumber')}
@@ -298,7 +323,7 @@ export default function LoginScreen() {
               />
             ) : null}
           </Card>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -306,8 +331,14 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
+  content: { flexGrow: 1, justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
   form: { flex: 1 },
   signUpLink: { textAlign: 'center', marginTop: Spacing.two },
   signUpHint: { textAlign: 'center', marginTop: Spacing.one },
+  shopHit: {
+    minHeight: MinTouchTarget,
+    minWidth: MinTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

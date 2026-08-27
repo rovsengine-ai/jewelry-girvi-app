@@ -104,6 +104,8 @@ function sampleLoan(overrides: Partial<LoanWithCustomer> = {}): LoanWithCustomer
       kyc_verified_on: null,
       guardian_name: null,
       photo_path: null,
+      id_document_last4: null,
+      id_document_path: null,
     },
     ...overrides,
   };
@@ -206,6 +208,8 @@ describe('<AdminLoanRow />', () => {
             kyc_verified_on: null,
             guardian_name: null,
       photo_path: null,
+      id_document_last4: null,
+      id_document_path: null,
           },
         })}
         index={0}
