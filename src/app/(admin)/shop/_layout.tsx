@@ -5,13 +5,19 @@
  * https://docs.expo.dev/router/advanced/nesting-navigators/
  */
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { stackMotionOptions } from '@/lib/motion';
 
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
 export default function ShopPathLayout() {
   const reduceMotion = useReduceMotion();
-  const pushMotion = stackMotionOptions(reduceMotion);
+  const pushMotion =
+    Platform.OS === 'web' ? { animation: 'none' as const } : stackMotionOptions(reduceMotion);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

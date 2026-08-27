@@ -170,9 +170,7 @@ export default function AdminLoansScreen() {
                 testID="loans-scan-qr"
                 accessibilityRole="button"
                 accessibilityLabel={t('a11y.scanReceiptQr')}
-                onPress={() =>
-                  router.push('/(admin)/shop/scanner?intent=qr' as Href)
-                }
+                onPress={() => router.push('/shop/scanner?intent=qr' as Href)}
                 style={styles.headerAdd}>
                 <TintedIconWell tint={colors.tintPrimary}>
                   <AppIcon ios="qrcode.viewfinder" android="qr_code_scanner" color={colors.primary} />
