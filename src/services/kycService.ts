@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import { readLocalImageBytes } from '@/lib/read-local-image-bytes';
 
 import { assertKycPhotoAllowed, normalizeIdLast4 } from '@/lib/kyc';
 import { prepareCustomerPhoto } from '@/lib/prepare-customer-photo';
@@ -11,8 +11,8 @@ import type { IdDocumentType, Profile } from '@/types/database';
  * https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/
  * package: expo-file-system  last-modified: June 29, 2026
  *
- * readAsStringAsync lives on the legacy import (`expo-file-system/legacy`).
- * The v57 File class API is not used here — match loanService receipts upload.
+ * Bytes come from readLocalImageBytes (legacy FileSystem on native, fetch on web).
+ * https://docs.expo.dev/versions/v57.0.0/sdk/filesystem-legacy/
  */
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -97,18 +97,6 @@ function parseOptionalDate(input: string): string | null {
 function parseOptionalName(input: string): string | null {
   const trimmed = input.trim();
   return trimmed === '' ? null : trimmed;
-}
-
-async function readLocalImageBytes(localUri: string): Promise<Uint8Array> {
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
 }
 
 export async function fetchCustomerKyc(customerId: string): Promise<CustomerKyc> {

@@ -30,11 +30,13 @@ function jsonResponse(body: unknown, status = 200): Response {
  */
 function normalizePhoneE164(input: string): string | null {
   const digits = input.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) {
-    return `+${digits}`;
+  const national =
+    digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits;
+  if (national.length === 12 && national.startsWith('91')) {
+    return `+${national}`;
   }
-  if (digits.length === 10) {
-    return `+91${digits}`;
+  if (national.length === 10) {
+    return `+91${national}`;
   }
   return null;
 }
@@ -114,13 +116,14 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Never create a second account for a number we already know. The profiles
-    // lookup is authoritative because handle_new_user() mirrors every auth user
-    // into profiles, and phone_number is UNIQUE there.
+    // Never create a second customer for a number we already know.
+    // Shop owner/staff may share this mobile; girvis attach only to a
+    // retail_customer / merchant row (many loans, one phone).
     const { data: existing, error: existingError } = await admin
       .from('profiles')
-      .select('id, role')
+      .select('id')
       .eq('phone_number', phone)
+      .in('role', ['retail_customer', 'merchant'])
       .maybeSingle();
 
     if (existingError) {
@@ -128,18 +131,8 @@ Deno.serve(async (req: Request) => {
     }
 
     if (existing) {
-      const existingRole = existing.role;
-      const canRetype =
-        existingRole === 'retail_customer' || existingRole === 'merchant';
-      if (canRetype && existingRole !== customerRole) {
-        const { error: roleError } = await admin
-          .from('profiles')
-          .update({ role: customerRole })
-          .eq('id', existing.id);
-        if (roleError) {
-          return jsonResponse({ error: roleError.message }, 500);
-        }
-      }
+      // Keep the existing customer row. Retail/merchant on later girvis is
+      // loans.interest_model, chosen on that receipt.
       return jsonResponse({ customer_id: existing.id, created: false });
     }
 

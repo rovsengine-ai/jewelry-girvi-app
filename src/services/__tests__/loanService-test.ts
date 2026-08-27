@@ -400,9 +400,11 @@ describe('createLoanWithCustomer', () => {
   ];
 
   const photoInserts: { loan_item_id: string; storage_path: string }[] = [];
+  const profileUpdates: Record<string, unknown>[] = [];
 
   beforeEach(() => {
     photoInserts.length = 0;
+    profileUpdates.length = 0;
     saveKycCaptureMock.mockReset();
     saveKycCaptureMock.mockResolvedValue(undefined);
     uploadKycImageMock.mockReset();
@@ -427,7 +429,12 @@ describe('createLoanWithCustomer', () => {
         then: (resolve: (value: typeof result) => unknown) => Promise<unknown>;
       } = {
         select: jest.fn(),
-        update: jest.fn(),
+        update: jest.fn((row: Record<string, unknown>) => {
+          if (table === 'profiles') {
+            profileUpdates.push(row);
+          }
+          return chain;
+        }),
         insert: jest.fn(async (row: { loan_item_id: string; storage_path: string }) => {
           if (table === 'loan_item_photos') {
             photoInserts.push(row);
@@ -440,12 +447,11 @@ describe('createLoanWithCustomer', () => {
         then: (resolve) => Promise.resolve(result).then(resolve),
       };
       chain.select.mockReturnValue(chain);
-      chain.update.mockReturnValue(chain);
       chain.eq.mockReturnValue(chain);
       return chain;
     });
     rpc.mockImplementation(async (fn: string) => {
-      if (fn === 'find_profile_by_phone') {
+      if (fn === 'find_customer_profile_by_phone') {
         return { data: CUSTOMER, error: null };
       }
       return { data: [{ loan_id: 'loan-uuid', item_ids: ['item-a'] }], error: null };
@@ -496,6 +502,10 @@ describe('createLoanWithCustomer', () => {
         p_rate_bps: 150,
       }),
     );
+    expect(profileUpdates.length).toBeGreaterThan(0);
+    for (const row of profileUpdates) {
+      expect(row).not.toHaveProperty('role');
+    }
   });
 
   test('rejects a missing metal before calling create_loan', async () => {
@@ -512,7 +522,7 @@ describe('createLoanWithCustomer', () => {
 
   test('surfaces the RPC error rather than leaving a loan without items', async () => {
     rpc.mockImplementation(async (fn: string) => {
-      if (fn === 'find_profile_by_phone') {
+      if (fn === 'find_customer_profile_by_phone') {
         return { data: CUSTOMER, error: null };
       }
       return {
@@ -527,7 +537,7 @@ describe('createLoanWithCustomer', () => {
 
   test('maps serial_exists: to SerialExistsError with the serial', async () => {
     rpc.mockImplementation(async (fn: string) => {
-      if (fn === 'find_profile_by_phone') {
+      if (fn === 'find_customer_profile_by_phone') {
         return { data: CUSTOMER, error: null };
       }
       return {
@@ -547,7 +557,7 @@ describe('createLoanWithCustomer', () => {
   test('attaches photo N to item N using ids returned by create_loan', async () => {
     const itemIds = ['item-a', 'item-b', 'item-c'];
     rpc.mockImplementation(async (fn: string) => {
-      if (fn === 'find_profile_by_phone') {
+      if (fn === 'find_customer_profile_by_phone') {
         return { data: CUSTOMER, error: null };
       }
       return { data: [{ loan_id: 'loan-uuid', item_ids: itemIds }], error: null };
@@ -575,7 +585,7 @@ describe('createLoanWithCustomer', () => {
   test('a mid-loop upload failure reports that the loan exists, not a generic save failure', async () => {
     const itemIds = ['item-a', 'item-b', 'item-c'];
     rpc.mockImplementation(async (fn: string) => {
-      if (fn === 'find_profile_by_phone') {
+      if (fn === 'find_customer_profile_by_phone') {
         return { data: CUSTOMER, error: null };
       }
       return { data: [{ loan_id: 'loan-uuid', item_ids: itemIds }], error: null };
@@ -736,10 +746,10 @@ describe('redeemLoan', () => {
 });
 
 describe('findCustomerIdByPhone', () => {
-  test('calls find_profile_by_phone with the typed number so SQL normalises', async () => {
+  test('calls find_customer_profile_by_phone with the typed number so SQL normalises', async () => {
     rpc.mockResolvedValue({ data: 'cust-1', error: null });
     await expect(findCustomerIdByPhone('98765 43210')).resolves.toBe('cust-1');
-    expect(rpc).toHaveBeenCalledWith('find_profile_by_phone', { p_phone: '98765 43210' });
+    expect(rpc).toHaveBeenCalledWith('find_customer_profile_by_phone', { p_phone: '98765 43210' });
   });
 
   test('returns null when no profile matches', async () => {

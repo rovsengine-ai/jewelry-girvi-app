@@ -560,6 +560,10 @@ export interface Database {
         Args: { p_phone: string };
         Returns: string | null;
       };
+      find_customer_profile_by_phone: {
+        Args: { p_phone: string };
+        Returns: string | null;
+      };
       find_loan_by_serial: {
         Args: { p_serial: string };
         Returns: {

@@ -1,9 +1,18 @@
 /**
  * Browser signature pad. react-native-signature-canvas uses a WebView that
- * does not ship on web, so this draws on a real <canvas>.
- * Same SignaturePadRef contract as signature-pad.tsx.
+ * does not ship on web, so this draws on a real <canvas> owned by React.
+ * Do not attach the canvas with replaceChildren: a re-render of the RN View
+ * would discard the DOM node and the ink would vanish.
  */
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  createElement,
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { StyleSheet, View, type ViewStyle, type ScrollView } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -32,6 +41,14 @@ function setParentScrollEnabled(
   scrollRef?.current?.setNativeProps({ scrollEnabled: enabled });
 }
 
+function strokeStyle(ctx: CanvasRenderingContext2D, dpr: number): void {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.strokeStyle = '#1a120c';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+
 export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
   function SignaturePadWeb(
     {
@@ -45,36 +62,62 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
     ref,
   ) {
     const { t } = useLanguage();
-    const hostRef = useRef<View>(null);
+    const wrapRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const drawing = useRef(false);
+    const hasInkRef = useRef(false);
     const [hasInk, setHasInk] = useState(false);
+    const onDrawingChangeRef = useRef(onDrawingChange);
+    onDrawingChangeRef.current = onDrawingChange;
+    const scrollRefStored = useRef(scrollRef);
+    scrollRefStored.current = scrollRef;
+
+    useLayoutEffect(() => {
+      const wrap = wrapRef.current;
+      const canvas = canvasRef.current;
+      if (!wrap || !canvas || typeof window === 'undefined') return;
+
+      const applySize = () => {
+        const cssW = Math.max(wrap.clientWidth, 280);
+        const cssH = height;
+        const dpr = window.devicePixelRatio || 1;
+        const nextW = Math.max(1, Math.floor(cssW * dpr));
+        const nextH = Math.max(1, Math.floor(cssH * dpr));
+        if (canvas.width === nextW && canvas.height === nextH) {
+          return;
+        }
+
+        let backup: HTMLCanvasElement | null = null;
+        if (hasInkRef.current && canvas.width > 0 && canvas.height > 0) {
+          backup = document.createElement('canvas');
+          backup.width = canvas.width;
+          backup.height = canvas.height;
+          backup.getContext('2d')?.drawImage(canvas, 0, 0);
+        }
+
+        canvas.width = nextW;
+        canvas.height = nextH;
+        canvas.style.width = `${cssW}px`;
+        canvas.style.height = `${cssH}px`;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        strokeStyle(ctx, dpr);
+        if (backup) {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.drawImage(backup, 0, 0, nextW, nextH);
+          strokeStyle(ctx, dpr);
+        }
+      };
+
+      applySize();
+      const observer = new ResizeObserver(applySize);
+      observer.observe(wrap);
+      return () => observer.disconnect();
+    }, [height]);
 
     useEffect(() => {
-      const node = hostRef.current as unknown as HTMLElement | null;
-      if (!node || typeof document === 'undefined') return;
-
-      const canvas = document.createElement('canvas');
-      canvas.setAttribute('data-testid', `${testID}-canvas`);
-      canvas.style.width = '100%';
-      canvas.style.height = `${height}px`;
-      canvas.style.display = 'block';
-      canvas.style.touchAction = 'none';
-      canvas.style.background = '#f7f4ef';
-      const dpr = window.devicePixelRatio || 1;
-      const width = Math.max(node.clientWidth, 280);
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.strokeStyle = '#1a120c';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      }
-      node.replaceChildren(canvas);
-      canvasRef.current = canvas;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
       const point = (event: PointerEvent) => {
         const rect = canvas.getBoundingClientRect();
@@ -82,30 +125,38 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
       };
 
       const onDown = (event: PointerEvent) => {
+        const ctx = canvas.getContext('2d');
         if (!ctx) return;
+        event.preventDefault();
         drawing.current = true;
-        setParentScrollEnabled(scrollRef, false);
-        onDrawingChange?.(true);
+        setParentScrollEnabled(scrollRefStored.current, false);
+        onDrawingChangeRef.current?.(true);
         canvas.setPointerCapture(event.pointerId);
         const p = point(event);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
       };
       const onMove = (event: PointerEvent) => {
-        if (!drawing.current || !ctx) return;
+        if (!drawing.current) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        event.preventDefault();
         const p = point(event);
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
-        setHasInk(true);
+        if (!hasInkRef.current) {
+          hasInkRef.current = true;
+          setHasInk(true);
+        }
       };
       const onUp = () => {
         drawing.current = false;
-        setParentScrollEnabled(scrollRef, true);
-        onDrawingChange?.(false);
+        setParentScrollEnabled(scrollRefStored.current, true);
+        onDrawingChangeRef.current?.(false);
       };
 
-      canvas.addEventListener('pointerdown', onDown);
-      canvas.addEventListener('pointermove', onMove);
+      canvas.addEventListener('pointerdown', onDown, { passive: false });
+      canvas.addEventListener('pointermove', onMove, { passive: false });
       canvas.addEventListener('pointerup', onUp);
       canvas.addEventListener('pointercancel', onUp);
 
@@ -114,15 +165,13 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
         canvas.removeEventListener('pointermove', onMove);
         canvas.removeEventListener('pointerup', onUp);
         canvas.removeEventListener('pointercancel', onUp);
-        canvasRef.current = null;
-        node.replaceChildren();
       };
-    }, [height, onDrawingChange, scrollRef, testID]);
+    }, []);
 
     useImperativeHandle(ref, () => ({
       readSignature: async () => {
         const canvas = canvasRef.current;
-        if (!canvas || !hasInk) return null;
+        if (!canvas || !hasInkRef.current) return null;
         return canvas.toDataURL('image/png');
       },
     }));
@@ -131,8 +180,12 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
       if (canvas && ctx) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
       }
+      hasInkRef.current = false;
       setHasInk(false);
     };
 
@@ -149,7 +202,30 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
           testID={`${testID}-status`}>
           {hasInk ? t('signaturePad.captured') : t('signaturePad.notSignedYet')}
         </ThemedText>
-        <View ref={hostRef} style={[styles.box, { height }]} />
+        {createElement(
+          'div',
+          {
+            ref: wrapRef,
+            style: {
+              width: '100%',
+              height,
+              borderRadius: Radii.md,
+              overflow: 'hidden',
+              touchAction: 'none',
+            },
+          },
+          createElement('canvas', {
+            ref: canvasRef,
+            'data-testid': `${testID}-canvas`,
+            style: {
+              display: 'block',
+              width: '100%',
+              height: '100%',
+              touchAction: 'none',
+              background: '#f7f4ef',
+            },
+          }),
+        )}
         <Button
           testID={`${testID}-clear`}
           label={t('common.clear')}
@@ -167,9 +243,4 @@ const styles = StyleSheet.create({
   },
   statusCaptured: {},
   statusEmpty: {},
-  box: {
-    borderRadius: Radii.md,
-    overflow: 'hidden',
-    width: '100%',
-  },
 });

@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import { bytesFromDataUrl, readLocalImageBytes } from '@/lib/read-local-image-bytes';
 
 import {
   edgeFunctionErrorMessage,
@@ -129,15 +129,7 @@ export async function uploadImageToStorage(
     throw new Error('Invalid storage object path.');
   }
 
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
+  const bytes = await readLocalImageBytes(localUri);
 
   const { error } = await supabase.storage.from('receipts').upload(objectPath, bytes, {
     contentType: safeExt === 'png' ? 'image/png' : 'image/jpeg',
@@ -155,12 +147,26 @@ export async function uploadSignatureDataUrl(
   dataUrl: string,
   customerId: string,
 ): Promise<string> {
-  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1]! : dataUrl;
-  const fileUri = `${FileSystem.cacheDirectory}signature-${Date.now()}.png`;
-  await FileSystem.writeAsStringAsync(fileUri, base64, {
-    encoding: FileSystem.EncodingType.Base64,
+  const bytes = bytesFromDataUrl(dataUrl);
+  const safeCustomerId = assertCustomerId(customerId);
+  const validatedPath = assertSafeStoragePath(
+    `${safeCustomerId}/signatures/${Date.now()}-${Math.random().toString(36).slice(2)}.png`,
+  );
+  const objectPath = validatedPath.replaceAll('../', '').replaceAll('..\\', '');
+  if (objectPath.includes('../') || objectPath.includes('..\\')) {
+    throw new Error('Invalid storage object path.');
+  }
+
+  const { error } = await supabase.storage.from('receipts').upload(objectPath, bytes, {
+    contentType: 'image/png',
+    upsert: false,
   });
-  return uploadImageToStorage(fileUri, 'signatures', customerId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return objectPath;
 }
 
 /**
@@ -208,7 +214,7 @@ export async function createWalkInCustomer(
 }
 
 export async function findCustomerIdByPhone(phoneNumber: string): Promise<string | null> {
-  const { data, error } = await supabase.rpc('find_profile_by_phone', {
+  const { data, error } = await supabase.rpc('find_customer_profile_by_phone', {
     p_phone: phoneNumber,
   });
 
@@ -488,13 +494,14 @@ export async function createLoanWithCustomer(
       ? defaults.merchant_rate_bps
       : defaults.rate_bps;
 
+  // Retail vs merchant is stored on this girvi (interest_model), not by
+  // rewriting the phone's profile role. One number can have both kinds.
   await supabase
     .from('profiles')
     .update({
       full_name: form.customer_name.trim() || null,
       address: form.address.trim() || null,
       phone_number: toE164India(form.phone_number),
-      role: selectedRole,
     })
     .eq('id', customerId);
 

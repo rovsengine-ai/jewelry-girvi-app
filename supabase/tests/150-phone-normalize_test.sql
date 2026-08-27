@@ -1,6 +1,4 @@
 -- Lockstep: toE164India in src/lib/phone.ts must match normalize_phone_e164.
--- Expected strings are the current TypeScript outputs, including the known
--- leading-zero mangling. If these fail, stop — do not "fix" SQL in this pass.
 begin;
 select plan(5);
 
@@ -12,8 +10,8 @@ select is(
 
 select is(
   public.normalize_phone_e164('09876543210'),
-  '+09876543210',
-  'a 0-prefixed number is mangled the same way as toE164India'
+  '+919876543210',
+  'a 0-prefixed 10-digit mobile is the same identity'
 );
 
 select is(

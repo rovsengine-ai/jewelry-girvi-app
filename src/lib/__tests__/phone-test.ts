@@ -34,18 +34,12 @@ describe('toE164India', () => {
     expect(() => toE164India('+++')).toThrow('Phone number is required.');
   });
 
-  describe('FLAGGED behaviours — asserted as-is, not fixed', () => {
-    test('a leading zero, as written all over India, is silently mangled', () => {
-      // '098765 43210' is how a great many customers write their own number.
-      // digits becomes 11 characters, so neither the 12-digit '91' branch nor
-      // the 10-digit branch matches and it falls through to the passthrough,
-      // producing '+09876543210'. That is not a valid E.164 number, it will not
-      // match the profile saved at OTP signup, and findCustomerIdByPhone will
-      // therefore report "no registered customer" for a customer who exists.
-      expect(toE164India('098765-43210')).toBe('+09876543210');
-      expect(toE164India('09876543210')).toBe('+09876543210');
-    });
+  test('a leading zero on a 10-digit mobile is the same customer as without it', () => {
+    expect(toE164India('098765-43210')).toBe('+919876543210');
+    expect(toE164India('09876543210')).toBe('+919876543210');
+  });
 
+  describe('FLAGGED behaviours — asserted as-is, not fixed', () => {
     test('a 0091 prefix is mangled the same way', () => {
       expect(toE164India('0091 98765 43210')).toBe('+00919876543210');
     });
@@ -84,7 +78,7 @@ describe('toE164India', () => {
 
   test('lockstep with SQL normalize_phone_e164 (see supabase/tests/150-phone-normalize_test.sql)', () => {
     expect(toE164India('9876543210')).toBe('+919876543210');
-    expect(toE164India('09876543210')).toBe('+09876543210');
+    expect(toE164India('09876543210')).toBe('+919876543210');
     expect(toE164India('+919876543210')).toBe('+919876543210');
     expect(toE164India('919876543210')).toBe('+919876543210');
     expect(toE164India('+91 98765-43210')).toBe('+919876543210');

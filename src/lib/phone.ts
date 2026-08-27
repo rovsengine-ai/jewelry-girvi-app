@@ -9,8 +9,10 @@ export function toE164India(phone: string): string {
     return `+${digits}`;
   }
 
-  if (digits.length === 10) {
-    return `+91${digits}`;
+  const national = digits.length === 11 && digits.startsWith('0') ? digits.slice(1) : digits;
+
+  if (national.length === 10) {
+    return `+91${national}`;
   }
 
   if (digits.length === 0) {
