@@ -9,6 +9,7 @@ import {
 import { Link, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 
 import { AppIcon } from '@/components/app-icon';
+import { BrandMark } from '@/components/brand-mark';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Field } from '@/components/field';
@@ -182,7 +183,12 @@ export default function LoginScreen() {
   if (authMode === 'pin') {
     return (
       <ThemedView style={styles.container}>
-        <ScreenHeader title={title} subtitle={subtitle} trailing={shopHeaderTrailing} />
+        <ScreenHeader
+          title={title}
+          subtitle={subtitle}
+          leading={<BrandMark size="md" />}
+          trailing={shopHeaderTrailing}
+        />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
@@ -191,6 +197,15 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}>
+            <View style={styles.brandHero} accessibilityRole="header">
+              <BrandMark size="lg" />
+              <ThemedText type="bodyBold" style={styles.brandHeroName}>
+                {t('app.name')}
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.brandHeroTag}>
+                {t('app.nameSecondary')}
+              </ThemedText>
+            </View>
             <Card>
               <Field
                 label={t('auth.mobileNumber')}
@@ -258,11 +273,25 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={t('auth.title')} subtitle={t('auth.subtitle')} trailing={shopHeaderTrailing} />
+      <ScreenHeader
+        title={t('auth.title')}
+        subtitle={t('auth.subtitle')}
+        leading={<BrandMark size="md" />}
+        trailing={shopHeaderTrailing}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.form}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+          <View style={styles.brandHero} accessibilityRole="header">
+            <BrandMark size="lg" />
+            <ThemedText type="bodyBold" style={styles.brandHeroName}>
+              {t('app.name')}
+            </ThemedText>
+            <ThemedText type="caption" themeColor="textSecondary" style={styles.brandHeroTag}>
+              {t('app.nameSecondary')}
+            </ThemedText>
+          </View>
           <Card>
             <Field
               label={t('auth.mobileNumber')}
@@ -333,6 +362,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: Spacing.four, gap: Spacing.three },
   form: { flex: 1 },
+  brandHero: {
+    alignItems: 'center',
+    gap: Spacing.one,
+    marginBottom: Spacing.one,
+  },
+  brandHeroName: { textAlign: 'center' },
+  brandHeroTag: { textAlign: 'center' },
   signUpLink: { textAlign: 'center', marginTop: Spacing.two },
   signUpHint: { textAlign: 'center', marginTop: Spacing.one },
   shopHit: {

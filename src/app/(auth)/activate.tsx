@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { BrandMark } from '@/components/brand-mark';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Field } from '@/components/field';
@@ -112,7 +113,11 @@ export default function ActivateScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={t('auth.activateTitle')} subtitle={t('auth.activateSubtitle')} />
+      <ScreenHeader
+        title={t('auth.activateTitle')}
+        subtitle={t('auth.activateSubtitle')}
+        leading={<BrandMark size="md" />}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.form}>

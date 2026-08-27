@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Link, useRouter, type Href } from 'expo-router';
 
+import { BrandMark } from '@/components/brand-mark';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Field } from '@/components/field';
@@ -113,7 +114,11 @@ export default function SignupScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScreenHeader title={t('auth.signUpTitle')} subtitle={t('auth.createPinFromShopHint')} />
+      <ScreenHeader
+        title={t('auth.signUpTitle')}
+        subtitle={t('auth.createPinFromShopHint')}
+        leading={<BrandMark size="md" />}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.form}>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppIcon } from '@/components/app-icon';
+import { BrandMark } from '@/components/brand-mark';
 import { Card } from '@/components/card';
 import { EmptyState } from '@/components/empty-state';
 import { ListRow } from '@/components/list-row';
@@ -128,9 +129,7 @@ export default function AdminInsightsScreen() {
       <ScreenHeader
         title={t('app.name')}
         subtitle={t('app.nameSecondary')}
-        leading={
-          <AppIcon ios="diamond.fill" android="diamond" color={colors.gold} />
-        }
+        leading={<BrandMark size="md" />}
         trailing={
           <PressableScale
             testID="insights-refresh"

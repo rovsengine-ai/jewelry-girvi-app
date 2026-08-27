@@ -4,6 +4,7 @@
  */
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { BrandMark } from '@/components/brand-mark';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing, TypeScale } from '@/constants/theme';
@@ -19,6 +20,9 @@ export default function PrivacyPolicyScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
+        <View style={styles.brandRow}>
+          <BrandMark size="lg" />
+        </View>
         <ThemedText style={[TypeScale.title, { color: colors.text }]}>
           Privacy Policy — GIRVI SEWA
         </ThemedText>
@@ -126,6 +130,10 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     width: '100%',
     alignSelf: 'center',
+  },
+  brandRow: {
+    alignItems: 'center',
+    marginBottom: Spacing.one,
   },
   section: {
     gap: Spacing.two,
