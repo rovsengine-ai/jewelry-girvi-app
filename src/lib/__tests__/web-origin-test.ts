@@ -23,4 +23,10 @@ describe('web-origin QR payloads', () => {
     delete process.env.EXPO_PUBLIC_WEB_ORIGIN;
     expect(() => readWebOrigin()).toThrow(/EXPO_PUBLIC_WEB_ORIGIN/);
   });
+
+  test('maps the retired jewelry-girvi-app host to girvi-sewa', () => {
+    process.env.EXPO_PUBLIC_WEB_ORIGIN = 'https://jewelry-girvi-app.vercel.app';
+    expect(readWebOrigin()).toBe('https://girvi-sewa.vercel.app');
+    expect(loanLandingUrl('tok')).toBe('https://girvi-sewa.vercel.app/g/tok');
+  });
 });

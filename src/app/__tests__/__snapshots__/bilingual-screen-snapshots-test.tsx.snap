@@ -30,12 +30,15 @@ exports[`bilingual screen snapshots admin settings: admin-settings-hi 1`] = `[]`
 
 exports[`bilingual screen snapshots auth login: login-en 1`] = `
 [
-  "Girvi Sewa Login",
+  "GIRVI SEWA Login",
   "Sign in with your mobile number to view receipts or manage loans.",
   "EN",
   "हिं",
   "Mobile number",
   "Send OTP",
+  "Shop already added your girvi? Create a PIN here",
+  "Use the same mobile number the shop used. Choose a 6-digit PIN to view your receipts.",
+  "Activate your account, click here",
 ]
 `;
 
@@ -47,6 +50,9 @@ exports[`bilingual screen snapshots auth login: login-hi 1`] = `
   "हिं",
   "मोबाइल नंबर",
   "OTP भेजें",
+  "दुकान ने अभी गिरवी जोड़ी है? यहाँ PIN बनाएँ",
+  "वही मोबाइल नंबर लिखें जो दुकान ने इस्तेमाल किया। रसीदें देखने के लिए 6 अंकों का PIN चुनें।",
+  "अपना खाता चालू करें, यहाँ क्लिक करें",
 ]
 `;
 

@@ -19,7 +19,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_AUTH_MODE": "pin"
+        "EXPO_PUBLIC_AUTH_MODE": "pin",
+        "EXPO_PUBLIC_WEB_ORIGIN": "https://girvi-sewa.vercel.app"
       }
     },
     "preview-dev": {
@@ -39,7 +40,9 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_AUTH_MODE": "pin"
+        "EXPO_PUBLIC_AUTH_MODE": "pin",
+        "EXPO_PUBLIC_WEB_ORIGIN": "https://girvi-sewa.vercel.app",
+        "EXPO_PUBLIC_ENABLE_ANDROID_BLUR": "true"
       }
     }
   },

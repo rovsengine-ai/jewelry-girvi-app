@@ -9,7 +9,7 @@ import {
 describe('insights tab access', () => {
   test('owner may see the Insights tab', () => {
     expect(isShopOwner('owner')).toBe(true);
-    expect(insightsTabHref('owner')).toBe('/(admin)/(tabs)/insights');
+    expect(insightsTabHref('owner')).toBe('/(admin)/shop/(tabs)/insights');
   });
 
   test('staff tab href is null (hiding a tab is not a permission)', () => {
@@ -27,7 +27,7 @@ describe('shop user', () => {
   test('owner and staff are shop users', () => {
     expect(isShopUser('owner')).toBe(true);
     expect(isShopUser('staff')).toBe(true);
-    expect(ADMIN_CALCULATOR_HREF).toBe('/(admin)/(tabs)/calculator');
+    expect(ADMIN_CALCULATOR_HREF).toBe('/(admin)/shop/(tabs)/calculator');
   });
 
   test('customers are not shop users', () => {
@@ -40,6 +40,6 @@ describe('shop user', () => {
 describe('archive route', () => {
   test('matches the owner-only archive stack screen', () => {
     expect(isArchiveRoute(['(admin)', 'archive'])).toBe(true);
-    expect(isArchiveRoute(['(admin)', '(tabs)', 'settings'])).toBe(false);
+    expect(isArchiveRoute(['(admin)', 'shop', '(tabs)', 'settings'])).toBe(false);
   });
 });

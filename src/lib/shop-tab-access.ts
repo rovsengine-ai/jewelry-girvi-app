@@ -2,10 +2,10 @@ import type { Href } from 'expo-router';
 
 import type { UserRole } from '@/types/database';
 
-export const ADMIN_LOANS_HREF = '/(admin)/(tabs)/loans' as Href;
+export const ADMIN_LOANS_HREF = '/(admin)/shop/(tabs)/loans' as Href;
 export const CUSTOMER_LOANS_HREF = '/(customer)/(tabs)/loans' as Href;
-export const ADMIN_INSIGHTS_HREF = '/(admin)/(tabs)/insights' as Href;
-export const ADMIN_CALCULATOR_HREF = '/(admin)/(tabs)/calculator' as Href;
+export const ADMIN_INSIGHTS_HREF = '/(admin)/shop/(tabs)/insights' as Href;
+export const ADMIN_CALCULATOR_HREF = '/(admin)/shop/(tabs)/calculator' as Href;
 export const ADMIN_ARCHIVE_HREF = '/(admin)/archive' as Href;
 
 export function isShopOwner(role: UserRole | undefined): boolean {

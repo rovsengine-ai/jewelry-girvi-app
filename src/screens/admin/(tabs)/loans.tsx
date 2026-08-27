@@ -165,7 +165,18 @@ export default function AdminLoansScreen() {
         collapsed={collapsed}
         trailing={
           canAddGirvi ? (
-            <PressableScale
+            <View style={styles.headerActions}>
+              <PressableScale
+                testID="loans-scan-qr"
+                accessibilityRole="button"
+                accessibilityLabel={t('a11y.scanReceiptQr')}
+                onPress={() => router.push('/(admin)/scanner?intent=qr')}
+                style={styles.headerAdd}>
+                <TintedIconWell tint={colors.tintPrimary}>
+                  <AppIcon ios="qrcode.viewfinder" android="qr_code_scanner" color={colors.primary} />
+                </TintedIconWell>
+              </PressableScale>
+              <PressableScale
               testID="loans-add-header"
               accessibilityRole="button"
               accessibilityLabel={t('a11y.scanPledge')}
@@ -175,6 +186,7 @@ export default function AdminLoansScreen() {
                 <AppIcon ios="plus.circle.fill" android="add_circle" color={colors.onGold} />
               </TintedIconWell>
             </PressableScale>
+            </View>
           ) : undefined
         }
       />
@@ -319,6 +331,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.one,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchWrap: {
     paddingHorizontal: Spacing.four,

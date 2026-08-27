@@ -100,12 +100,14 @@ jest.mock('expo-router', () => {
         return typeof cleanup === 'function' ? cleanup : undefined;
       }, [effect]);
     },
+    Link: ({ children }: { children?: React.ReactNode }) => children,
+    Redirect: () => null,
   };
 });
 
 jest.mock('@/providers/auth-provider', () => ({
   useAuth: jest.fn(),
-  routeForRole: jest.fn(() => '/(admin)/(tabs)/loans'),
+  routeForRole: jest.fn(() => '/(admin)/shop/(tabs)/loans'),
 }));
 
 jest.mock('@/lib/supabase', () => {
@@ -132,6 +134,11 @@ jest.mock('@/lib/supabase', () => {
       },
       functions: { invoke: jest.fn() },
       rpc: jest.fn(),
+      channel: jest.fn(() => ({
+        on: jest.fn().mockReturnThis(),
+        subscribe: jest.fn(),
+      })),
+      removeChannel: jest.fn(),
     },
   };
 });
@@ -141,6 +148,7 @@ jest.mock('@/services/loanService', () => ({
   quoteLoanPayoff: jest.fn(async () => null),
   fetchShopDefaults: jest.fn(async () => ({
     rate_bps: 300,
+    merchant_rate_bps: 150,
     simple_period_days: 180,
     compound_every_days: 30,
     grace_days: 0,
@@ -185,8 +193,14 @@ jest.mock('@/services/printService', () => ({
 }));
 
 jest.mock('expo-camera', () => ({
-  CameraView: 'CameraView',
+  CameraView: Object.assign(
+    function CameraView() {
+      return null;
+    },
+    { isAvailableAsync: async () => false },
+  ),
   useCameraPermissions: () => [{ granted: false }, jest.fn()],
+  scanFromURLAsync: jest.fn(async () => []),
 }));
 
 jest.mock('expo-image', () => ({
@@ -206,11 +220,11 @@ jest.mock('@/hooks/use-reduce-motion', () => ({
 import { useAuth } from '@/providers/auth-provider';
 
 import LoginScreen from '@/app/(auth)/login';
-import AdminLoansScreen from '@/app/(admin)/(tabs)/loans';
-import AdminAlertsScreen from '@/app/(admin)/(tabs)/alerts';
-import AdminInsightsScreen from '@/app/(admin)/(tabs)/insights';
-import AdminSettingsScreen from '@/app/(admin)/(tabs)/settings';
-import AdminCalculatorScreen from '@/app/(admin)/(tabs)/calculator';
+import AdminLoansScreen from '@/app/(admin)/shop/(tabs)/loans';
+import AdminAlertsScreen from '@/app/(admin)/shop/(tabs)/alerts';
+import AdminInsightsScreen from '@/app/(admin)/shop/(tabs)/insights';
+import AdminSettingsScreen from '@/app/(admin)/shop/(tabs)/settings';
+import AdminCalculatorScreen from '@/app/(admin)/shop/(tabs)/calculator';
 import AdminArchiveScreen from '@/app/(admin)/archive';
 import AdminScannerScreen from '@/app/(admin)/scanner';
 import CustomerLoansScreen from '@/app/(customer)/(tabs)/loans';

@@ -16,7 +16,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { CUSTOMER_LOANS_HREF } from '@/lib/shop-tab-access';
+import { CUSTOMER_LOANS_HREF, isShopUser } from '@/lib/shop-tab-access';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
 import {
@@ -37,13 +37,14 @@ type ViewState =
 export default function CustomerLoanQrLandingScreen() {
   const { token: tokenParam } = useLocalSearchParams<{ token?: string | string[] }>();
   const token = firstParam(tokenParam)?.trim() ?? '';
-  const { session, isLoading: authLoading } = useAuth();
+  const { session, profile, isLoading: authLoading } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
   const [state, setState] = useState<ViewState>({ kind: 'loading' });
 
   useEffect(() => {
     if (authLoading) return;
+    if (session && !profile) return;
 
     let cancelled = false;
 
@@ -72,6 +73,10 @@ export default function CustomerLoanQrLandingScreen() {
         const loanId = await fetchOwnLoanIdByPublicToken(token);
         if (cancelled) return;
         if (loanId) {
+          if (isShopUser(profile?.role)) {
+            router.replace(`/(admin)/loan/${loanId}`);
+            return;
+          }
           router.replace(CUSTOMER_LOANS_HREF);
           return;
         }
@@ -84,7 +89,7 @@ export default function CustomerLoanQrLandingScreen() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, token, router]);
+  }, [authLoading, session, profile, token, router]);
 
   if (state.kind === 'loading') {
     return (

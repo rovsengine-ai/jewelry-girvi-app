@@ -55,7 +55,7 @@ describe('Admin Insights URL gate', () => {
     await renderInsights();
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(admin)/(tabs)/loans');
+      expect(mockReplace).toHaveBeenCalledWith('/(admin)/shop/(tabs)/loans');
     });
   });
 

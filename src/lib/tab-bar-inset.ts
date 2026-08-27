@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { BottomTabInset, Glass } from '@/constants/theme';
 
 /**
@@ -6,7 +8,8 @@ import { BottomTabInset, Glass } from '@/constants/theme';
  * https://docs.expo.dev/router/advanced/tabs/
  */
 export function tabBarOccupiedHeight(safeAreaBottom: number): number {
-  return Glass.tabBarHeight + safeAreaBottom;
+  const browserChrome = Platform.OS === 'web' ? 12 : 0;
+  return Glass.tabBarHeight + safeAreaBottom + browserChrome;
 }
 
 /**
@@ -16,5 +19,6 @@ export function tabBarOccupiedHeight(safeAreaBottom: number): number {
  * smaller than the bar itself.
  */
 export function tabBarScrollPadding(safeAreaBottom: number): number {
-  return BottomTabInset + safeAreaBottom;
+  const browserChrome = Platform.OS === 'web' ? 12 : 0;
+  return BottomTabInset + safeAreaBottom + browserChrome;
 }

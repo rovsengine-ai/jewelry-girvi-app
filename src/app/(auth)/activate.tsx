@@ -114,7 +114,7 @@ export default function ActivateScreen() {
     <ThemedView style={styles.container}>
       <ScreenHeader title={t('auth.activateTitle')} subtitle={t('auth.activateSubtitle')} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.form}>
         <View style={styles.content}>
           <Card>
@@ -132,6 +132,7 @@ export default function ActivateScreen() {
                   keyboardType="number-pad"
                   maxLength={6}
                   secureTextEntry
+                  secureToggle
                   editable={!isSubmitting}
                   testID="activate-pin"
                 />
@@ -143,6 +144,7 @@ export default function ActivateScreen() {
                   keyboardType="number-pad"
                   maxLength={6}
                   secureTextEntry
+                  secureToggle
                   editable={!isSubmitting}
                   testID="activate-pin-confirm"
                 />

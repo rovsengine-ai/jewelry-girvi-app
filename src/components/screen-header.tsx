@@ -161,7 +161,7 @@ export function ScreenHeader({
         {backControl}
         <View style={styles.titleBlock}>
           <ThemedText
-            numberOfLines={1}
+            numberOfLines={2}
             style={[
               collapsed ? styles.titleCollapsed : styles.title,
               { color: colors.onChrome },
@@ -187,10 +187,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   bar: {
-    height: Glass.headerHeight,
+    minHeight: Glass.headerHeight,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
     gap: Spacing.two,
   },
   titleBlock: {

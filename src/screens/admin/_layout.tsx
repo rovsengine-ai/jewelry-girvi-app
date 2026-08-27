@@ -12,8 +12,9 @@ function isShopRole(role: string | undefined): boolean {
 }
 
 /**
- * Role gate stays on this Stack. Tabs live in `(tabs)`; scanner, loan/[id],
- * kyc, and archive push as siblings ABOVE the tabs (WhatsApp model).
+ * Role gate stays on this Stack. Tabs live under `shop/(tabs)` so URLs are
+ * `/shop/loans` (customer tabs stay at `/loans`). Scanner, loan/[id], kyc,
+ * and archive push as siblings ABOVE the tabs (WhatsApp model).
  * Archive is owner-only: staff who type the URL are replaced here. Hiding the
  * Settings link is not a permission. `Stack.Protected` is in the v57 docs but
  * not in expo-router@57.0.12, so this uses `useSegments`.
@@ -52,7 +53,7 @@ export default function AdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="shop" />
       <Stack.Screen name="scanner" options={pushMotion} />
       <Stack.Screen name="loan/[id]" options={pushMotion} />
       <Stack.Screen name="kyc/[customerId]" options={pushMotion} />

@@ -158,7 +158,7 @@ baked in at **build** time (`EXPO_PUBLIC_*`).
 | `EXPO_PUBLIC_ENV` | yes | Must be `production` for the live site |
 | `EXPO_PUBLIC_SUPABASE_URL` | yes | Hosted project URL (`https://….supabase.co`), never localhost |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | yes | **Anon** (publishable) key only |
-| `EXPO_PUBLIC_WEB_ORIGIN` | yes | Public site origin for loan/activation QR URLs (no trailing slash), e.g. `https://your-app.vercel.app` |
+| `EXPO_PUBLIC_WEB_ORIGIN` | yes | Public site origin for loan/activation QR URLs (no trailing slash). Production: `https://girvi-sewa.vercel.app` |
 | `EXPO_PUBLIC_AUTH_MODE` | no | `pin` (default) or `otp` when SMS OTP is ready |
 | `EXPO_PUBLIC_ENABLE_ANDROID_BLUR` | no | Native chrome only; harmless if unset on web |
 

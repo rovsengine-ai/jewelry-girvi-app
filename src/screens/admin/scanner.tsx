@@ -5,13 +5,13 @@
  * Camera: https://docs.expo.dev/versions/v57.0.0/sdk/camera/
  * Image picker: https://docs.expo.dev/versions/v57.0.0/sdk/imagepicker/
  */
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, scanFromURLAsync, useCameraPermissions } from 'expo-camera';
 import * as Device from 'expo-device';
 import { BlurTargetView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -31,6 +31,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Sizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatIsoDateInput } from '@/lib/format-iso-date-input';
 import { newIdempotencyKey } from '@/lib/idempotency';
 import { emptyKycDraft, kycDraftHasContent, type KycDraft } from '@/lib/kyc-draft';
 import { todayInKolkata } from '@/lib/money';
@@ -47,12 +48,14 @@ import {
   type PledgeMetal,
   type ScannerItemDraft,
 } from '@/lib/scanner-items';
+import { parseShopQr } from '@/lib/parse-shop-qr';
 import { ADMIN_LOANS_HREF } from '@/lib/shop-tab-access';
 import { gramsInputToMg } from '@/lib/weight';
 import { useLanguage } from '@/providers/language-provider';
 import {
   attachItemPhotos,
   createLoanWithCustomer,
+  fetchOwnLoanIdByPublicToken,
   findLoanBySerial,
   LoanPhotosIncompleteError,
   SerialExistsError,
@@ -82,6 +85,7 @@ const emptyForm: LoanFormData = {
 };
 
 type EntryMode = 'scan' | 'manual';
+type CameraMode = 'ocr' | 'qr';
 type ScannerStep = 'choose' | 'camera' | 'review';
 
 function ChoiceChip({
@@ -227,7 +231,7 @@ function PledgeItemCard({
           <Image
             source={{ uri: item.localPhotoUri }}
             style={styles.itemPhoto}
-            contentFit="cover"
+            contentFit="contain"
           />
         </ImagePreviewTap>
       ) : null}
@@ -266,6 +270,8 @@ function PledgeItemCard({
 
 export default function AdminScannerScreen() {
   const router = useRouter();
+  const { intent } = useLocalSearchParams<{ intent?: string | string[] }>();
+  const qrIntent = (Array.isArray(intent) ? intent[0] : intent) === 'qr';
   const { t } = useLanguage();
   const colors = useTheme();
 
@@ -275,10 +281,12 @@ export default function AdminScannerScreen() {
   const reviewScrollRef = useRef<ScrollView>(null);
   const signaturePadRef = useRef<SignaturePadRef>(null);
   const createLoanIdempotencyKeyRef = useRef(newIdempotencyKey());
+  const qrLockRef = useRef(false);
   const [reviewScrollEnabled, setReviewScrollEnabled] = useState(true);
 
-  const [step, setStep] = useState<ScannerStep>('choose');
+  const [step, setStep] = useState<ScannerStep>(qrIntent ? 'camera' : 'choose');
   const [entryMode, setEntryMode] = useState<EntryMode>('scan');
+  const [cameraMode, setCameraMode] = useState<CameraMode>(qrIntent ? 'qr' : 'ocr');
   const [localPhotoUri, setLocalPhotoUri] = useState<string | null>(null);
   const [form, setForm] = useState<LoanFormData>(emptyForm);
   const [items, dispatchItems] = useReducer(scannerItemsReducer, [emptyScannerItem('item-1')]);
@@ -293,13 +301,27 @@ export default function AdminScannerScreen() {
   const [photoGap, setPhotoGap] = useState<LoanPhotosIncompleteError | null>(null);
   const [existingLoan, setExistingLoan] = useState<FindLoanBySerialRow | null>(null);
   const [customerRole, setCustomerRole] = useState<CounterCustomerRole>('retail_customer');
-  // CameraView.isAvailableAsync is web-only; use Device.isDevice for simulators.
-  // https://docs.expo.dev/versions/v57.0.0/sdk/device/
-  const cameraAvailable = Device.isDevice;
+  // CameraView.isAvailableAsync is the web/simulator probe.
+  // https://docs.expo.dev/versions/v57.0.0/sdk/camera/
+  const [cameraAvailable, setCameraAvailable] = useState(Device.isDevice);
   const [cameraMountError, setCameraMountError] = useState<string | null>(null);
 
   useEffect(() => {
     void readPracticeMode().then(setPracticeMode).catch(() => setPracticeMode(false));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void CameraView.isAvailableAsync()
+      .then((available) => {
+        if (!cancelled) setCameraAvailable(available);
+      })
+      .catch(() => {
+        if (!cancelled) setCameraAvailable(Device.isDevice);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const updateForm = useCallback((key: keyof LoanFormData, value: string) => {
@@ -393,12 +415,16 @@ export default function AdminScannerScreen() {
 
     setIsBusy(true);
     setFormError(null);
-    setFormNotice(t('loans.scanner.ocrWorking'));
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
       if (!photo?.uri) {
         throw new Error(t('loans.scanner.cameraNoImage'));
       }
+      if (cameraMode === 'qr') {
+        await captureQrFromUri(photo.uri);
+        return;
+      }
+      setFormNotice(t('loans.scanner.ocrWorking'));
       setLocalPhotoUri(photo.uri);
       setStep('review');
       const { extraction, preparedUri } = await extractReceiptData(photo.uri);
@@ -417,6 +443,10 @@ export default function AdminScannerScreen() {
     try {
       const uri = await pickStillImage('library');
       if (!uri) return;
+      if (cameraMode === 'qr') {
+        await captureQrFromUri(uri);
+        return;
+      }
       await processReceiptUri(uri);
     } catch (error) {
       if (error instanceof PermissionDeniedError) {
@@ -440,8 +470,91 @@ export default function AdminScannerScreen() {
   const startScan = () => {
     resetDraft();
     setEntryMode('scan');
+    setCameraMode('ocr');
+    qrLockRef.current = false;
     setCameraMountError(null);
     setStep('camera');
+  };
+
+  const startQrLookup = () => {
+    resetDraft();
+    setEntryMode('scan');
+    setCameraMode('qr');
+    qrLockRef.current = false;
+    setCameraMountError(null);
+    setStep('camera');
+  };
+
+  const openLoanFromQr = async (raw: string) => {
+    const payload = parseShopQr(raw);
+    if (!payload || payload.kind !== 'loan') {
+      setFormError(t('loans.scanner.qrNotRecognized'));
+      return;
+    }
+    setFormNotice(t('loans.scanner.qrWorking'));
+    setFormError(null);
+    try {
+      const loanId = await fetchOwnLoanIdByPublicToken(payload.token);
+      if (!loanId) {
+        setFormNotice(null);
+        setFormError(t('loans.scanner.qrLoanNotFound'));
+        qrLockRef.current = false;
+        return;
+      }
+      router.replace(`/(admin)/loan/${loanId}`);
+    } catch (error) {
+      setFormNotice(null);
+      setFormError(error instanceof Error ? error.message : t('errors.unknown'));
+      qrLockRef.current = false;
+    }
+  };
+
+  const onQrScanned = (result: { data?: string }) => {
+    if (cameraMode !== 'qr' || qrLockRef.current) return;
+    const data = result.data?.trim() ?? '';
+    if (!data) return;
+    qrLockRef.current = true;
+    void openLoanFromQr(data);
+  };
+
+  const captureQrFromUri = async (uri: string) => {
+    setIsBusy(true);
+    setFormError(null);
+    setFormNotice(t('loans.scanner.qrWorking'));
+    try {
+      const hits = await scanFromURLAsync(uri, ['qr']);
+      const data = hits[0]?.data;
+      if (!data) {
+        setFormNotice(null);
+        setFormError(t('loans.scanner.qrNotRecognized'));
+        return;
+      }
+      await openLoanFromQr(data);
+    } catch (error) {
+      setFormNotice(null);
+      setFormError(error instanceof Error ? error.message : t('loans.scanner.qrNotRecognized'));
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const pickPhoneCamera = async () => {
+    setFormError(null);
+    try {
+      const uri = await pickStillImage('camera');
+      if (!uri) return;
+      if (cameraMode === 'qr') {
+        await captureQrFromUri(uri);
+        return;
+      }
+      await processReceiptUri(uri);
+    } catch (error) {
+      if (error instanceof PermissionDeniedError) {
+        setFormError(t('loans.scanner.cameraNeededBody'));
+        return;
+      }
+      setFormError(resolveOcrError(error));
+    }
   };
 
   const attachReceiptOnReview = async () => {
@@ -567,7 +680,7 @@ export default function AdminScannerScreen() {
     return (
       <ThemedView style={styles.container} type="surfaceSunken">
         <ScreenHeader showBack title={t('loans.scanner.choiceTitle')} />
-        <View style={styles.choiceBody}>
+        <ScrollView contentContainerStyle={styles.choiceBody} keyboardShouldPersistTaps="handled">
           <GlassSurface androidBlur intensity="strong" style={styles.choiceGlass}>
             <ThemedText type="bodyLarge">{t('loans.scanner.choiceSubtitle')}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -579,6 +692,12 @@ export default function AdminScannerScreen() {
               onPress={startScan}
             />
             <Button
+              testID="scanner-choose-qr"
+              label={t('loans.scanner.scanReceiptQr')}
+              variant="secondary"
+              onPress={startQrLookup}
+            />
+            <Button
               testID="scanner-choose-manual"
               label={t('loans.scanner.enterManually')}
               variant="secondary"
@@ -586,16 +705,27 @@ export default function AdminScannerScreen() {
             />
             <Button label={t('common.cancel')} variant="secondary" onPress={() => router.back()} />
           </GlassSurface>
-        </View>
+        </ScrollView>
       </ThemedView>
     );
   }
 
   if (step === 'camera') {
+    const cameraTitle =
+      cameraMode === 'qr' ? t('loans.scanner.scanReceiptQr') : t('loans.scanner.cameraTitle');
+    const previewHint =
+      cameraMode === 'qr'
+        ? t('loans.scanner.scanReceiptQrHint')
+        : Platform.OS === 'web'
+          ? t('loans.scanner.cameraWebHint')
+          : !cameraAvailable || cameraMountError
+            ? t('loans.scanner.cameraUnavailableBody')
+            : t('loans.scanner.cameraPreviewHint');
+
     if (!permission) {
       return (
         <ThemedView style={styles.container} type="surfaceSunken">
-          <ScreenHeader showBack title={t('loans.scanner.cameraTitle')} />
+          <ScreenHeader showBack title={cameraTitle} />
           <ListSkeleton rows={4} />
         </ThemedView>
       );
@@ -606,7 +736,7 @@ export default function AdminScannerScreen() {
         <ThemedView style={styles.container} type="surfaceSunken">
           <ScreenHeader
             showBack
-            title={t('loans.scanner.cameraTitle')}
+            title={cameraTitle}
             onBack={() => setStep('choose')}
           />
           <View style={styles.centered}>
@@ -616,6 +746,12 @@ export default function AdminScannerScreen() {
                 body={t('loans.scanner.cameraNeededBody')}
                 actionLabel={t('common.grantPermission')}
                 onAction={() => void requestPermission()}
+              />
+              <Button
+                testID="scanner-phone-camera"
+                label={t('loans.scanner.usePhoneCamera')}
+                loading={isBusy}
+                onPress={() => void pickPhoneCamera()}
               />
               <Button
                 label={t('loans.scanner.pickFromGallery')}
@@ -633,16 +769,43 @@ export default function AdminScannerScreen() {
       <ThemedView style={styles.container}>
         <ScreenHeader
           showBack
-          title={t('loans.scanner.cameraTitle')}
+          title={cameraTitle}
           onBack={() => setStep('choose')}
         />
-        <View style={styles.cameraStage}>
+        <View style={[styles.cameraStage, Platform.OS === 'web' ? styles.cameraStageWeb : null]}>
+          {Platform.OS === 'web' ? (
+            <View style={[styles.camera, styles.cameraWeb]}>
+              {cameraAvailable === false || cameraMountError ? (
+                <View style={[styles.camera, styles.cameraFallback, { backgroundColor: colors.surfaceSunken }]}>
+                  <EmptyState
+                    title={t('loans.scanner.cameraUnavailableTitle')}
+                    body={cameraMountError ?? previewHint}
+                    iconIos="camera"
+                    iconAndroid="photo_camera"
+                  />
+                </View>
+              ) : (
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.cameraWebView}
+                  facing="back"
+                  barcodeScannerSettings={
+                    cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
+                  }
+                  onBarcodeScanned={cameraMode === 'qr' ? onQrScanned : undefined}
+                  onMountError={() => {
+                    setCameraMountError(t('loans.scanner.cameraMountFailed'));
+                  }}
+                />
+              )}
+            </View>
+          ) : (
           <BlurTargetView ref={cameraBlurTargetRef} style={styles.camera}>
             {cameraAvailable === false || cameraMountError ? (
               <View style={[styles.camera, styles.cameraFallback, { backgroundColor: colors.surfaceSunken }]}>
                 <EmptyState
                   title={t('loans.scanner.cameraUnavailableTitle')}
-                  body={cameraMountError ?? t('loans.scanner.cameraUnavailableBody')}
+                  body={cameraMountError ?? previewHint}
                   iconIos="camera"
                   iconAndroid="photo_camera"
                 />
@@ -652,58 +815,79 @@ export default function AdminScannerScreen() {
                 ref={cameraRef}
                 style={styles.camera}
                 facing="back"
+                barcodeScannerSettings={
+                  cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
+                }
+                onBarcodeScanned={cameraMode === 'qr' ? onQrScanned : undefined}
                 onMountError={() => {
                   setCameraMountError(t('loans.scanner.cameraMountFailed'));
                 }}
               />
             )}
           </BlurTargetView>
+          )}
           {cameraAvailable && !cameraMountError ? (
             <View pointerEvents="none" style={styles.viewfinder}>
               <View style={[styles.viewfinderFrame, { borderColor: colors.onChrome }]} />
             </View>
           ) : null}
           <SafeAreaView edges={['bottom']} style={styles.cameraOverlay}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.cameraDockScroll}>
             <GlassSurface
-              androidBlur
-              blurTarget={cameraBlurTargetRef}
+              androidBlur={Platform.OS !== 'web'}
+              blurTarget={Platform.OS === 'web' ? undefined : cameraBlurTargetRef}
               intensity="strong"
               style={styles.cameraDock}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.dockHint}>
-                {!cameraAvailable || cameraMountError
-                  ? t('loans.scanner.cameraUnavailableBody')
-                  : t('loans.scanner.cameraPreviewHint')}
+                {previewHint}
               </ThemedText>
               <FormNotice error={formError} notice={formNotice} />
               {cameraAvailable && !cameraMountError ? (
                 <Button
                   testID="scanner-capture"
-                  label={t('loans.scanner.captureExtract')}
+                  label={
+                    cameraMode === 'qr'
+                      ? t('loans.scanner.scanReceiptQr')
+                      : t('loans.scanner.captureExtract')
+                  }
                   loading={isBusy}
                   requiresNetwork
                   onPress={() => void captureAndProcess()}
                 />
               ) : null}
               <Button
+                testID="scanner-phone-camera"
+                label={t('loans.scanner.usePhoneCamera')}
+                variant={cameraAvailable && !cameraMountError ? 'secondary' : 'primary'}
+                loading={isBusy}
+                requiresNetwork
+                onPress={() => void pickPhoneCamera()}
+              />
+              <Button
                 testID="scanner-gallery"
                 label={t('loans.scanner.pickFromGallery')}
-                variant={!cameraAvailable || cameraMountError ? 'primary' : 'secondary'}
+                variant="secondary"
                 loading={isBusy}
                 requiresNetwork
                 onPress={() => void pickGalleryAndProcess()}
               />
-              <Button
-                testID="scanner-enter-manual"
-                label={t('loans.scanner.enterManually')}
-                variant="secondary"
-                onPress={startManual}
-              />
+              {cameraMode === 'ocr' ? (
+                <Button
+                  testID="scanner-enter-manual"
+                  label={t('loans.scanner.enterManually')}
+                  variant="secondary"
+                  onPress={startManual}
+                />
+              ) : null}
               <Button
                 label={t('common.cancel')}
                 variant="secondary"
                 onPress={() => setStep('choose')}
               />
             </GlassSurface>
+            </ScrollView>
           </SafeAreaView>
         </View>
       </ThemedView>
@@ -801,7 +985,11 @@ export default function AdminScannerScreen() {
           <Field
             label={t('loans.scanner.disbursedOn')}
             value={form.disbursed_on}
-            onChangeText={(v) => updateForm('disbursed_on', v)}
+            onChangeText={(v) => updateForm('disbursed_on', formatIsoDateInput(v))}
+            keyboardType="number-pad"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="YYYY-MM-DD"
           />
         </Card>
 
@@ -916,7 +1104,7 @@ export default function AdminScannerScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   choiceBody: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     padding: Spacing.four,
   },
@@ -931,7 +1119,25 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   cameraStage: { flex: 1 },
+  cameraStageWeb: { minHeight: 320 },
   camera: { flex: 1 },
+  cameraWeb: {
+    flex: 1,
+    minHeight: 320,
+    width: '100%',
+    backgroundColor: '#111111',
+    position: 'relative',
+  },
+  cameraWebView: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#111111',
+  },
   cameraFallback: {
     justifyContent: 'center',
   },
@@ -955,6 +1161,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.two,
   },
+  cameraDockScroll: {
+    paddingBottom: Spacing.one,
+  },
   cameraDock: {
     borderRadius: Radii.md,
     padding: Spacing.three,
@@ -966,10 +1175,10 @@ const styles = StyleSheet.create({
     borderRadius: Radii.md,
     padding: Spacing.one,
   },
-  preview: { width: '100%', height: Sizes.imagePreviewHeight, borderRadius: Radii.sm },
+  preview: { width: '100%', aspectRatio: 4 / 3, borderRadius: Radii.sm },
   itemPhoto: {
     width: '100%',
-    height: Sizes.itemPhotoThumbHeight,
+    aspectRatio: 4 / 3,
     borderRadius: Radii.sm,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },

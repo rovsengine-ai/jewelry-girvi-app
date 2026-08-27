@@ -56,7 +56,7 @@ describe('Admin Archive URL gate', () => {
     await renderArchive();
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(admin)/(tabs)/loans');
+      expect(mockReplace).toHaveBeenCalledWith('/(admin)/shop/(tabs)/loans');
     });
   });
 
