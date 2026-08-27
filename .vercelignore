@@ -1,0 +1,6 @@
+/artifacts
+*.apk
+/android
+/ios
+/.expo
+/node_modules

@@ -1,0 +1,57 @@
+appId: com.girvisewa.app
+---
+# Owner: loan list → open SEED-ACTIVE → record payment → redeem → print.
+# Requires local seeded DB (npx supabase db reset) and a running native build.
+- runFlow:
+    file: subflows/login.yaml
+    env:
+      PHONE: "9000000001"
+- extendedWaitUntil:
+    visible: "SEED-ACTIVE"
+    timeout: 20000
+- tapOn:
+    id: loan-row-SEED-ACTIVE
+- extendedWaitUntil:
+    visible:
+      id: payment-amount
+    timeout: 15000
+- tapOn:
+    id: payment-amount
+- eraseText
+- inputText: "100"
+- tapOn:
+    id: record-payment
+- scrollUntilVisible:
+    element:
+      id: open-redeem
+    direction: DOWN
+- tapOn:
+    id: open-redeem
+- extendedWaitUntil:
+    visible:
+      id: redeem-collector
+    timeout: 15000
+- tapOn:
+    id: item-check-1
+- tapOn:
+    id: item-check-2
+- tapOn:
+    id: redeem-collector
+- eraseText
+- inputText: "Test Owner"
+- scrollUntilVisible:
+    element:
+      id: confirm-redeem
+    direction: DOWN
+- tapOn:
+    id: confirm-redeem
+- extendedWaitUntil:
+    visible: "Redeemed"
+    timeout: 20000
+- tapOn: "Back to loan"
+- extendedWaitUntil:
+    visible:
+      id: print-redemption
+    timeout: 15000
+- tapOn:
+    id: print-redemption

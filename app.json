@@ -1,0 +1,92 @@
+{
+  "expo": {
+    "name": "GIRVI SEWA",
+    "slug": "jewelry-girvi-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "girvisewa",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.girvisewa.app",
+      "appleTeamId": "U5RDM8MM7T",
+      "infoPlist": {
+        "CFBundleLocalizations": [
+          "en",
+          "hi"
+        ]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4E0F1A",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.girvisewa.app"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#4E0F1A",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Girvi Sewa to scan handwritten receipt pads."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#4E0F1A",
+          "defaultChannel": "loan-reminders"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Girvi Sewa to attach pledged-item and KYC photos.",
+          "cameraPermission": "Allow Girvi Sewa to photograph pledged items and ID documents.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": [
+            "en",
+            "hi"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "03e59023-9a4a-468c-8054-76a65237f8f7"
+      }
+    }
+  }
+}
