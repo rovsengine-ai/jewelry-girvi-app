@@ -88,6 +88,11 @@ export function GlassSurface({
     intensity === 'strong' ? Glass.blurIntensityStrong : Glass.blurIntensity;
 
   useEffect(() => {
+    // Web has no reduce-transparency API; calling it unmounts the whole tree.
+    // https://reactnative.dev/docs/accessibilityinfo#isreducetransparencyenabled
+    if (Platform.OS === 'web') return;
+    if (typeof AccessibilityInfo.isReduceTransparencyEnabled !== 'function') return;
+
     let mounted = true;
     void AccessibilityInfo.isReduceTransparencyEnabled().then((enabled) => {
       if (mounted) setReduceTransparency(enabled);

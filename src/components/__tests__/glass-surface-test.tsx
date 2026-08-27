@@ -177,6 +177,23 @@ describe('<GlassSurface />', () => {
     });
   });
 
+  test('web does not call isReduceTransparencyEnabled', async () => {
+    setOs('web');
+    const spy = jest
+      .spyOn(AccessibilityInfo, 'isReduceTransparencyEnabled')
+      .mockImplementation(() => {
+        throw new Error('web has no reduce-transparency API');
+      });
+    spy.mockClear();
+    const { getByText } = await render(
+      <GlassSurface>
+        <Text>Chrome</Text>
+      </GlassSurface>,
+    );
+    getByText('Chrome');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
   test('reduce-transparency forces the opaque branch', async () => {
     setOs('ios');
     jest.spyOn(AccessibilityInfo, 'isReduceTransparencyEnabled').mockResolvedValue(true);
