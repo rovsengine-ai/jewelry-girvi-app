@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
@@ -45,7 +45,6 @@ export default function CustomerLayout() {
   }, [session, profile, isLoading, waitingForProfile, onLoanQrLanding, router]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
     if (!session || !isCustomerRole(profile?.role)) return;
     let cancelled = false;
     void (async () => {

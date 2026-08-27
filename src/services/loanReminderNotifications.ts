@@ -24,8 +24,12 @@ export { remindersToSchedule } from '@/lib/loan-reminders';
 
 const ANDROID_CHANNEL_NAME = 'Loan payment reminders';
 
+function supportsReminders(): boolean {
+  return Platform.OS === 'ios' || Platform.OS === 'android' || Platform.OS === 'web';
+}
+
 export async function ensureLoanReminderPermissions(): Promise<boolean> {
-  if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+  if (!supportsReminders()) {
     return false;
   }
 
@@ -56,7 +60,7 @@ async function cancelOurScheduledReminders(): Promise<void> {
 
 /** Drop OS reminders so a later sign-in on this device does not inherit them. */
 export async function clearLoanReminderNotifications(): Promise<void> {
-  if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+  if (!supportsReminders()) {
     return;
   }
   await cancelOurScheduledReminders();
@@ -75,7 +79,7 @@ export async function syncLoanReminderNotifications(
   nowMs: number = Date.now(),
   options?: { preferRemotePush?: boolean },
 ): Promise<number> {
-  if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+  if (!supportsReminders()) {
     return 0;
   }
 

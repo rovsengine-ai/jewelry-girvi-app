@@ -542,7 +542,7 @@ export const en = {
       subtitle:
         "Payment reminders (15 days before due, due day, and overdue) use this phone's notifications after you allow them.",
       subtitleWeb:
-        'Due-date notices appear here in the browser. Local phone reminders need the Android app — they are not scheduled in this tab.',
+        'Payment reminders (15 days before due, due day, and overdue) can appear as browser notifications if you allow them. Keep this tab open. Lock-screen notices still need the phone app.',
       loadError: 'Could not load notices.',
       emptyTitle: 'No notices',
       emptyBody: 'No due-date notices for your girvis yet.',
@@ -607,7 +607,7 @@ export const en = {
     deleteAccountUnavailable:
       'Account deletion is not available in this version. Visit the shop for help.',
     remindersWebNote:
-      'Payment reminders on this phone need the Android app. This website shows receipts and notices only — it does not schedule local notifications.',
+      'Allow browser notifications to get due reminders in this tab. Keep the site open. Lock-screen notices still need the phone app.',
     roleOwner: 'Owner',
     roleStaff: 'Staff',
     groupTeam: 'Team',
