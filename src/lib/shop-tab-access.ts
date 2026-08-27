@@ -7,6 +7,7 @@ export const CUSTOMER_LOANS_HREF = '/(customer)/(tabs)/loans' as Href;
 export const ADMIN_INSIGHTS_HREF = '/(admin)/shop/(tabs)/insights' as Href;
 export const ADMIN_CALCULATOR_HREF = '/(admin)/shop/(tabs)/calculator' as Href;
 export const ADMIN_ARCHIVE_HREF = '/(admin)/archive' as Href;
+export const ADMIN_SCANNER_HREF = '/(admin)/shop/scanner' as Href;
 
 export function isShopOwner(role: UserRole | undefined): boolean {
   return role === 'owner';

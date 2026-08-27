@@ -1,5 +1,6 @@
 import {
   ADMIN_CALCULATOR_HREF,
+  ADMIN_SCANNER_HREF,
   insightsTabHref,
   isArchiveRoute,
   isShopOwner,
@@ -28,6 +29,7 @@ describe('shop user', () => {
     expect(isShopUser('owner')).toBe(true);
     expect(isShopUser('staff')).toBe(true);
     expect(ADMIN_CALCULATOR_HREF).toBe('/(admin)/shop/(tabs)/calculator');
+    expect(ADMIN_SCANNER_HREF).toBe('/(admin)/shop/scanner');
   });
 
   test('customers are not shop users', () => {

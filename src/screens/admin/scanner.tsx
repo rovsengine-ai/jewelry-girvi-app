@@ -291,7 +291,9 @@ export default function AdminScannerScreen() {
   const qrLockRef = useRef(false);
   const [reviewScrollEnabled, setReviewScrollEnabled] = useState(true);
 
-  const [step, setStep] = useState<ScannerStep>(qrIntent ? 'camera' : 'choose');
+  const [step, setStep] = useState<ScannerStep>(
+    qrIntent && Platform.OS !== 'web' ? 'camera' : 'choose',
+  );
   const [entryMode, setEntryMode] = useState<EntryMode>('scan');
   const [cameraMode, setCameraMode] = useState<CameraMode>(qrIntent ? 'qr' : 'ocr');
   const [localPhotoUri, setLocalPhotoUri] = useState<string | null>(null);
@@ -705,7 +707,7 @@ export default function AdminScannerScreen() {
 
   if (step === 'choose') {
     return (
-      <ThemedView style={styles.container} type="surfaceSunken">
+      <ThemedView style={[styles.container, styles.webFill]} type="surfaceSunken">
         <ScreenHeader showBack title={t('loans.scanner.choiceTitle')} />
         <ScrollView contentContainerStyle={styles.choiceBody} keyboardShouldPersistTaps="handled">
           <GlassSurface androidBlur intensity="strong" style={styles.choiceGlass}>
@@ -752,7 +754,89 @@ export default function AdminScannerScreen() {
       ? webLivePreview && permission?.granted === true && !cameraMountError
       : Boolean(cameraAvailable) && !cameraMountError;
 
-    if (!isWeb && !permission) {
+    if (isWeb) {
+      return (
+        <ThemedView style={[styles.container, styles.webFill]} type="surfaceSunken">
+          <ScreenHeader showBack title={cameraTitle} onBack={() => setStep('choose')} />
+          <ScrollView contentContainerStyle={styles.choiceBody} keyboardShouldPersistTaps="handled">
+            <GlassSurface androidBlur intensity="strong" style={styles.choiceGlass}>
+              <ThemedText type="bodyLarge">{cameraTitle}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {previewHint}
+              </ThemedText>
+              <FormNotice error={formError} notice={formNotice} />
+              {showLivePreview ? (
+                <View style={styles.cameraWeb}>
+                  <CameraView
+                    ref={cameraRef}
+                    style={styles.cameraWebView}
+                    facing="front"
+                    barcodeScannerSettings={
+                      cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
+                    }
+                    onBarcodeScanned={cameraMode === 'qr' ? onQrScanned : undefined}
+                    onMountError={() => {
+                      setWebLivePreview(false);
+                      setCameraMountError(t('loans.scanner.cameraMountFailed'));
+                    }}
+                  />
+                </View>
+              ) : null}
+              {!showLivePreview ? (
+                <Button
+                  testID="scanner-enable-camera"
+                  label={t('loans.scanner.enableLiveCamera')}
+                  onPress={() => void enableWebLiveCamera()}
+                />
+              ) : (
+                <Button
+                  testID="scanner-capture"
+                  label={
+                    cameraMode === 'qr'
+                      ? t('loans.scanner.scanReceiptQr')
+                      : t('loans.scanner.captureExtract')
+                  }
+                  loading={isBusy}
+                  requiresNetwork
+                  onPress={() => void captureAndProcess()}
+                />
+              )}
+              <Button
+                testID="scanner-gallery"
+                label={t('loans.scanner.pickFromGallery')}
+                variant="secondary"
+                loading={isBusy}
+                requiresNetwork
+                onPress={() => void pickGalleryAndProcess()}
+              />
+              <Button
+                testID="scanner-phone-camera"
+                label={t('loans.scanner.usePhoneCamera')}
+                variant="secondary"
+                loading={isBusy}
+                requiresNetwork
+                onPress={() => void pickPhoneCamera()}
+              />
+              {cameraMode === 'ocr' ? (
+                <Button
+                  testID="scanner-enter-manual"
+                  label={t('loans.scanner.enterManually')}
+                  variant="secondary"
+                  onPress={startManual}
+                />
+              ) : null}
+              <Button
+                label={t('common.cancel')}
+                variant="secondary"
+                onPress={() => setStep('choose')}
+              />
+            </GlassSurface>
+          </ScrollView>
+        </ThemedView>
+      );
+    }
+
+    if (!permission) {
       return (
         <ThemedView style={styles.container} type="surfaceSunken">
           <ScreenHeader showBack title={cameraTitle} />
@@ -761,7 +845,7 @@ export default function AdminScannerScreen() {
       );
     }
 
-    if (!isWeb && permission && !permission.granted) {
+    if (permission && !permission.granted) {
       return (
         <ThemedView style={styles.container} type="surfaceSunken">
           <ScreenHeader
@@ -798,8 +882,8 @@ export default function AdminScannerScreen() {
     const liveCamera = (
       <CameraView
         ref={cameraRef}
-        style={isWeb ? styles.cameraWebView : styles.camera}
-        facing={isWeb ? 'front' : 'back'}
+        style={styles.camera}
+        facing="back"
         barcodeScannerSettings={
           cameraMode === 'qr' ? { barcodeTypes: ['qr'] } : undefined
         }
@@ -833,16 +917,10 @@ export default function AdminScannerScreen() {
           title={cameraTitle}
           onBack={() => setStep('choose')}
         />
-        <View style={[styles.cameraStage, isWeb ? styles.cameraStageWeb : null]}>
-          {isWeb ? (
-            <View style={[styles.camera, styles.cameraWeb]}>
-              {showLivePreview ? liveCamera : cameraFallback}
-            </View>
-          ) : (
+        <View style={styles.cameraStage}>
           <BlurTargetView ref={cameraBlurTargetRef} style={styles.camera}>
             {showLivePreview ? liveCamera : cameraFallback}
           </BlurTargetView>
-          )}
           {showLivePreview ? (
             <View pointerEvents="none" style={styles.viewfinder}>
               <View style={[styles.viewfinderFrame, { borderColor: colors.onChrome }]} />
@@ -853,21 +931,14 @@ export default function AdminScannerScreen() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.cameraDockScroll}>
             <GlassSurface
-              androidBlur={!isWeb}
-              blurTarget={isWeb ? undefined : cameraBlurTargetRef}
+              androidBlur
+              blurTarget={cameraBlurTargetRef}
               intensity="strong"
               style={styles.cameraDock}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.dockHint}>
                 {previewHint}
               </ThemedText>
               <FormNotice error={formError} notice={formNotice} />
-              {isWeb && !showLivePreview ? (
-                <Button
-                  testID="scanner-enable-camera"
-                  label={t('loans.scanner.enableLiveCamera')}
-                  onPress={() => void enableWebLiveCamera()}
-                />
-              ) : null}
               {showLivePreview ? (
                 <Button
                   testID="scanner-capture"
@@ -884,7 +955,7 @@ export default function AdminScannerScreen() {
               <Button
                 testID="scanner-phone-camera"
                 label={t('loans.scanner.usePhoneCamera')}
-                variant={showLivePreview ? 'secondary' : isWeb ? 'secondary' : 'primary'}
+                variant={showLivePreview ? 'secondary' : 'primary'}
                 loading={isBusy}
                 requiresNetwork
                 onPress={() => void pickPhoneCamera()}
@@ -1127,6 +1198,9 @@ export default function AdminScannerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  webFill: {
+    ...(Platform.OS === 'web' ? { minHeight: '100%' as const } : {}),
+  },
   choiceBody: {
     flexGrow: 1,
     justifyContent: 'center',

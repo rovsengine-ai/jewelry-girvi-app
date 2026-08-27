@@ -6,7 +6,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, SectionList, StyleSheet, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 
 import { AdminLoanRow } from '@/components/admin-loan-row';
 import { AppIcon, TintedIconWell } from '@/components/app-icon';
@@ -27,7 +27,7 @@ import { useTabBarScrollPadding } from '@/hooks/use-tab-bar-scroll-padding';
 import { useTheme } from '@/hooks/use-theme';
 import { unknownMessage } from '@/i18n';
 import { loanStatusLabel, parseOwnerOnlyError } from '@/lib/redemption';
-import { isShopOwner } from '@/lib/shop-tab-access';
+import { ADMIN_SCANNER_HREF, isShopOwner } from '@/lib/shop-tab-access';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useLanguage } from '@/providers/language-provider';
@@ -156,7 +156,7 @@ export default function AdminLoansScreen() {
 
   const canAddGirvi = isOwner || !loansConcealed;
   const listBottom = tabBarPadding + Sizes.fab + Spacing.four;
-  const openAddGirvi = () => router.push('/(admin)/scanner');
+  const openAddGirvi = () => router.push(ADMIN_SCANNER_HREF);
 
   return (
     <ThemedView style={styles.container} type="surfaceSunken">
@@ -170,7 +170,9 @@ export default function AdminLoansScreen() {
                 testID="loans-scan-qr"
                 accessibilityRole="button"
                 accessibilityLabel={t('a11y.scanReceiptQr')}
-                onPress={() => router.push('/(admin)/scanner?intent=qr')}
+                onPress={() =>
+                  router.push('/(admin)/shop/scanner?intent=qr' as Href)
+                }
                 style={styles.headerAdd}>
                 <TintedIconWell tint={colors.tintPrimary}>
                   <AppIcon ios="qrcode.viewfinder" android="qr_code_scanner" color={colors.primary} />

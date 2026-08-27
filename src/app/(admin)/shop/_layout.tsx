@@ -1,10 +1,23 @@
 /**
  * Path prefix so shop tabs are /shop/loans (not /loans).
- * Customer tabs stay at /loans — groups omit from the URL, so both cannot
- * share the same file name at the root.
+ * Scanner is a stack sibling of the tabs so plus/scan can push /shop/scanner
+ * instead of leaving the shop navigator (blank page on web).
+ * https://docs.expo.dev/router/advanced/nesting-navigators/
  */
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
+
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { stackMotionOptions } from '@/lib/motion';
 
 export default function ShopPathLayout() {
-  return <Slot />;
+  const reduceMotion = useReduceMotion();
+  const pushMotion = stackMotionOptions(reduceMotion);
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="scanner" options={pushMotion} />
+    </Stack>
+  );
 }
